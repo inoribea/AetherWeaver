@@ -10,8 +10,8 @@ import { JsonOutputKeyToolsParser } from "@langchain/core/output_parsers/openai_
 
 const Weather = z
   .object({
-    city: z.string().describe("City to search for weather"),
-    state: z.string().describe("State abbreviation to search for weather"),
+    city: z.string().describe("City to search for weather").nonempty(),
+    state: z.string().describe("State abbreviation to search for weather").nonempty(),
   })
   .describe("Weather search parameters");
 
