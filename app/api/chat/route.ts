@@ -96,13 +96,14 @@ const MODEL_PROVIDERS: Record<string, {
     // 可以添加更多能力，例如: code_generation?: boolean; long_context?: boolean;
   };
 }> = {
-  // --- Custom Models (OpenAI Compatible via Neko/O3) ---
+  // --- Base Models (OpenAI) ---
   'gpt4.1': {
     type: 'openai_compatible',
     model: ChatOpenAI,
-    config: { apiKey: process.env.NEKO_API_KEY, baseURL: process.env.NEKO_BASE_URL },
+    config: { apiKey: process.env.OPENAI_API_KEY, baseURL: process.env.OPENAI_BASE_URL },
     capabilities: { vision: true, reasoning: true, tool_calling: true },
   },
+  // --- Custom Models (OpenAI Compatible via Neko/O3) ---
   'gpt-4o-all': {
     type: 'openai_compatible',
     model: ChatOpenAI,
