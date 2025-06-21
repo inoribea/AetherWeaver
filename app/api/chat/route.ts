@@ -10,7 +10,7 @@ import {
   SystemMessage,
   AIMessageChunk,
   BaseMessage,
-  BaseMessageContent 
+  MessageContent 
 } from '@langchain/core/messages';
 import { ChatPromptTemplate, MessagesPlaceholder } from '@langchain/core/prompts';
 import { StringOutputParser } from '@langchain/core/output_parsers';
@@ -36,24 +36,26 @@ import { AgentStep } from "@langchain/core/agents"; // 导入 AgentStep
 
 // Helper function to format messages from Vercel AI SDK to LangChain format
 // 支持多模态内容（特别是图像 URL）
+
+interface ContentPart {
+  type: string;
+  text?: string;
+  image_url?: { url: any };
+}
+
 function formatMessage(message: VercelChatMessage): BaseMessage {
   if (message.role === 'user') {
-    // 检查 message.content 是否为数组 (Vercel AI SDK 的多模态消息格式)
     if (Array.isArray(message.content)) {
-      const contentParts: BaseMessageContent[] = message.content.map(part => {
+      const contentParts: ContentPart[] = message.content.map(part => {
         if (part.type === 'text') {
           return { type: 'text', text: part.text };
         } else if (part.type === 'image_url') {
-          // 确保 image_url.url 是一个字符串
           return { type: 'image_url', image_url: { url: part.image_url.url } };
         }
-        // 如果有其他多模态类型（如音频、视频等），也需要在此处添加处理逻辑
-        // Fallback for unknown part types or if content is directly text within an array
         return { type: 'text', text: (part as any).text || String(part) };
       });
-      return new HumanMessage({ content: contentParts });
+      return new HumanMessage({ content: contentParts as MessageContent });
     }
-    // 如果 content 是字符串，则直接创建 HumanMessage
     return new HumanMessage(message.content as string);
   } else if (message.role === 'assistant') {
     return new AIMessage(message.content as string);
@@ -61,7 +63,6 @@ function formatMessage(message: VercelChatMessage): BaseMessage {
     return new SystemMessage(message.content as string);
   }
 }
-
 import { ChatPromptValueInterface } from "@langchain/core/prompt_values";
 
 // 这个 RunnableLambda 的作用是将 LangChain 消息数组转换为单个字符串
@@ -269,11 +270,19 @@ const tools: Tool[] = [
 
 // Helper function to check if messages contain image content
 function containsImage(messages: BaseMessage[]): boolean {
-  return messages.some(msg =>
-    msg._getType() === 'human' &&
-    Array.isArray(msg.content) &&
-    msg.content.some((part: BaseMessageContent) => part.type === 'image_url')
-  );
+  for (const msg of messages) {
+    if (msg._getType() === 'human' && Array.isArray(msg.content)) {
+      for (const part of msg.content) {
+        if (typeof part === 'string') {
+          continue; // Strings cannot be image URLs
+        }
+        if (part.type === 'image_url') {
+          return true; // Found an image URL
+        }
+      }
+    }
+  }
+  return false; // No image URLs found
 }
 
 // *** 核心逻辑：自动判断并返回合适的 LLM 实例和 LangChain Chain ***
@@ -301,7 +310,7 @@ async function determineModelAndChain(
       }) as BaseChatModel<BaseChatModelCallOptions, AIMessageChunk>; // 视觉模型通常是 ChatModel
 
       // 对于视觉模型，直接将所有消息（包括图像）传递给模型
-      // ChatPromptTemplate.fromMessages 可以处理包含 BaseMessageContent 数组的消息
+      // ChatPromptTemplate.fromMessages 可以处理包含 MessageContent 数组的消息
       const prompt = ChatPromptTemplate.fromMessages(formattedMessages);
       const chain = prompt.pipe(llmInstance).pipe(new StringOutputParser());
       return { llmInstance, chain };
