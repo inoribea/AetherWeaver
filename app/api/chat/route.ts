@@ -4,10 +4,12 @@ import { NextRequest } from 'next/server';
 import { Message as VercelChatMessage, StreamingTextResponse } from 'ai';
 
 // Core LangChain imports
-import { AIMessage, HumanMessage, SystemMessage } from '@langchain/core/messages';
+import { AIMessage, HumanMessage, SystemMessage, AIMessageChunk, BaseMessage } from '@langchain/core/messages';
 import { ChatPromptTemplate } from '@langchain/core/prompts';
 import { StringOutputParser } from '@langchain/core/output_parsers';
-import { BaseChatModel } from '@langchain/core/language_models/chat_models'; // To type hint llmInstance
+import { BaseChatModel, BaseChatModelCallOptions } from '@langchain/core/language_models/chat_models'; // To type hint llmInstance
+import { BaseLLM, BaseLLMCallOptions } from '@langchain/core/language_models/llms';
+import { Runnable, RunnableLambda } from '@langchain/core/runnables';
 
 // LangChain Integration Imports
 import { ChatOpenAI } from '@langchain/openai';
@@ -32,10 +34,19 @@ function formatMessage(message: VercelChatMessage) {
   }
 }
 
+import { ChatPromptValueInterface } from "@langchain/core/prompt_values";
+
+const messagesToText = new RunnableLambda({
+  func: (input: ChatPromptValueInterface) => {
+    const messages = input.messages;
+    return messages.map((m: BaseMessage) => `${m._getType()}: ${m.content}`).join("\n");
+  },
+});
+
 // Define a map for model configurations
 const MODEL_PROVIDERS: Record<string, {
   type: string;
-  model: new (...args: any[]) => BaseChatModel; // Type hint for the model class constructor
+  model: new (...args: any[]) => BaseChatModel<any, any> | BaseLLM; // Type hint for the model class constructor
   config: Record<string, any>;
 }> = {
   // --- Custom Models (OpenAI Compatible) ---
@@ -123,26 +134,25 @@ const MODEL_PROVIDERS: Record<string, {
   },
 
   // --- Cloudflare Workers AI Models ---
-  // 'cloudflare-llama-3-8b-instruct': {
-  //   type: 'cloudflare',
-  //   model: CloudflareWorkersAI,
-  //   config: {
-  //     cloudflareAccountId: process.env.CLOUDFLARE_ACCOUNT_ID,
-  //     cloudflareApiToken: process.env.CLOUDFLARE_API_TOKEN,
-  //     model: '@cf/meta/llama-3-8b-instruct',
-  //     temperature: 0.7,
-  //   },
-  // },
-  // 'cloudflare-gemma-7b-it': {
-  //   type: 'cloudflare',
-  //   model: CloudflareWorkersAI,
-  //   config: {
-  //     cloudflareAccountId: process.env.CLOUDFLARE_ACCOUNT_ID,
-  //     cloudflareApiToken: process.env.CLOUDFLARE_API_TOKEN,
-  //     model: '@cf/google/gemma-7b-it',
-  //     temperature: 0.7,
-  //   },
-  // },
+  'cloudflare-llama-3-8b-instruct': {
+    type: 'cloudflare',
+    model: CloudflareWorkersAI,
+    config: {
+      cloudflareAccountId: process.env.CLOUDFLARE_ACCOUNT_ID,
+      cloudflareApiToken: process.env.CLOUDFLARE_API_TOKEN,
+      model: '@cf/meta/llama-3-8b-instruct',
+      temperature: 0.7,   },
+ },
+  'cloudflare-gemma-7b-it': {
+    type: 'cloudflare',
+    model: CloudflareWorkersAI,
+    config: {
+      cloudflareAccountId: process.env.CLOUDFLARE_ACCOUNT_ID,
+      cloudflareApiToken: process.env.CLOUDFLARE_API_TOKEN,
+      model: '@cf/google/gemma-7b-it',
+      temperature: 0.7,
+    },
+   },
   // --- Tencent Hunyuan Models ---
   'tencent-hunyuan-lite': {
     type: 'tencent_hunyuan',
@@ -212,7 +222,7 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  let llmInstance: BaseChatModel; // Declare llmInstance with BaseChatModel type
+  let llmInstance: BaseChatModel<BaseChatModelCallOptions, AIMessageChunk> | BaseLLM<BaseLLMCallOptions>;
   try {
     switch (providerEntry.type) {
       case 'openai_compatible':
@@ -248,12 +258,10 @@ export async function POST(req: NextRequest) {
         llmInstance = new providerEntry.model({
           temperature: 0.7,
           streaming: true,
-          // Cloudflare Workers AI expects cloudflareAccountId and cloudflareApiToken
-          // It's generally better to get these directly from process.env for security
           cloudflareAccountId: process.env.CLOUDFLARE_ACCOUNT_ID,
           cloudflareApiToken: process.env.CLOUDFLARE_API_TOKEN,
           model: providerEntry.config.model || modelName,
-        });
+        }) as BaseLLM<BaseLLMCallOptions>;
         break;
       case 'tencent_hunyuan':
         llmInstance = new providerEntry.model({
@@ -272,12 +280,9 @@ export async function POST(req: NextRequest) {
         llmInstance = new providerEntry.model({
           temperature: 0.7,
           streaming: true,
-          // ChatGoogleGenerativeAI uses apiKey
-          apiKey: providerEntry.config.apiKey,
+          ...providerEntry.config,
           model: providerEntry.config.model || modelName,
-          // Optional: baseUrl (default to undefined if not provided)
-          baseUrl: providerEntry.config.baseUrl,
-        });
+        }) as BaseChatModel<BaseChatModelCallOptions, AIMessageChunk>;
         break;
       default:
         return new Response(JSON.stringify({ error: `Unknown provider type for model ${modelName}.` }), {
@@ -301,6 +306,14 @@ export async function POST(req: NextRequest) {
     });
   }
 
+  // ... (Your existing code before this section)
+  // Ensure llmInstance has invoke or stream methods
+  if (!llmInstance || (typeof (llmInstance as any).invoke !== 'function' && typeof (llmInstance as any).stream !== 'function')) {
+    return new Response(JSON.stringify({ error: `Invalid LLM instance for model ${modelName}. It does not have invoke or stream methods.` }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
   // Create your LangChain Chain (LCEL)
   // Define the prompt template based on history and current message
   const prompt = ChatPromptTemplate.fromMessages([
@@ -308,23 +321,26 @@ export async function POST(req: NextRequest) {
     // If you have a system message in your Vercel AI SDK messages,
     // ensure it's at the beginning of `historyMessages`.
     // Example: new SystemMessage("You are a helpful AI assistant."),
-
     // Pass previous messages for context. These are already formatted by `formatMessage`.
     ...historyMessages,
-
     // The current user input is always the last message and will be mapped to the 'input' variable
     // for the final human message in the prompt.
-    new HumanMessage({
-      content: currentMessage.content, // This ensures the current user message is always last
-    }),
+    currentMessage, // This is already a HumanMessage, no need to wrap again.
   ]);
-
-  // Define the LangChain chain
-  const chain = prompt.pipe(llmInstance).pipe(new StringOutputParser());
-
-  // Stream the response
-  const stream = await chain.stream({});
-
-  // Return the stream as a StreamingTextResponse
+  let chain: Runnable<any, string>; // Changed to Runnable to be more general
+  if (llmInstance instanceof BaseChatModel) {
+    chain = prompt.pipe(llmInstance).pipe(new StringOutputParser());
+  } else if (llmInstance instanceof BaseLLM) {
+    chain = prompt.pipe(messagesToText).pipe(llmInstance).pipe(new StringOutputParser());
+  } else {
+    return new Response(JSON.stringify({ error: `Unsupported LLM instance type for model ${modelName}.` }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+  // Define the streaming process
+  const stream = await chain.stream({
+  });
+  // Return the streaming response
   return new StreamingTextResponse(stream);
-}
+} 
