@@ -375,48 +375,42 @@ async function determineModelAndChain(
   // ]);
 
 
-  // createReactAgent 返回一个 Runnable，兼容 AgentExecutor 的 agent 参数
-  const agent = createReactAgent({
-    llm: agentLLMInstance,
-    tools,
-    prompt: agentPrompt,
+  const memory = new BufferMemory({
+    memoryKey: "chat_history",
+    returnMessages: true,
   });
 
-  const agentExecutor = AgentExecutor.fromAgentAndTools({
-    agent: agent, // 传入创建好的 Agent Runnable
-    tools: tools, // 传入可用的工具列表
-    verbose: true, // 开启 Agent 的详细日志，方便调试其思考过程
+  const agentExecutor = await initializeAgentExecutorWithOptions(tools, agentLLMInstance, {
+    agentType: "openai-functions",
+    memory,
+    returnIntermediateSteps: true,
+    agentArgs: {
+      prefix: `Do your best to answer the questions.  Feel free to use any tools available to look up relevant information, only if necessary.`,
+    },
   });
 
-  // Agent Chain: 适配 LangChain Agent 的输入输出
   const agentChain = RunnableSequence.from([
     {
-      // 提取当前用户输入
       input: (i: { messages: BaseMessage[] }) => {
         const lastMessage = i.messages[i.messages.length - 1];
-        // Agent 通常期望纯文本输入作为 'input'
-        if (lastMessage._getType() === 'human') {
+        if (lastMessage._getType() === "human") {
           if (Array.isArray(lastMessage.content)) {
-            // 从多模态内容中提取文本部分作为 Agent 的 input
-            const textPart = lastMessage.content.find(part => part.type === 'text') as { text: string };
-            return textPart ? textPart.text : "";
+            const textPart = lastMessage.content.find((part) => part.type === "text") as { text: string };
+          return textPart ? textPart.text : "";
           }
           return lastMessage.content as string;
         }
-        return ""; // Fallback
+        return "";
       },
-      // 将历史消息（除了最新一条）作为 chat_history 传递给 Agent
       chat_history: (i: { messages: BaseMessage[] }) => i.messages.slice(0, -1),
-      // `tools` 字段在 `AgentExecutor` 中已经定义，这里不需要再显式传递
     },
-    agentExecutor, // 执行 Agent
-    new StringOutputParser(), // 将 Agent 的最终输出转换为字符串
+    agentExecutor,
+    new StringOutputParser(),
   ]);
 
   console.log("[自动判断] 将使用 Agent Chain 处理请求。");
   return { llmInstance: agentLLMInstance, chain: agentChain };
 }
-
 export async function POST(req: NextRequest) {
   const body = await req.json();
   const messages = body.messages ?? [];
