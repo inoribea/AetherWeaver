@@ -123,26 +123,26 @@ const MODEL_PROVIDERS: Record<string, {
   },
 
   // --- Cloudflare Workers AI Models ---
-  'cloudflare-llama-3-8b-instruct': {
-    type: 'cloudflare',
-    model: CloudflareWorkersAI,
-    config: {
-      cloudflareAccountId: process.env.CLOUDFLARE_ACCOUNT_ID,
-      cloudflareApiToken: process.env.CLOUDFLARE_API_TOKEN,
-      model: '@cf/meta/llama-3-8b-instruct',
-      temperature: 0.7,
-    },
-  },
-  'cloudflare-gemma-7b-it': {
-    type: 'cloudflare',
-    model: CloudflareWorkersAI,
-    config: {
-      cloudflareAccountId: process.env.CLOUDFLARE_ACCOUNT_ID,
-      cloudflareApiToken: process.env.CLOUDFLARE_API_TOKEN,
-      model: '@cf/google/gemma-7b-it',
-      temperature: 0.7,
-    },
-  },
+  // 'cloudflare-llama-3-8b-instruct': {
+  //   type: 'cloudflare',
+  //   model: CloudflareWorkersAI,
+  //   config: {
+  //     cloudflareAccountId: process.env.CLOUDFLARE_ACCOUNT_ID,
+  //     cloudflareApiToken: process.env.CLOUDFLARE_API_TOKEN,
+  //     model: '@cf/meta/llama-3-8b-instruct',
+  //     temperature: 0.7,
+  //   },
+  // },
+  // 'cloudflare-gemma-7b-it': {
+  //   type: 'cloudflare',
+  //   model: CloudflareWorkersAI,
+  //   config: {
+  //     cloudflareAccountId: process.env.CLOUDFLARE_ACCOUNT_ID,
+  //     cloudflareApiToken: process.env.CLOUDFLARE_API_TOKEN,
+  //     model: '@cf/google/gemma-7b-it',
+  //     temperature: 0.7,
+  //   },
+  // },
   // --- Tencent Hunyuan Models ---
   'tencent-hunyuan-lite': {
     type: 'tencent_hunyuan',
@@ -285,7 +285,7 @@ export async function POST(req: NextRequest) {
           headers: { 'Content-Type': 'application/json' },
         });
     }
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error initializing LLM instance:", error);
     return new Response(JSON.stringify({ error: `Failed to initialize LLM for model ${modelName}. Check environment variables and configuration.`, details: (error as Error).message }), {
       status: 500,
@@ -327,14 +327,4 @@ export async function POST(req: NextRequest) {
 
   // Return the stream as a StreamingTextResponse
   return new StreamingTextResponse(stream);
-}  (error) {
-  console.error('[API/CHAT]', error); // Log the actual error object with context
-  // Return an error response
-  return new NextResponse(JSON.stringify({ error: (error as Error).message || 'An unknown error occurred during chat processing.' }), {
-    status: 500,
-    headers: {
-      'Content-Type': 'application/json',
-    },
-  });
 }
-} // This curly brace closes the POST function.
