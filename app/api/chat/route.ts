@@ -36,7 +36,7 @@ import { AgentStep } from "@langchain/core/agents"; // 导入 AgentStep
 
 // Helper function to format messages from Vercel AI SDK to LangChain format
 // 支持多模态内容（特别是图像 URL）
-export interface ContentPart { 
+interface ContentPart { 
   type?: string;
   text?: string;
   image_url?: { url: any };
