@@ -29,9 +29,10 @@ import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
 // --- Imports for Tools and Agents ---
 import { Tool } from "@langchain/core/tools";
 import { TavilySearchResults } from "@langchain/community/tools/tavily_search"; // For "联网"功能
-import { AgentExecutor, createReactAgent } from "langchain/agents"; // For Agent功能
+import { initializeAgentExecutorWithOptions } from "langchain/agents";
 import { pull } from "langchain/hub"; // For pulling agent prompts from LangChain Hub
 import { AgentStep } from "@langchain/core/agents"; // 导入 AgentStep
+import { BufferMemory } from "langchain/memory";
 
 
 // Helper function to format messages from Vercel AI SDK to LangChain format
@@ -475,4 +476,3 @@ export async function POST(req: NextRequest) {
   // 5. 返回流式响应
   return new StreamingTextResponse(stream);
 }
-
