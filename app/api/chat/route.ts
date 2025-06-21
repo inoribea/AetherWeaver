@@ -50,7 +50,7 @@ const MODEL_PROVIDERS: Record<string, {
   config: Record<string, any>;
 }> = {
   // --- Custom Models (OpenAI Compatible) ---
-  'custom-provider-a-model': {
+  'gpt4.1': {
     type: 'openai_compatible', // Custom type
     model: ChatOpenAI, // Use ChatOpenAI class
     config: {
@@ -58,7 +58,39 @@ const MODEL_PROVIDERS: Record<string, {
       baseURL: process.env.NEKO_BASE_URL,
     },
   },
-  'custom-provider-b-model': {
+  'gpt-4o-all': {
+    type: 'openai_compatible', // Custom type
+    model: ChatOpenAI, // Use ChatOpenAI class
+    config: {
+      apiKey: process.env.NEKO_API_KEY,
+      baseURL: process.env.NEKO_BASE_URL,
+    },
+  },
+  'o4-mini': {
+    type: 'openai_compatible', // Custom type
+    model: ChatOpenAI, // Use ChatOpenAI class
+    config: {
+      apiKey: process.env.NEKO_API_KEY,
+      baseURL: process.env.NEKO_BASE_URL,
+    },
+  },
+  'claude-sonnet-4-all': {
+    type: 'openai_compatible', // Custom type
+    model: ChatOpenAI, // Use ChatOpenAI class
+    config: {
+      apiKey: process.env.NEKO_API_KEY,
+      baseURL: process.env.NEKO_BASE_URL,
+    },
+  },
+  'deepseek-ai/DeepSeek-V3-search': {
+    type: 'openai_compatible',
+    model: ChatOpenAI,
+    config: {
+      apiKey: process.env.O3_API_KEY,
+      baseURL: process.env.O3_BASE_URL,
+    },
+  },
+  'deepseek-ai/DeepSeek-R1-search': {
     type: 'openai_compatible',
     model: ChatOpenAI,
     config: {
@@ -67,7 +99,20 @@ const MODEL_PROVIDERS: Record<string, {
     },
   },
   // --- OpenRouter Models (OpenAI Compatible) ---
-  'openrouter-gpt-4o': { // Model name sent by LobeChat
+  'rekaai/reka-flash-3:free': { // Model name sent by LobeChat
+    type: 'openai_compatible',
+    model: ChatOpenAI,
+    config: {
+      apiKey: process.env.OPENROUTER_API_KEY,
+      baseURL: process.env.OPENROUTER_BASE_URL,
+      // Replace with your Vercel app URL for HTTP-Referer
+      extraHeaders: {
+        "HTTP-Referer": process.env.VERCEL_APP_URL, 
+        "X-Title": process.env.APP_TITLE, 
+      },
+    },
+  },
+  'mistralai/devstral-small:free': { // Model name sent by LobeChat
     type: 'openai_compatible',
     model: ChatOpenAI,
     config: {
@@ -81,18 +126,6 @@ const MODEL_PROVIDERS: Record<string, {
     },
   },
   // You can continue to add other OpenRouter supported models
-  'openrouter-gemini-pro': {
-    type: 'openai_compatible',
-    model: ChatOpenAI,
-    config: {
-      apiKey: process.env.OPENROUTER_API_KEY,
-      baseURL: process.env.OPENROUTER_BASE_URL,
-      extraHeaders: {
-        "HTTP-Referer": process.env.VERCEL_APP_URL, 
-        "X-Title": process.env.APP_TITLE, 
-      },
-    },
-  },
 
   // --- DeepSeek Models ---
   'deepseek-chat': { // DeepSeek's primary model name
@@ -118,18 +151,18 @@ const MODEL_PROVIDERS: Record<string, {
     model: ChatAlibabaTongyi, // Use ChatAlibabaTongyi class
     config: {
       apiKey: process.env.DASHSCOPE_API_KEY, // DashScope's API Key variable name (for Aliyun Tongyi)
-      model: 'qwen-turbo',
+      model: 'qwen-turbo-latest',
       // If you need to use DashScope's OpenAI compatible interface, configure as follows:
       // baseURL: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
       // model: 'qwen-plus', // Or other models supporting compatible mode
     },
   },
-  'qwen-plus': {
+  'qvq-plus': {
     type: 'alibaba_tongyi',
     model: ChatAlibabaTongyi,
     config: {
       apiKey: process.env.DASHSCOPE_API_KEY,
-      model: 'qwen-plus',
+      model: 'qvq-plus',
     },
   },
 
@@ -154,26 +187,26 @@ const MODEL_PROVIDERS: Record<string, {
     },
    },
   // --- Tencent Hunyuan Models ---
-  'tencent-hunyuan-lite': {
+  'tencent-hunyuan-t1': {
     type: 'tencent_hunyuan',
     model: ChatTencentHunyuan,
     config: {
       secretId: process.env.TENCENT_HUNYUAN_SECRET_ID,
       secretKey: process.env.TENCENT_HUNYUAN_SECRET_KEY,
-      model: 'hunyuan-lite',
+      model: 'hunyuan-t1-latest',
       temperature: 0.7,
       // Optional: Specify region or endpoint if needed
       // region: process.env.TENCENT_HUNYUAN_REGION,
       // endpoint: process.env.TENCENT_HUNYUAN_ENDPOINT,
     },
   },
-  'tencent-hunyuan-pro': {
+  'tencent-hunyuan-turbo': {
     type: 'tencent_hunyuan',
     model: ChatTencentHunyuan,
     config: {
       secretId: process.env.TENCENT_HUNYUAN_SECRET_ID,
       secretKey: process.env.TENCENT_HUNYUAN_SECRET_KEY,
-      model: 'hunyuan-pro',
+      model: 'hunyuan-turbos-latest',
       temperature: 0.7,
     },
   },
@@ -185,17 +218,17 @@ const MODEL_PROVIDERS: Record<string, {
     model: ChatGoogleGenerativeAI,
     config: {
       apiKey: process.env.GOOGLE_API_KEY,
-      model: 'gemini-pro',
+      model: 'gemini-2.5-pro-preview-05-06',
       // Optional: Set a specific base URL if needed
       // baseUrl: process.env.GOOGLE_BASE_URL,
     },
   },
-  'gemini-pro-vision': {
+  'gemini-flash': {
     type: 'google_gemini',
     model: ChatGoogleGenerativeAI,
     config: {
       apiKey: process.env.GOOGLE_API_KEY,
-      model: 'gemini-pro-vision',
+      model: 'gemini-2.5-flash-preview-05-20',
     },
   },
 };
