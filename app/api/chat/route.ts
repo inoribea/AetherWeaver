@@ -428,10 +428,16 @@ export async function POST(req: NextRequest) {
     finalChain = chain;
   } catch (error: any) {
     console.error("自动模型判断或构建链失败:", error);
-    return new Response(JSON.stringify({ error: `自动模型选择或构建链失败: ${error.message}` }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return new Response(
+      JSON.stringify({
+        error: `自动模型选择或构建链失败: ${error.message}`,
+        stack: error.stack,
+      }),
+      {
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+      }
+    );
   }
 
   // 3. 确保获取到的 LLM 实例有效
@@ -450,10 +456,16 @@ export async function POST(req: NextRequest) {
         });
       } catch (invokeError: any) {
         console.error("Invoke failed:", invokeError);
-        return new Response(JSON.stringify({ error: `Invoke 模式执行失败: ${invokeError.message}` }), {
-          status: 500,
-          headers: { 'Content-Type': 'application/json' },
-        });
+        return new Response(
+          JSON.stringify({
+            error: `Invoke 模式执行失败: ${invokeError.message}`,
+            stack: invokeError.stack,
+          }),
+          {
+            status: 500,
+            headers: { "Content-Type": "application/json" },
+          }
+        );
       }
     }
     return new Response(JSON.stringify({ error: `无效的 LLM 实例，它既没有 stream 也没有 invoke 方法。` }), {
