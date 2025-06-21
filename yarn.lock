@@ -226,6 +226,11 @@
   resolved "https://registry.npmmirror.com/@floating-ui/utils/-/utils-0.2.9.tgz"
   integrity sha512-MDWhGtE+eHw5JW7lq4qhc5yRLS11ERl1c7Z6Xd0a58DozHES6EnNNwUWbMiG4J9Cgj053Bhk8zvlhFYKVhULwg==
 
+"@google/generative-ai@^0.24.0":
+  version "0.24.1"
+  resolved "https://registry.npmmirror.com/@google/generative-ai/-/generative-ai-0.24.1.tgz"
+  integrity sha512-MqO+MLfM6kjxcKoy0p1wRzG3b4ZZXtPI+z2IE26UogS2Cm/XHO+7gGRBh6gcJsOiIVoH93UwKvW4HdgiOZCy9Q==
+
 "@graphql-typed-document-node/core@^3.2.0":
   version "3.2.0"
   resolved "https://registry.npmmirror.com/@graphql-typed-document-node/core/-/core-3.2.0.tgz"
@@ -449,6 +454,14 @@
   resolved "https://registry.npmmirror.com/@js-sdsl/ordered-map/-/ordered-map-4.4.2.tgz"
   integrity sha512-iUKgm52T8HOE/makSxjqoWhe95ZJA1/G1sYsGev2JDKUSS14KAgg1LHb+Ba+IPow0xflbnSkOsZcO08C7w1gYw==
 
+"@langchain/cloudflare@^0.1.0":
+  version "0.1.0"
+  resolved "https://registry.npmmirror.com/@langchain/cloudflare/-/cloudflare-0.1.0.tgz"
+  integrity sha512-qCbYZkH9Faumcn8djd8UZThO8HHj10uoBJwOb3ucyM0tI3E42jbYlBjkMJpTMzc4qpzxF/86fJSqTaH+ii2hrw==
+  dependencies:
+    "@langchain/core" ">=0.2.21 <0.4.0"
+    uuid "^10.0.0"
+
 "@langchain/community@^0.3.47":
   version "0.3.47"
   resolved "https://registry.npmmirror.com/@langchain/community/-/community-0.3.47.tgz"
@@ -483,6 +496,21 @@
     zod "^3.25.32"
     zod-to-json-schema "^3.22.3"
 
+"@langchain/deepseek@*", "@langchain/deepseek@^0.0.2":
+  version "0.0.2"
+  resolved "https://registry.npmmirror.com/@langchain/deepseek/-/deepseek-0.0.2.tgz"
+  integrity sha512-u13KbPUXW7uhcybbRzYdRroBgqVUSgG0SJM15c7Etld2yjRQC2c4O/ga9eQZdLh/kaDlQfH/ZITFdjHe77RnGw==
+  dependencies:
+    "@langchain/openai" "^0.5.5"
+
+"@langchain/google-genai@*", "@langchain/google-genai@^0.2.13":
+  version "0.2.13"
+  resolved "https://registry.npmmirror.com/@langchain/google-genai/-/google-genai-0.2.13.tgz"
+  integrity sha512-ReZe4oNUhPNEijYo9CGA3/CJUwVPaaoYnyplZyYTbUNPAwwRH5aR1e6bppKFBb+ZZeTRCR25JFDIPnXJFfjaBg==
+  dependencies:
+    "@google/generative-ai" "^0.24.0"
+    uuid "^11.1.0"
+
 "@langchain/langgraph-checkpoint@~0.0.17":
   version "0.0.18"
   resolved "https://registry.npmmirror.com/@langchain/langgraph-checkpoint/-/langgraph-checkpoint-0.0.18.tgz"
@@ -510,7 +538,7 @@
     uuid "^10.0.0"
     zod "^3.23.8"
 
-"@langchain/openai@^0.5.15", "@langchain/openai@>=0.1.0 <0.6.0", "@langchain/openai@>=0.2.0 <0.6.0":
+"@langchain/openai@^0.5.15", "@langchain/openai@^0.5.5", "@langchain/openai@>=0.1.0 <0.6.0", "@langchain/openai@>=0.2.0 <0.6.0":
   version "0.5.15"
   resolved "https://registry.npmmirror.com/@langchain/openai/-/openai-0.5.15.tgz"
   integrity sha512-ANadEHyAj5sufQpz+SOPpKbyoMcTLhnh8/d+afbSPUqWsIMPpEFX3HoSY3nrBPG6l4NQQNG5P5oHb4SdC8+YIg==
@@ -1873,6 +1901,11 @@ cross-spawn@^7.0.2, cross-spawn@^7.0.6:
     path-key "^3.1.0"
     shebang-command "^2.0.0"
     which "^2.0.1"
+
+crypto-js@^4.2.0:
+  version "4.2.0"
+  resolved "https://registry.npmmirror.com/crypto-js/-/crypto-js-4.2.0.tgz"
+  integrity sha512-KALDyEYgpY+Rlob/iriUtjV6d5Eq+Y191A5g4UqLAi8CyGP9N1+FdVbkc1SxKc2r4YAYqG8JzO2KGL+AizD70Q==
 
 cssesc@^3.0.0:
   version "3.0.0"
@@ -4942,6 +4975,11 @@ uuid@^10.0.0:
   version "10.0.0"
   resolved "https://registry.npmmirror.com/uuid/-/uuid-10.0.0.tgz"
   integrity sha512-8XkAphELsDnEGrDxUOHB3RGvXz6TeuYSGEZBOjtTtPm2lwhGBjLgOzLHB63IUWfBpNucQjND6d3AOudO+H3RWQ==
+
+uuid@^11.1.0:
+  version "11.1.0"
+  resolved "https://registry.npmmirror.com/uuid/-/uuid-11.1.0.tgz"
+  integrity sha512-0/A9rDy9P7cJ+8w1c9WD9V//9Wj15Ce2MPz8Ri6032usz+NfePxx5AcN3bN+r6ZL6jEo066/yNYB3tn4pQEx+A==
 
 uuid@^9.0.0:
   version "9.0.1"

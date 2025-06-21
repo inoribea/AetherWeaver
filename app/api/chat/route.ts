@@ -1,73 +1,340 @@
-import { NextRequest, NextResponse } from "next/server";
-import { Message as VercelChatMessage, StreamingTextResponse } from "ai";
+// src/app/api/chat/route.ts
 
-import { ChatOpenAI } from "@langchain/openai";
-import { PromptTemplate } from "@langchain/core/prompts";
-import { HttpResponseOutputParser } from "langchain/output_parsers";
+import { NextRequest } from 'next/server';
+import { Message as VercelChatMessage, StreamingTextResponse } from 'ai';
 
-export const runtime = "edge";
+// Core LangChain imports
+import { AIMessage, HumanMessage, SystemMessage } from '@langchain/core/messages';
+import { ChatPromptTemplate } from '@langchain/core/prompts';
+import { StringOutputParser } from '@langchain/core/output_parsers';
+import { BaseChatModel } from '@langchain/core/language_models/chat_models'; // To type hint llmInstance
 
-const formatMessage = (message: VercelChatMessage) => {
-  return `${message.role}: ${message.content}`;
-};
+// LangChain Integration Imports
+import { ChatOpenAI } from '@langchain/openai';
+import { ChatDeepSeek } from '@langchain/deepseek';
+import { ChatAlibabaTongyi } from '@langchain/community/chat_models/alibaba_tongyi';
+import { CloudflareWorkersAI } from '@langchain/cloudflare';
+import { ChatTencentHunyuan } from '@langchain/community/chat_models/tencent_hunyuan';
+import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
 
-const TEMPLATE = `You are a pirate named Patchy. All responses must be extremely verbose and in pirate dialect.
+// --- Other imports (if any, keep them here) ---
+// import { ... } from '...';
 
-Current conversation:
-{chat_history}
-
-User: {input}
-AI:`;
-
-/**
- * This handler initializes and calls a simple chain with a prompt,
- * chat model, and output parser. See the docs for more information:
- *
- * https://js.langchain.com/docs/guides/expression_language/cookbook#prompttemplate--llm--outputparser
- */
-export async function POST(req: NextRequest) {
-  try {
-    const body = await req.json();
-    const messages = body.messages ?? [];
-    const formattedPreviousMessages = messages.slice(0, -1).map(formatMessage);
-    const currentMessageContent = messages[messages.length - 1].content;
-    const prompt = PromptTemplate.fromTemplate(TEMPLATE);
-
-    /**
-     * You can also try e.g.:
-     *
-     * import { ChatAnthropic } from "@langchain/anthropic";
-     * const model = new ChatAnthropic({});
-     *
-     * See a full list of supported models at:
-     * https://js.langchain.com/docs/modules/model_io/models/
-     */
-    const model = new ChatOpenAI({
-      temperature: 0.8,
-      model: "gpt-4o-mini",
-    });
-
-    /**
-     * Chat models stream message chunks rather than bytes, so this
-     * output parser handles serialization and byte-encoding.
-     */
-    const outputParser = new HttpResponseOutputParser();
-
-    /**
-     * Can also initialize as:
-     *
-     * import { RunnableSequence } from "@langchain/core/runnables";
-     * const chain = RunnableSequence.from([prompt, model, outputParser]);
-     */
-    const chain = prompt.pipe(model).pipe(outputParser);
-
-    const stream = await chain.stream({
-      chat_history: formattedPreviousMessages.join("\n"),
-      input: currentMessageContent,
-    });
-
-    return new StreamingTextResponse(stream);
-  } catch (e: any) {
-    return NextResponse.json({ error: e.message }, { status: e.status ?? 500 });
+// Helper function to format messages from Vercel AI SDK to LangChain format
+function formatMessage(message: VercelChatMessage) {
+  if (message.role === 'user') {
+    return new HumanMessage(message.content);
+  } else if (message.role === 'assistant') {
+    return new AIMessage(message.content);
+  } else {
+    // Treat other roles (e.g., 'system') as SystemMessage
+    return new SystemMessage(message.content);
   }
 }
+
+// Define a map for model configurations
+const MODEL_PROVIDERS: Record<string, {
+  type: string;
+  model: new (...args: any[]) => BaseChatModel; // Type hint for the model class constructor
+  config: Record<string, any>;
+}> = {
+  // --- Custom Models (OpenAI Compatible) ---
+  'custom-provider-a-model': {
+    type: 'openai_compatible', // Custom type
+    model: ChatOpenAI, // Use ChatOpenAI class
+    config: {
+      apiKey: process.env.CUSTOM_PROVIDER_A_API_KEY,
+      baseURL: process.env.CUSTOM_PROVIDER_A_BASE_URL,
+    },
+  },
+  'custom-provider-b-model': {
+    type: 'openai_compatible',
+    model: ChatOpenAI,
+    config: {
+      apiKey: process.env.CUSTOM_PROVIDER_B_API_KEY,
+      baseURL: process.env.CUSTOM_PROVIDER_B_BASE_URL,
+    },
+  },
+  // --- OpenRouter Models (OpenAI Compatible) ---
+  'openrouter-gpt-4o': { // Model name sent by LobeChat
+    type: 'openai_compatible',
+    model: ChatOpenAI,
+    config: {
+      apiKey: process.env.OPENROUTER_API_KEY,
+      baseURL: process.env.OPENROUTER_BASE_URL,
+      // Replace with your Vercel app URL for HTTP-Referer
+      extraHeaders: {
+        "HTTP-Referer": "https://your-vercel-app-url.vercel.app",
+        "X-Title": "LangChain Vercel API",
+      },
+    },
+  },
+  // You can continue to add other OpenRouter supported models
+  'openrouter-gemini-pro': {
+    type: 'openai_compatible',
+    model: ChatOpenAI,
+    config: {
+      apiKey: process.env.OPENROUTER_API_KEY,
+      baseURL: process.env.OPENROUTER_BASE_URL,
+      extraHeaders: {
+        "HTTP-Referer": "https://your-vercel-app-url.vercel.app",
+        "X-Title": "LangChain Vercel API",
+      },
+    },
+  },
+
+  // --- DeepSeek Models ---
+  'deepseek-chat': { // DeepSeek's primary model name
+    type: 'deepseek',
+    model: ChatDeepSeek, // Use ChatDeepSeek class
+    config: {
+      deepseekApiKey: process.env.DEEPSEEK_API_KEY, // DeepSeek's API Key variable name
+      // Add other DeepSeek configuration options here if any
+    },
+  },
+  'deepseek-reasoner': { // Another DeepSeek model
+    type: 'deepseek',
+    model: ChatDeepSeek,
+    config: {
+      deepseekApiKey: process.env.DEEPSEEK_API_KEY,
+      model: 'deepseek-reasoner', // Explicitly specify model name
+    },
+  },
+
+  // --- Aliyun Bailian (Tongyi) Models ---
+  'qwen-turbo': { // Tongyi Qianwen turbo version
+    type: 'alibaba_tongyi',
+    model: ChatAlibabaTongyi, // Use ChatAlibabaTongyi class
+    config: {
+      apiKey: process.env.DASHSCOPE_API_KEY, // DashScope's API Key variable name (for Aliyun Tongyi)
+      model: 'qwen-turbo',
+      // If you need to use DashScope's OpenAI compatible interface, configure as follows:
+      // baseURL: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+      // model: 'qwen-plus', // Or other models supporting compatible mode
+    },
+  },
+  'qwen-plus': {
+    type: 'alibaba_tongyi',
+    model: ChatAlibabaTongyi,
+    config: {
+      apiKey: process.env.DASHSCOPE_API_KEY,
+      model: 'qwen-plus',
+    },
+  },
+
+  // --- Cloudflare Workers AI Models ---
+  'cloudflare-llama-3-8b-instruct': {
+    type: 'cloudflare',
+    model: CloudflareWorkersAI,
+    config: {
+      cloudflareAccountId: process.env.CLOUDFLARE_ACCOUNT_ID,
+      cloudflareApiToken: process.env.CLOUDFLARE_API_TOKEN,
+      model: '@cf/meta/llama-3-8b-instruct',
+      temperature: 0.7,
+    },
+  },
+  'cloudflare-gemma-7b-it': {
+    type: 'cloudflare',
+    model: CloudflareWorkersAI,
+    config: {
+      cloudflareAccountId: process.env.CLOUDFLARE_ACCOUNT_ID,
+      cloudflareApiToken: process.env.CLOUDFLARE_API_TOKEN,
+      model: '@cf/google/gemma-7b-it',
+      temperature: 0.7,
+    },
+  },
+  // --- Tencent Hunyuan Models ---
+  'tencent-hunyuan-lite': {
+    type: 'tencent_hunyuan',
+    model: ChatTencentHunyuan,
+    config: {
+      secretId: process.env.TENCENT_HUNYUAN_SECRET_ID,
+      secretKey: process.env.TENCENT_HUNYUAN_SECRET_KEY,
+      model: 'hunyuan-lite',
+      temperature: 0.7,
+      // Optional: Specify region or endpoint if needed
+      // region: process.env.TENCENT_HUNYUAN_REGION,
+      // endpoint: process.env.TENCENT_HUNYUAN_ENDPOINT,
+    },
+  },
+  'tencent-hunyuan-pro': {
+    type: 'tencent_hunyuan',
+    model: ChatTencentHunyuan,
+    config: {
+      secretId: process.env.TENCENT_HUNYUAN_SECRET_ID,
+      secretKey: process.env.TENCENT_HUNYUAN_SECRET_KEY,
+      model: 'hunyuan-pro',
+      temperature: 0.7,
+    },
+  },
+
+  // --- Google Gemini Models ---
+  // Example model names, e.g., "gemini-pro", "gemini-pro-vision"
+  'gemini-pro': {
+    type: 'google_gemini',
+    model: ChatGoogleGenerativeAI,
+    config: {
+      apiKey: process.env.GOOGLE_API_KEY,
+      model: 'gemini-pro',
+      // Optional: Set a specific base URL if needed
+      // baseUrl: process.env.GOOGLE_BASE_URL,
+    },
+  },
+  'gemini-pro-vision': {
+    type: 'google_gemini',
+    model: ChatGoogleGenerativeAI,
+    config: {
+      apiKey: process.env.GOOGLE_API_KEY,
+      model: 'gemini-pro-vision',
+    },
+  },
+};
+
+export async function POST(req: NextRequest) {
+  const body = await req.json();
+  const messages = body.messages ?? [];
+  const modelName = body.model; // Get model name from the request
+
+  // Format messages to LangChain format
+  // Ensure formatMessage returns LangChain's BaseMessage type
+  const formattedMessages = messages.map(formatMessage);
+  // For ChatPromptTemplate, the last message is usually the HumanMessage (current user input)
+  const currentMessage = formattedMessages[formattedMessages.length - 1] as HumanMessage;
+  const historyMessages = formattedMessages.slice(0, -1);
+
+
+  const providerEntry = MODEL_PROVIDERS[modelName];
+
+  if (!providerEntry) {
+    return new Response(JSON.stringify({ error: `Model ${modelName} not configured.` }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  let llmInstance: BaseChatModel; // Declare llmInstance with BaseChatModel type
+  try {
+    switch (providerEntry.type) {
+      case 'openai_compatible':
+        llmInstance = new providerEntry.model({
+          temperature: 0.7,
+          streaming: true,
+          ...providerEntry.config,
+          // Pass the model name from the config, or use a default if not specified
+          model: providerEntry.config.model || modelName,
+        });
+        break;
+      case 'deepseek':
+        llmInstance = new providerEntry.model({
+          temperature: 0.7,
+          streaming: true,
+          // ChatDeepSeek uses deepseekApiKey
+          deepseekApiKey: providerEntry.config.deepseekApiKey,
+          model: providerEntry.config.model || modelName, // Ensure model name is passed
+        });
+        break;
+      case 'alibaba_tongyi':
+        llmInstance = new providerEntry.model({
+          temperature: 0.7,
+          streaming: true,
+          // ChatAlibabaTongyi uses apiKey (for DashScope)
+          apiKey: providerEntry.config.apiKey,
+          model: providerEntry.config.model || modelName,
+          // Pass baseURL if present in config
+          baseURL: providerEntry.config.baseURL,
+        });
+        break;
+      case 'cloudflare':
+        llmInstance = new providerEntry.model({
+          temperature: 0.7,
+          streaming: true,
+          // Cloudflare Workers AI expects cloudflareAccountId and cloudflareApiToken
+          // It's generally better to get these directly from process.env for security
+          cloudflareAccountId: process.env.CLOUDFLARE_ACCOUNT_ID,
+          cloudflareApiToken: process.env.CLOUDFLARE_API_TOKEN,
+          model: providerEntry.config.model || modelName,
+        });
+        break;
+      case 'tencent_hunyuan':
+        llmInstance = new providerEntry.model({
+          temperature: 0.7,
+          streaming: true,
+          // ChatTencentHunyuan uses secretId and secretKey
+          secretId: providerEntry.config.secretId,
+          secretKey: providerEntry.config.secretKey,
+          model: providerEntry.config.model || modelName,
+          // Optional: region and endpoint (default to undefined if not provided)
+          region: providerEntry.config.region,
+          endpoint: providerEntry.config.endpoint,
+        });
+        break;
+      case 'google_gemini':
+        llmInstance = new providerEntry.model({
+          temperature: 0.7,
+          streaming: true,
+          // ChatGoogleGenerativeAI uses apiKey
+          apiKey: providerEntry.config.apiKey,
+          model: providerEntry.config.model || modelName,
+          // Optional: baseUrl (default to undefined if not provided)
+          baseUrl: providerEntry.config.baseUrl,
+        });
+        break;
+      default:
+        return new Response(JSON.stringify({ error: `Unknown provider type for model ${modelName}.` }), {
+          status: 500,
+          headers: { 'Content-Type': 'application/json' },
+        });
+    }
+  } catch (error) {
+    console.error("Error initializing LLM instance:", error);
+    return new Response(JSON.stringify({ error: `Failed to initialize LLM for model ${modelName}. Check environment variables and configuration.`, details: (error as Error).message }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  // Ensure llmInstance is a ChatModel compatible with ChatPromptTemplate
+  if (!llmInstance || typeof llmInstance.invoke !== 'function' && typeof llmInstance.stream !== 'function') {
+    return new Response(JSON.stringify({ error: `Invalid LLM instance for model ${modelName}. It does not have invoke or stream methods.` }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  // Create your LangChain Chain (LCEL)
+  // Define the prompt template based on history and current message
+  const prompt = ChatPromptTemplate.fromMessages([
+    // System message (optional, but good for setting context/persona)
+    // If you have a system message in your Vercel AI SDK messages,
+    // ensure it's at the beginning of `historyMessages`.
+    // Example: new SystemMessage("You are a helpful AI assistant."),
+
+    // Pass previous messages for context. These are already formatted by `formatMessage`.
+    ...historyMessages,
+
+    // The current user input is always the last message and will be mapped to the 'input' variable
+    // for the final human message in the prompt.
+    new HumanMessage({
+      content: currentMessage.content, // This ensures the current user message is always last
+    }),
+  ]);
+
+  // Define the LangChain chain
+  const chain = prompt.pipe(llmInstance).pipe(new StringOutputParser());
+
+  // Stream the response
+  const stream = await chain.stream({});
+
+  // Return the stream as a StreamingTextResponse
+  return new StreamingTextResponse(stream);
+}  (error) {
+  console.error('[API/CHAT]', error); // Log the actual error object with context
+  // Return an error response
+  return new NextResponse(JSON.stringify({ error: (error as Error).message || 'An unknown error occurred during chat processing.' }), {
+    status: 500,
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  });
+}
+} // This curly brace closes the POST function.
