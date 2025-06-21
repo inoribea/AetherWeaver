@@ -54,16 +54,16 @@ const MODEL_PROVIDERS: Record<string, {
     type: 'openai_compatible', // Custom type
     model: ChatOpenAI, // Use ChatOpenAI class
     config: {
-      apiKey: process.env.CUSTOM_PROVIDER_A_API_KEY,
-      baseURL: process.env.CUSTOM_PROVIDER_A_BASE_URL,
+      apiKey: process.env.NEKO_API_KEY,
+      baseURL: process.env.NEKO_BASE_URL,
     },
   },
   'custom-provider-b-model': {
     type: 'openai_compatible',
     model: ChatOpenAI,
     config: {
-      apiKey: process.env.CUSTOM_PROVIDER_B_API_KEY,
-      baseURL: process.env.CUSTOM_PROVIDER_B_BASE_URL,
+      apiKey: process.env.O3_API_KEY,
+      baseURL: process.env.O3_BASE_URL,
     },
   },
   // --- OpenRouter Models (OpenAI Compatible) ---
@@ -75,8 +75,8 @@ const MODEL_PROVIDERS: Record<string, {
       baseURL: process.env.OPENROUTER_BASE_URL,
       // Replace with your Vercel app URL for HTTP-Referer
       extraHeaders: {
-        "HTTP-Referer": "https://your-vercel-app-url.vercel.app",
-        "X-Title": "LangChain Vercel API",
+        "HTTP-Referer": process.env.VERCEL_APP_URL, 
+        "X-Title": process.env.APP_TITLE, 
       },
     },
   },
@@ -88,8 +88,8 @@ const MODEL_PROVIDERS: Record<string, {
       apiKey: process.env.OPENROUTER_API_KEY,
       baseURL: process.env.OPENROUTER_BASE_URL,
       extraHeaders: {
-        "HTTP-Referer": "https://your-vercel-app-url.vercel.app",
-        "X-Title": "LangChain Vercel API",
+        "HTTP-Referer": process.env.VERCEL_APP_URL, 
+        "X-Title": process.env.APP_TITLE, 
       },
     },
   },
