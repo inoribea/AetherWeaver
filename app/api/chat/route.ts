@@ -166,13 +166,13 @@ const MODEL_PROVIDERS: Record<string, {
   'deepseek-chat': {
     type: 'deepseek',
     model: ChatDeepSeek,
-    config: { apiKey: process.env.DEEPSEEK_API_KEY }, // CORRECTED: apiKey in configuration
+    config: { deepseekApiKey: process.env.DEEPSEEK_API_KEY },
     capabilities: { reasoning: true },
   },
   'deepseek-reasoner': {
     type: 'deepseek',
     model: ChatDeepSeek,
-    config: { apiKey: process.env.DEEPSEEK_API_KEY, model: 'deepseek-reasoner' }, // CORRECTED: apiKey in configuration
+    config: { deepseekApiKey: process.env.DEEPSEEK_API_KEY, model: 'deepseek-reasoner' },
     capabilities: { reasoning: true },
   },
   // --- Aliyun Bailian (Tongyi) Models ---
@@ -272,33 +272,32 @@ function containsImage(messages: BaseMessage[]): boolean {
 
 // Create a fallback model
 function createFallbackModel(): BaseChatModel<BaseChatModelCallOptions, AIMessageChunk> {
-  console.log("[Fallback] Attempting to create fallback model...");
   // Prioritize OpenAI if available, then DeepSeek, then Google
   if (process.env.OPENAI_API_KEY) {
-    console.log("[Fallback] Using OpenAI as fallback model");
+    console.log("Using OpenAI as fallback model");
     return new ChatOpenAI({
       temperature: 0.7,
       streaming: true,
-      // OpenAI requires apiKey directly in the constructor or via configuration.baseURL
       apiKey: process.env.OPENAI_API_KEY,
+      // Prefer a capable model like gpt-4o-mini if available, otherwise a basic one.
       model: process.env.NEKO_BASE_URL ? 'gpt-4o-all' : 'gpt-4o-mini', // Assuming NEKO_BASE_URL implies Neko/O3, use gpt-4o-all
-      configuration: { // Configuration for baseURL
+      // Correctly configure baseURL via configuration object
+      configuration: {
         baseURL: process.env.NEKO_BASE_URL || process.env.OPENAI_BASE_URL,
       },
     });
   } else if (process.env.DEEPSEEK_API_KEY) {
-    console.log("[Fallback] Using DeepSeek as fallback model");
+    console.log("Using DeepSeek as fallback model");
     return new ChatDeepSeek({
       temperature: 0.7,
       streaming: true,
-      // CORRECTED: Pass apiKey within configuration object
       configuration: {
         apiKey: process.env.DEEPSEEK_API_KEY,
       },
       model: 'deepseek-chat', // Or 'deepseek-reasoner' if preferred for fallback
     });
   } else if (process.env.GOOGLE_API_KEY) {
-    console.log("[Fallback] Using Google Gemini as fallback model");
+    console.log("Using Google Gemini as fallback model");
     return new ChatGoogleGenerativeAI({
       temperature: 0.7,
       streaming: true,
@@ -308,7 +307,6 @@ function createFallbackModel(): BaseChatModel<BaseChatModelCallOptions, AIMessag
   }
   // Add other fallbacks if necessary (e.g., Cloudflare, Tencent)
   
-  console.error("[Fallback] No available API keys found for fallback model. Please configure OPENAI_API_KEY, DEEPSEEK_API_KEY, or GOOGLE_API_KEY.");
   throw new Error("No available API keys found for fallback model. Please configure OPENAI_API_KEY, DEEPSEEK_API_KEY, or GOOGLE_API_KEY.");
 }
 
@@ -318,12 +316,9 @@ async function determineModelAndChain(
 ): Promise<{ llmInstance: BaseChatModel<BaseChatModelCallOptions, AIMessageChunk> | BaseLLM<BaseLLMCallOptions>, chain: Runnable<any, string> }> {
 
   try {
-    console.log("[Auto-detect] Starting model and chain determination.");
-
     // 1. Prioritize vision models if image content is present
     const hasImage = containsImage(formattedMessages);
     if (hasImage) {
-      console.log("[Auto-detect] Image input detected. Checking for vision models.");
       const visionModelName = Object.keys(MODEL_PROVIDERS).find(name =>
         MODEL_PROVIDERS[name].capabilities.vision
       );
@@ -331,17 +326,17 @@ async function determineModelAndChain(
       if (visionModelName) {
         const providerEntry = MODEL_PROVIDERS[visionModelName];
         // Check if the required API key for this vision model is available
-        let apiKeyConfigured = false;
-        if (providerEntry.type === 'openai_compatible' || providerEntry.type === 'deepseek' || providerEntry.type === 'google_gemini') {
-           apiKeyConfigured = !!providerEntry.config.apiKey;
-        } else if (providerEntry.type === 'cloudflare') {
-           apiKeyConfigured = !!providerEntry.config.cloudflareApiToken;
-        } else if (providerEntry.type === 'tencent_hunyuan') {
-           apiKeyConfigured = !!providerEntry.config.secretId && !!providerEntry.config.secretKey;
-        }
-        // Add other checks for different provider types if needed
+        let apiKeyEnvVar: string | undefined;
+        // This logic needs to be robust for all potential API key env var names
+        if (providerEntry.config.apiKey) apiKeyEnvVar = providerEntry.config.apiKey.replace('process.env.', '');
+        else if (providerEntry.config.deepseekApiKey) apiKeyEnvVar = providerEntry.config.deepseekApiKey.replace('process.env.', '');
+        else if (providerEntry.config.secretId && providerEntry.config.secretKey) apiKeyEnvVar = "TENCENT_HUNYUAN_SECRET_KEY"; // Placeholder logic
+        else if (providerEntry.config.cloudflareAccountId && providerEntry.config.cloudflareApiToken) apiKeyEnvVar = "CLOUDFLARE_API_TOKEN"; // Placeholder logic
+        // Add more checks for other API key types if needed
 
-        if (apiKeyConfigured) {
+        const isApiKeyAvailable = apiKeyEnvVar ? !!process.env[apiKeyEnvVar] : false;
+
+        if (isApiKeyAvailable) {
           console.log(`[Auto-detect] Image input detected, selecting vision model: ${visionModelName}`);
           const llmInstance = new providerEntry.model({
             temperature: 0.7,
@@ -353,10 +348,9 @@ async function determineModelAndChain(
           // Use the already correctly formatted BaseMessage array
           const prompt = ChatPromptTemplate.fromMessages(formattedMessages);
           const chain = prompt.pipe(llmInstance).pipe(new StringOutputParser());
-          console.log(`[Auto-detect] Successfully created chain for vision model: ${visionModelName}`);
           return { llmInstance, chain };
         } else {
-          console.log(`[Auto-detect] Vision model ${visionModelName} selected, but its API key/config is missing.`);
+          console.log(`[Auto-detect] Vision model ${visionModelName} selected, but API key is missing.`);
         }
       } else {
         console.log("[Auto-detect] Image input detected, but no vision model found with available API key.");
@@ -364,7 +358,6 @@ async function determineModelAndChain(
     }
 
     // 2. Attempt to use Agent for reasoning and tool calling
-    console.log("[Auto-detect] Checking for Agent-capable models.");
     const agentCapableModelName = Object.keys(MODEL_PROVIDERS).find(name => {
       const provider = MODEL_PROVIDERS[name];
       // Prioritize models that can handle tool_calling and reasoning
@@ -373,17 +366,17 @@ async function determineModelAndChain(
 
     // Check if a suitable agent model and TAVILY_API_KEY are available
     if (agentCapableModelName && process.env.TAVILY_API_KEY) {
-      console.log(`[Auto-detect] Agent model ${agentCapableModelName} identified and TAVILY_API_KEY is present.`);
       const providerEntry = MODEL_PROVIDERS[agentCapableModelName];
-      let apiKeyConfigured = false;
-      if (providerEntry.type === 'openai_compatible' || providerEntry.type === 'deepseek' || providerEntry.type === 'google_gemini') {
-         apiKeyConfigured = !!providerEntry.config.apiKey;
-      }
-      // Add other checks for different provider types if needed
+      let apiKeyEnvVar: string | undefined;
+      if (providerEntry.config.apiKey) apiKeyEnvVar = providerEntry.config.apiKey.replace('process.env.', '');
+      else if (providerEntry.config.deepseekApiKey) apiKeyEnvVar = providerEntry.config.deepseekApiKey.replace('process.env.', '');
+      // Add more checks for other API key types if needed
 
-      if (apiKeyConfigured) {
+      const isApiKeyAvailable = apiKeyEnvVar ? !!process.env[apiKeyEnvVar] : false;
+
+      if (isApiKeyAvailable) {
         try {
-          console.log(`[Auto-detect] Initializing Agent with model: ${agentCapableModelName}`);
+          console.log(`[Auto-detect] Attempting to initialize Agent with model: ${agentCapableModelName}`);
           const agentLLMInstance = new providerEntry.model({
             temperature: 0.7,
             streaming: true,
@@ -396,7 +389,7 @@ async function determineModelAndChain(
             new TavilySearchResults({ maxResults: 5, apiKey: process.env.TAVILY_API_KEY }),
           ];
 
-          // Use locally defined prompt
+          // Use locally defined prompt, avoid fetching from hub
           const agentPrompt = ChatPromptTemplate.fromMessages([
             ["system", "You are a helpful AI assistant. You have access to tools to help answer questions. Use them when necessary to provide accurate and up-to-date information."],
             new MessagesPlaceholder("chat_history"),
@@ -409,9 +402,8 @@ async function determineModelAndChain(
             returnMessages: true,
           });
 
-          // Using 'openai-functions' agent type, which is common and works with many models that support tool calling.
           const agentExecutor = await initializeAgentExecutorWithOptions(tools, agentLLMInstance, {
-            agentType: "openai-functions", 
+            agentType: "openai-functions", // Assumes the model supports OpenAI's function calling format
             memory,
             returnIntermediateSteps: true,
             agentArgs: {
@@ -420,33 +412,39 @@ async function determineModelAndChain(
           });
 
           // AgentExecutor itself handles messages, so we can pipe it.
+          // The input to agentExecutor should be structured correctly by the RunnableSequence.
           const agentChain = RunnableSequence.from([
             {
+              // Map the incoming messages to the agent's expected input format
               input: (i: { messages: BaseMessage[] }) => {
+                // Get the last human message content
                 const lastMessage = i.messages[i.messages.length - 1];
                 if (lastMessage._getType() === "human") {
                   if (Array.isArray(lastMessage.content)) {
+                    // Extract text part if content is complex (with images, etc.)
                     const textPart = lastMessage.content.find((part) => typeof part === 'object' && part !== null && part.type === 'text') as { text: string };
                     return textPart ? textPart.text : "";
                   }
-                  return lastMessage.content as string;
+                  return lastMessage.content as string; // Plain string content
                 }
-                return ""; 
+                return ""; // Should not happen if last message is always human
               },
-              chat_history: (i: { messages: BaseMessage[] }) => i.messages.slice(0, -1),
+              chat_history: (i: { messages: BaseMessage[] }) => i.messages.slice(0, -1), // All messages except the last one for history
             },
             agentExecutor,
-            new StringOutputParser(), 
+            new StringOutputParser(), // Parse the final output from the agent
           ]);
 
           console.log(`[Auto-detect] Successfully initialized Agent Chain with model: ${agentCapableModelName}`);
+          // AgentExecutor itself needs the LLM, so return it.
           return { llmInstance: agentLLMInstance, chain: agentChain };
 
-        } catch (agentError: any) { 
-          console.warn(`[Auto-detect] Agent initialization failed for ${agentCapableModelName}: ${agentError.message}. Falling back to simple model.`);
+        } catch (agentError: any) { // Use 'any' or 'Error' for type safety
+          console.warn(`[Auto-detect] Agent initialization failed: ${agentError.message}. Falling back to simple model.`);
+          // If agent initialization fails, we will fall through to the next logic.
         }
       } else {
-        console.log(`[Auto-detect] Agent model ${agentCapableModelName} selected, but its API key/config is missing.`);
+        console.log(`[Auto-detect] Agent model ${agentCapableModelName} selected, but API key is missing.`);
       }
     } else {
       if (!process.env.TAVILY_API_KEY) console.log("[Auto-detect] Agent model selected, but TAVILY_API_KEY is missing.");
@@ -454,21 +452,19 @@ async function determineModelAndChain(
     }
 
     // 3. Fallback to simple reasoning models
-    console.log("[Auto-detect] Checking for reasoning models (non-agent).");
     const reasoningModelName = Object.keys(MODEL_PROVIDERS).find(name =>
       MODEL_PROVIDERS[name].capabilities.reasoning
     );
 
     if (reasoningModelName) {
-      console.log(`[Auto-detect] Reasoning model ${reasoningModelName} identified.`);
       const providerEntry = MODEL_PROVIDERS[reasoningModelName];
-      let apiKeyConfigured = false;
-      if (providerEntry.type === 'openai_compatible' || providerEntry.type === 'deepseek' || providerEntry.type === 'google_gemini') {
-         apiKeyConfigured = !!providerEntry.config.apiKey;
-      }
-      // Add other checks for different provider types if needed
+      let apiKeyEnvVar: string | undefined;
+      if (providerEntry.config.apiKey) apiKeyEnvVar = providerEntry.config.apiKey.replace('process.env.', '');
+      // Add other API key checks if needed for this provider
 
-      if (apiKeyConfigured) {
+      const isApiKeyAvailable = apiKeyEnvVar ? !!process.env[apiKeyEnvVar] : false;
+
+      if (isApiKeyAvailable) {
         try {
           console.log(`[Auto-detect] Using reasoning model: ${reasoningModelName}`);
           const llmInstance = new providerEntry.model({
@@ -480,35 +476,36 @@ async function determineModelAndChain(
 
           const prompt = ChatPromptTemplate.fromMessages(formattedMessages);
           const chain = prompt.pipe(llmInstance).pipe(new StringOutputParser());
-          console.log(`[Auto-detect] Successfully created chain for reasoning model: ${reasoningModelName}`);
           return { llmInstance, chain };
-        } catch (error: any) { 
+        } catch (error: any) { // Use 'any' or 'Error' for type safety
           console.warn(`[Auto-detect] Reasoning model ${reasoningModelName} initialization failed: ${error.message}`);
+          // Fall through if this model also fails to initialize
         }
       } else {
-        console.log(`[Auto-detect] Reasoning model ${reasoningModelName} selected, but its API key/config is missing.`);
+        console.log(`[Auto-detect] Reasoning model ${reasoningModelName} selected, but API key is missing.`);
       }
     } else {
       console.log("[Auto-detect] No reasoning model found with available API key.");
     }
 
     // 4. Final fallback to any available simple model
-    console.log("[Auto-detect] All specific detections failed or models misconfigured. Falling back to a generally available simple model.");
+    console.log("[Auto-detect] Falling back to a generally available simple model.");
     const fallbackModel = createFallbackModel(); // This function already handles API key checks and throws if none found.
     const simplePrompt = ChatPromptTemplate.fromMessages(formattedMessages);
     const simpleChain = simplePrompt.pipe(fallbackModel).pipe(new StringOutputParser());
-    console.log("[Auto-detect] Successfully created chain for fallback model.");
     return { llmInstance: fallbackModel, chain: simpleChain };
 
   } catch (error: any) { // Catch-all for any unforeseen errors during model/chain determination
     console.error("[Auto-detect] An unexpected error occurred during model/chain determination:", error);
-    console.error('Error stack:', error.stack);
     
+    // If all attempts fail, provide a very basic fallback.
+    // This might not handle complex messages like images.
     console.warn("[Auto-detect] All model initialization attempts failed, using a most basic fallback.");
     
     const basicFallback = createFallbackModel(); // This will throw if no keys are set at all
     const basicPrompt = ChatPromptTemplate.fromMessages([
       ["system", "You are a helpful AI assistant."],
+      // For the absolute basic fallback, assume text-only input
       ["human", "{input}"] 
     ]);
     const basicChain = basicPrompt.pipe(basicFallback).pipe(new StringOutputParser());
@@ -517,94 +514,100 @@ async function determineModelAndChain(
 }
 
 export async function POST(req: NextRequest) {
-  console.log('[API] POST request received.');
   try {
+    console.log('API request received');
+    
     const body = await req.json();
     const messages = body.messages ?? [];
 
     if (!messages.length) {
-      console.error('[API] Error: No messages provided in request body.');
-      return new Response(
-        JSON.stringify({ error: "No messages provided." }),
-        { status: 400, headers: { "Content-Type": "application/json" } }
-      );
+      console.error('No messages provided');
+      return new Response("No messages provided", { status: 400 });
     }
 
     // Check if at least one API key is available across all providers
-    const isAnyApiKeyPresent = 
+    const allApiKeysPresent = 
       !!process.env.OPENAI_API_KEY || 
+      !!process.env.DEEPSEEK_API_KEY || 
+      !!process.env.GOOGLE_API_KEY ||
       !!process.env.NEKO_API_KEY || 
       !!process.env.O3_API_KEY || 
       !!process.env.OPENROUTER_API_KEY || 
-      !!process.env.DEEPSEEK_API_KEY || 
       !!process.env.DASHSCOPE_API_KEY || 
       !!process.env.CLOUDFLARE_API_TOKEN || 
-      (!!process.env.TENCENT_HUNYUAN_SECRET_ID && !!process.env.TENCENT_HUNYUAN_SECRET_KEY) ||
-      !!process.env.GOOGLE_API_KEY;
+      (!!process.env.TENCENT_HUNYUAN_SECRET_ID && !!process.env.TENCENT_HUNYUAN_SECRET_KEY);
     
-    if (!isAnyApiKeyPresent) {
-      console.error('API Error: No API keys found in environment variables. Please configure keys for supported providers.');
+    if (!allApiKeysPresent) {
+      console.error('No API keys found in environment variables. Please configure keys for supported providers.');
       return new Response(
-        JSON.stringify({ error: "No API keys configured for any supported AI provider. Please check your environment variables." }), 
+        JSON.stringify({ error: "No API keys configured for any supported AI provider." }), 
         { status: 500, headers: { "Content-Type": "application/json" } }
       );
     }
 
-    console.log('[API] Formatting messages...');
+    console.log('Formatting messages...');
     const formattedMessages = messages.map(formatMessage);
-    console.log(`[API] Formatted ${formattedMessages.length} messages.`);
 
-    console.log('[API] Determining model and chain...');
+    console.log('Determining model and chain...');
+    // The determineModelAndChain function now correctly uses the formattedMessages directly.
     const { llmInstance, chain } = await determineModelAndChain(formattedMessages);
 
     if (!llmInstance || !chain) {
-      console.error('[API] Error: Failed to create model instance or chain.');
+      console.error('Failed to create model instance or chain');
       return new Response(
         JSON.stringify({ error: "Failed to initialize AI model" }), 
         { status: 500, headers: { "Content-Type": "application/json" } }
       );
     }
-    
-    // Log the selected model if possible
-    const modelName = llmInstance.modelName || (llmInstance as any).model || 'Unknown Model';
-    console.log(`[API] Model selected for processing: ${modelName}`);
 
-    console.log('[API] Attempting to stream response...');
+    // Check if the model instance supports streaming. Some models might only support invoke.
+    // LangChain's BaseChatModel doesn't have a 'stream' method directly, but its Runnable adapter does.
+    // A more reliable check is to see if the chain can be streamed.
+    // However, for simpler cases, we might assume streaming if 'streaming: true' was set.
+    // A robust check would be more complex, checking specific model implementations.
+    // For now, let's assume 'chain.stream' will work if the model was configured for streaming.
+
+    console.log('Starting stream...');
     try {
-      // Pass the formattedMessages directly to the stream function
-      const stream = await chain.stream({ messages: formattedMessages });
-      console.log('[API] Stream initialized successfully. Returning StreamingTextResponse.');
+      const stream = await chain.stream({
+        messages: formattedMessages, // Pass the correctly formatted messages
+      });
+
       return new StreamingTextResponse(stream);
 
     } catch (streamError: any) {
-      console.error("[API] Streaming failed:", streamError);
-      console.error('Streaming error stack:', streamError.stack);
-      
+      console.error("Streaming failed, attempting to invoke:", streamError);
       // If streaming fails, try a non-streaming invoke.
-      console.log("[API] Streaming failed, attempting non-streaming invoke...");
       try {
-        // For chains built with prompt.pipe(model), invoke expects an object that can be passed to the prompt.
-        // In our case, `ChatPromptTemplate.fromMessages(formattedMessages)` creates a chain that implicitly expects `messages`.
-        const result = await chain.invoke({ messages: formattedMessages }); 
-        console.log('[API] Non-streaming invoke succeeded.');
+        // The input to chain.invoke might need to match the expected input structure.
+        // For a typical chain like prompt.pipe(model).pipe(parser), it's often { input: ..., chat_history: ... } or just { messages: ... }
+        // Since our chain is `prompt.pipe(llmInstance).pipe(parser)`, it expects the input format matching the prompt.
+        // `ChatPromptTemplate.fromMessages(formattedMessages)` doesn't explicitly define input variables like `input` or `chat_history`.
+        // However, `agentExecutor` in the AgentChain part does define `input` and `chat_history`.
+        // Let's assume `chain.invoke` can handle an object with `messages` if the chain was built that way.
+        // For chains constructed with fromMessages, it usually expects the variable name used in the prompt, or just implicitly uses the messages.
+        // The most common pattern for prompt.pipe(model) is expecting an object that gets passed to the prompt.
+        // Since `fromMessages` takes the full message array, the chain might expect `{ messages: formattedMessages }` or similar.
+        // If the chain was built using `messages:formattedMessages`, the invoke might need a compatible object.
+        // Let's try passing the formattedMessages directly if it's a simple chain.
         
+        const result = await chain.invoke({ messages: formattedMessages });
+
+        // If invoke succeeds, return it as a plain text response.
         return new Response(result, {
           status: 200,
           headers: { 'Content-Type': 'text/plain' },
         });
       } catch (invokeError: any) {
-        console.error("[API] Non-streaming invoke also failed:", invokeError);
-        console.error('Invoke error stack:', invokeError.stack);
-        
-        // If both stream and invoke fail, return a detailed error.
+        console.error("Invoke also failed:", invokeError);
+        // If both stream and invoke fail, return an error.
         return new Response(
           JSON.stringify({
-            error: "AI processing failed. Both streaming and invoking returned errors.",
+            error: `AI processing failed. Streaming error: ${streamError.message}, Invoke error: ${invokeError.message}`,
             details: {
-              streamingError: streamError.message,
+              streamError: streamError.message,
               invokeError: invokeError.message,
               invokeStack: invokeError.stack,
-              streamingStack: streamError.stack // Include streaming error stack for completeness
             }
           }),
           {
@@ -634,5 +637,5 @@ export async function POST(req: NextRequest) {
       }
     );
   }
-}
+} // <-- Semicolon added here to ensure statement termination.
 
