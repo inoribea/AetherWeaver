@@ -40,19 +40,19 @@ export async function POST(req: NextRequest) {
      * We use Zod (https://zod.dev) to define our schema for convenience,
      * but you can pass JSON schema if desired.
      */
-    const schema = z
-      .object({
-        tone: z
-          .enum(["positive", "negative", "neutral"])
-          .describe("The overall tone of the input"),
-        entity: z.string().describe("The entity mentioned in the input"),
-        word_count: z.number().describe("The number of words in the input"),
-        chat_response: z.string().describe("A response to the human's input"),
-        final_punctuation: z
-          .optional(z.string())
-          .describe("The final punctuation mark in the input, if any."),
-      })
-      .describe("Should always be used to properly format output");
+ const schema = z
+  .object({
+    tone: z
+      .enum(["positive", "negative", "neutral"])
+      .describe("The overall tone of the input"),
+    entity: z.string().describe("The entity mentioned in the input"),
+    word_count: z.number().describe("The number of words in the input"),
+    chat_response: z.string().describe("A response to the human's input"),
+    final_punctuation: z
+      .string()
+      .describe("The final punctuation mark in the input, or empty string if none."),
+  })
+  .describe("Should always be used to properly format output");
 
     /**
      * Bind schema to the OpenAI model.
