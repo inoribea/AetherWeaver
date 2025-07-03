@@ -149,7 +149,7 @@ const MODEL_PROVIDERS: Record<string, {
     },
     capabilities: { reasoning: true },
   },
-  'mistralai/devstral-small:free': {
+  'qwen/qwen3-8b:free': {
     type: 'openai_compatible',
     model: ChatOpenAI,
     config: {
