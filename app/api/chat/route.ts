@@ -1,5 +1,3 @@
-// src/app/api/chat/route.ts
-
 import { NextRequest } from 'next/server';
 import { Message as VercelChatMessage, StreamingTextResponse } from 'ai';
 
@@ -15,7 +13,7 @@ import {
 import { ChatPromptTemplate, MessagesPlaceholder } from '@langchain/core/prompts';
 import { StringOutputParser } from '@langchain/core/output_parsers';
 import { BaseChatModel, BaseChatModelCallOptions } from '@langchain/core/language_models/chat_models';
-import { BaseLLM, BaseLLMCallOptions } from '@langchain/core/language_models/llms'; // 修正 BaseLLM 泛型参数
+import { BaseLLM, BaseLLMCallOptions } from '@langchain/core/language_models/llms';
 import { Runnable, RunnableLambda, RunnableSequence } from '@langchain/core/runnables';
 
 // LangChain Integration Imports
@@ -28,15 +26,14 @@ import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
 
 // --- Imports for Tools and Agents ---
 import { Tool } from "@langchain/core/tools";
-import { TavilySearchResults } from "@langchain/community/tools/tavily_search"; // For "联网"功能
+import { TavilySearchResults } from "@langchain/community/tools/tavily_search";
 import { initializeAgentExecutorWithOptions } from "langchain/agents";
-import { pull } from "langchain/hub"; // For pulling agent prompts from LangChain Hub
-import { AgentStep } from "@langchain/core/agents"; // 导入 AgentStep
+import { AgentStep } from "@langchain/core/agents";
 import { BufferMemory } from "langchain/memory";
 
+export const runtime = 'edge';
 
 // Helper function to format messages from Vercel AI SDK to LangChain format
-// 支持多模态内容（特别是图像 URL）
 interface ContentPart { 
   type?: string;
   text?: string;
@@ -63,10 +60,9 @@ function formatMessage(message: VercelChatMessage): BaseMessage {
     return new SystemMessage(message.content as string);
   }
 }
+
 import { ChatPromptValueInterface } from "@langchain/core/prompt_values";
 
-// 这个 RunnableLambda 的作用是将 LangChain 消息数组转换为单个字符串
-// 主要用于那些不支持消息数组输入的旧版或特定 LLM
 const messagesToText = new RunnableLambda({
   func: (input: ChatPromptValueInterface) => {
     const messages = input.messages;
@@ -86,15 +82,12 @@ const messagesToText = new RunnableLambda({
 // 定义模型配置映射
 const MODEL_PROVIDERS: Record<string, {
   type: string;
-  // 修正 BaseLLM 类型参数
   model: new (...args: any[]) => BaseChatModel<BaseChatModelCallOptions, AIMessageChunk> | BaseLLM<BaseLLMCallOptions>;
   config: Record<string, any>;
-  // 新增 capabilities 字段，用于自动判断模型能力
   capabilities: {
-    vision?: boolean; // 是否支持视觉输入 (处理图像)
-    reasoning?: boolean; // 是否是“思考模型” (更强的推理能力)
-    tool_calling?: boolean; // 是否支持工具调用 (如 OpenAI functions, Gemini tools)
-    // 可以添加更多能力，例如: code_generation?: boolean; long_context?: boolean;
+    vision?: boolean;
+    reasoning?: boolean;
+    tool_calling?: boolean;
   };
 }> = {
   // --- Base Models (OpenAI) ---
@@ -117,7 +110,7 @@ const MODEL_PROVIDERS: Record<string, {
     config: { apiKey: process.env.NEKO_API_KEY, baseURL: process.env.NEKO_BASE_URL },
     capabilities: { reasoning: true },
   },
-  'claude-sonnet-4-all': { // 注意：如果实际是 Claude 模型，应使用 @langchain/anthropic
+  'claude-sonnet-4-all': {
     type: 'openai_compatible',
     model: ChatOpenAI,
     config: { apiKey: process.env.NEKO_API_KEY, baseURL: process.env.NEKO_BASE_URL },
@@ -135,8 +128,7 @@ const MODEL_PROVIDERS: Record<string, {
     config: { apiKey: process.env.O3_API_KEY, baseURL: process.env.O3_BASE_URL },
     capabilities: { reasoning: true, tool_calling: true },
   },
-  // --- OpenRouter Models (OpenAI Compatible) ---
-  // OpenRouter models require setting HTTP-Referer and X-Title headers
+  // --- OpenRouter Models ---
   'rekaai/reka-flash-3:free': {
     type: 'openai_compatible',
     model: ChatOpenAI,
@@ -144,8 +136,8 @@ const MODEL_PROVIDERS: Record<string, {
       apiKey: process.env.OPENROUTER_API_KEY,
       baseURL: process.env.OPENROUTER_BASE_URL,
       extraHeaders: {
-        "HTTP-Referer": process.env.VERCEL_APP_URL || "https://your-vercel-app-url.com", // 替换为你的 Vercel 应用 URL
-        "X-Title": process.env.APP_TITLE || "Your App Title", // 替换为你的应用标题
+        "HTTP-Referer": process.env.VERCEL_APP_URL || "https://your-vercel-app-url.com",
+        "X-Title": process.env.APP_TITLE || "Your App Title",
       },
     },
     capabilities: { reasoning: true },
@@ -163,7 +155,6 @@ const MODEL_PROVIDERS: Record<string, {
     },
     capabilities: { reasoning: true },
   },
-
   // --- DeepSeek Models ---
   'deepseek-chat': {
     type: 'deepseek',
@@ -177,7 +168,6 @@ const MODEL_PROVIDERS: Record<string, {
     config: { deepseekApiKey: process.env.DEEPSEEK_API_KEY, model: 'deepseek-reasoner' },
     capabilities: { reasoning: true },
   },
-
   // --- Aliyun Bailian (Tongyi) Models ---
   'qwen-turbo': {
     type: 'alibaba_tongyi',
@@ -191,7 +181,6 @@ const MODEL_PROVIDERS: Record<string, {
     config: { apiKey: process.env.DASHSCOPE_API_KEY, model: 'qvq-plus' },
     capabilities: { reasoning: true },
   },
-
   // --- Cloudflare Workers AI Models ---
   'cloudflare-llama-3-8b-instruct': {
     type: 'cloudflare',
@@ -238,7 +227,6 @@ const MODEL_PROVIDERS: Record<string, {
     },
     capabilities: { reasoning: true },
   },
-
   // --- Google Gemini Models ---
   'gemini-pro': {
     type: 'google_gemini',
@@ -246,7 +234,7 @@ const MODEL_PROVIDERS: Record<string, {
     config: { apiKey: process.env.GOOGLE_API_KEY, model: 'gemini-2.5-pro-preview-05-06' },
     capabilities: { reasoning: true, tool_calling: true },
   },
-  'gemini-pro-vision': { // 显式添加一个视觉模型入口
+  'gemini-pro-vision': {
     type: 'google_gemini',
     model: ChatGoogleGenerativeAI,
     config: { apiKey: process.env.GOOGLE_API_KEY, model: 'gemini-pro-vision' },
@@ -260,196 +248,266 @@ const MODEL_PROVIDERS: Record<string, {
   },
 };
 
-// --- 定义可供 Agent 使用的工具 ---
-const tools: Tool[] = [
-  new TavilySearchResults({ maxResults: 5, apiKey: process.env.TAVILY_API_KEY }), // 联网搜索工具
-  // 在这里添加你的其他工具，例如：
-  // new Calculator(), // 假设你有一个计算器工具，需要从 @langchain/community/tools/calculator 导入
-  // new CustomDatabaseTool(), // 自定义数据库查询工具
-];
-
 // Helper function to check if messages contain image content
 function containsImage(messages: BaseMessage[]): boolean {
   for (const msg of messages) {
     if (msg._getType() === 'human' && Array.isArray(msg.content)) {
       for (const part of msg.content) {
         if (typeof part === 'string') {
-          continue; // Strings cannot be image URLs
+          continue;
         }
         if (part.type === 'image_url') {
-          return true; // Found an image URL
+          return true;
         }
       }
     }
   }
-  return false; // No image URLs found
+  return false;
 }
 
-// *** 核心逻辑：自动判断并返回合适的 LLM 实例和 LangChain Chain ***
-async function determineModelAndChain(
-  formattedMessages: BaseMessage[],
-  // 修正 BaseLLM 类型参数
-): Promise<{ llmInstance: BaseChatModel<BaseChatModelCallOptions, AIMessageChunk> | BaseLLM<BaseLLMCallOptions>, chain: Runnable<any, string> }> {
-
-  // 1. 优先判断是否需要视觉模型 (有图像输入)
-  const hasImage = containsImage(formattedMessages);
-  if (hasImage) {
-    // 查找第一个支持视觉的模型
-    const visionModelName = Object.keys(MODEL_PROVIDERS).find(name =>
-      MODEL_PROVIDERS[name].capabilities.vision
-    );
-
-    if (visionModelName) {
-      console.log(`[自动判断] 检测到图像输入，选择视觉模型: ${visionModelName}`);
-      const providerEntry = MODEL_PROVIDERS[visionModelName];
-      const llmInstance = new providerEntry.model({
-        temperature: 0.7,
-        streaming: true,
-        ...providerEntry.config,
-        model: providerEntry.config.model || visionModelName,
-      }) as BaseChatModel<BaseChatModelCallOptions, AIMessageChunk>; // 视觉模型通常是 ChatModel
-
-      // 对于视觉模型，直接将所有消息（包括图像）传递给模型
-      // ChatPromptTemplate.fromMessages 可以处理包含 MessageContent 数组的消息
-      const prompt = ChatPromptTemplate.fromMessages(formattedMessages);
-      const chain = prompt.pipe(llmInstance).pipe(new StringOutputParser());
-      return { llmInstance, chain };
-    } else {
-      console.warn("[自动判断] 检测到图像输入，但未找到支持视觉功能的模型。将尝试使用Agent处理（Agent可能无法处理图像内容，仅处理文本）。");
-      // Fallback: 如果没有视觉模型，继续尝试 Agent 逻辑
-    }
-  }
-
-  // 2. 如果没有图像，或者没有找到视觉模型，则尝试使用 Agent 处理（思考、联网、工具调用）
-  // 寻找一个既有推理能力又支持工具调用的模型作为 Agent 的基底
-  const agentCapableModelName = Object.keys(MODEL_PROVIDERS).find(name =>
-    MODEL_PROVIDERS[name].capabilities.reasoning && MODEL_PROVIDERS[name].capabilities.tool_calling
-  );
-
-  let agentLLMInstance: BaseChatModel<BaseChatModelCallOptions, AIMessageChunk>; // Agent 总是需要 ChatModel
-  if (agentCapableModelName) {
-    console.log(`[自动判断] 选择支持工具调用和推理的 Agent 基模型: ${agentCapableModelName}`);
-    const providerEntry = MODEL_PROVIDERS[agentCapableModelName];
-    // 确保选中的模型是 ChatModel，因为 Agent 需要它
-    if (!("prototype" in providerEntry.model) || !(providerEntry.model.prototype instanceof BaseChatModel)) {
-      throw new Error(`模型 ${agentCapableModelName} 不是 ChatModel 类型，无法用作 Agent 的基底。`);
-    }
-    agentLLMInstance = new providerEntry.model({
+// 创建一个简单的回退模型
+function createFallbackModel(): BaseChatModel<BaseChatModelCallOptions, AIMessageChunk> {
+  const apiKey = process.env.OPENAI_API_KEY || 
+                 process.env.DEEPSEEK_API_KEY || 
+                 process.env.GOOGLE_API_KEY;
+  
+  if (process.env.OPENAI_API_KEY) {
+    return new ChatOpenAI({
       temperature: 0.7,
       streaming: true,
-      ...providerEntry.config,
-      model: providerEntry.config.model || agentCapableModelName,
-    }) as BaseChatModel<BaseChatModelCallOptions, AIMessageChunk>;
-  } else {
-    // 悲观回退：如果连 Agent 的基模型都找不到，则回退到一个普通的思考模型
-    const fallbackReasoningModelName = Object.keys(MODEL_PROVIDERS).find(name =>
+      apiKey: process.env.OPENAI_API_KEY,
+      model: 'gpt-4o-mini',
+    });
+  } else if (process.env.DEEPSEEK_API_KEY) {
+    return new ChatDeepSeek({
+      temperature: 0.7,
+      streaming: true,
+      deepseekApiKey: process.env.DEEPSEEK_API_KEY,
+      model: 'deepseek-chat',
+    });
+  } else if (process.env.GOOGLE_API_KEY) {
+    return new ChatGoogleGenerativeAI({
+      temperature: 0.7,
+      streaming: true,
+      apiKey: process.env.GOOGLE_API_KEY,
+      model: 'gemini-pro',
+    });
+  }
+  
+  throw new Error("No available API keys found for fallback model");
+}
+
+// 核心逻辑：自动判断并返回合适的 LLM 实例和 LangChain Chain
+async function determineModelAndChain(
+  formattedMessages: BaseMessage[],
+): Promise<{ llmInstance: BaseChatModel<BaseChatModelCallOptions, AIMessageChunk> | BaseLLM<BaseLLMCallOptions>, chain: Runnable<any, string> }> {
+
+  try {
+    // 1. 优先判断是否需要视觉模型 (有图像输入)
+    const hasImage = containsImage(formattedMessages);
+    if (hasImage) {
+      const visionModelName = Object.keys(MODEL_PROVIDERS).find(name =>
+        MODEL_PROVIDERS[name].capabilities.vision
+      );
+
+      if (visionModelName) {
+        const providerEntry = MODEL_PROVIDERS[visionModelName];
+        // 检查该视觉模型的 API key 是否可用
+        const configKeys = Object.keys(providerEntry.config);
+        const hasRequiredKey = configKeys.some(key => 
+          key.includes('apiKey') || key.includes('Api') ? process.env[providerEntry.config[key]?.replace('process.env.', '')] : true
+        );
+        
+        if (hasRequiredKey) {
+          console.log(`[自动判断] 检测到图像输入，选择视觉模型: ${visionModelName}`);
+          const llmInstance = new providerEntry.model({
+            temperature: 0.7,
+            streaming: true,
+            ...providerEntry.config,
+            model: providerEntry.config.model || visionModelName,
+          }) as BaseChatModel<BaseChatModelCallOptions, AIMessageChunk>;
+
+          const prompt = ChatPromptTemplate.fromMessages(formattedMessages);
+          const chain = prompt.pipe(llmInstance).pipe(new StringOutputParser());
+          return { llmInstance, chain };
+        }
+      }
+    }
+
+    // 2. 尝试使用 Agent 处理（如果有合适的模型和工具）
+    const agentCapableModelName = Object.keys(MODEL_PROVIDERS).find(name => {
+      const provider = MODEL_PROVIDERS[name];
+      return provider.capabilities.reasoning && provider.capabilities.tool_calling;
+    });
+
+    if (agentCapableModelName && process.env.TAVILY_API_KEY) {
+      const providerEntry = MODEL_PROVIDERS[agentCapableModelName];
+      
+      // 检查该模型的 API key 是否可用
+      let hasRequiredKey = false;
+      try {
+        const agentLLMInstance = new providerEntry.model({
+          temperature: 0.7,
+          streaming: true,
+          ...providerEntry.config,
+          model: providerEntry.config.model || agentCapableModelName,
+        }) as BaseChatModel<BaseChatModelCallOptions, AIMessageChunk>;
+
+        // 创建工具
+        const tools: Tool[] = [
+          new TavilySearchResults({ maxResults: 5, apiKey: process.env.TAVILY_API_KEY }),
+        ];
+
+        // 使用本地定义的 prompt，避免从 Hub 拉取
+        const agentPrompt = ChatPromptTemplate.fromMessages([
+          ["system", "You are a helpful AI assistant. You have access to tools to help answer questions. Use them when necessary to provide accurate and up-to-date information."],
+          new MessagesPlaceholder("chat_history"),
+          ["human", "{input}"],
+          new MessagesPlaceholder("agent_scratchpad"),
+        ]);
+
+        const memory = new BufferMemory({
+          memoryKey: "chat_history",
+          returnMessages: true,
+        });
+
+        const agentExecutor = await initializeAgentExecutorWithOptions(tools, agentLLMInstance, {
+          agentType: "openai-functions",
+          memory,
+          returnIntermediateSteps: true,
+          agentArgs: {
+            prefix: `Do your best to answer the questions. Feel free to use any tools available to look up relevant information, only if necessary.`,
+          },
+        });
+
+        const agentChain = RunnableSequence.from([
+          {
+            input: (i: { messages: BaseMessage[] }) => {
+              const lastMessage = i.messages[i.messages.length - 1];
+              if (lastMessage._getType() === "human") {
+                if (Array.isArray(lastMessage.content)) {
+                  const textPart = lastMessage.content.find((part) => part.type === "text") as { text: string };
+                  return textPart ? textPart.text : "";
+                }
+                return lastMessage.content as string;
+              }
+              return "";
+            },
+            chat_history: (i: { messages: BaseMessage[] }) => i.messages.slice(0, -1),
+          },
+          agentExecutor,
+          new StringOutputParser(),
+        ]);
+
+        console.log(`[自动判断] 将使用 Agent Chain 处理请求，模型: ${agentCapableModelName}`);
+        return { llmInstance: agentLLMInstance, chain: agentChain };
+
+      } catch (agentError) {
+        console.warn(`[自动判断] Agent 初始化失败: ${agentError.message}，回退到简单模型`);
+      }
+    }
+
+    // 3. 回退到简单的推理模型
+    const reasoningModelName = Object.keys(MODEL_PROVIDERS).find(name =>
       MODEL_PROVIDERS[name].capabilities.reasoning
     );
-    if (fallbackReasoningModelName) {
-      console.warn(`[自动判断] 未找到支持工具调用的模型，回退到普通思考模型: ${fallbackReasoningModelName}`);
-      const providerEntry = MODEL_PROVIDERS[fallbackReasoningModelName];
-      if (!("prototype" in providerEntry.model) || !(providerEntry.model.prototype instanceof BaseChatModel)) {
-        throw new Error(`回退模型 ${fallbackReasoningModelName} 不是 ChatModel 类型。`);
-      }
-      agentLLMInstance = new providerEntry.model({
-        temperature: 0.7,
-        streaming: true,
-        ...providerEntry.config,
-        model: providerEntry.config.model || fallbackReasoningModelName,
-      }) as BaseChatModel<BaseChatModelCallOptions, AIMessageChunk>;
-      // 在这种情况下，Agent 将无法使用工具，只会进行纯文本推理。
-    } else {
-      throw new Error("无法找到任何支持推理或工具调用的模型。请检查 MODEL_PROVIDERS 配置。");
-    }
-  }
 
-  // 构建 Agent (使用 ReAct 代理范式)
-  // 从 LangChain Hub 拉取 Agent Prompt。'hwchase17/react' 是一个经典的 ReAct 提示模板
-  const agentPrompt = await pull<ChatPromptTemplate>("hwchase17/react");
-  // 你也可以自定义 prompt，但需要包含 MessagesPlaceholder("agent_scratchpad") 和 MessagesPlaceholder("chat_history")
-  // const agentPrompt = ChatPromptTemplate.fromMessages([
-  //   ["system", "You are a helpful AI assistant. You have access to the following tools: {tools}"],
-  //   new MessagesPlaceholder("chat_history"), // 聊天历史
-  //   ["human", "{input}"], // 当前用户输入
-  //   new MessagesPlaceholder("agent_scratchpad"), // Agent 的思考过程和工具调用记录
-  // ]);
-
-
-  const memory = new BufferMemory({
-    memoryKey: "chat_history",
-    returnMessages: true,
-  });
-
-  const agentExecutor = await initializeAgentExecutorWithOptions(tools, agentLLMInstance, {
-    agentType: "openai-functions",
-    memory,
-    returnIntermediateSteps: true,
-    agentArgs: {
-      prefix: `Do your best to answer the questions.  Feel free to use any tools available to look up relevant information, only if necessary.`,
-    },
-  });
-
-  const agentChain = RunnableSequence.from([
-    {
-      input: (i: { messages: BaseMessage[] }) => {
-        const lastMessage = i.messages[i.messages.length - 1];
-        if (lastMessage._getType() === "human") {
-          if (Array.isArray(lastMessage.content)) {
-            const textPart = lastMessage.content.find((part) => part.type === "text") as { text: string };
-          return textPart ? textPart.text : "";
-          }
-          return lastMessage.content as string;
-        }
-        return "";
-      },
-      chat_history: (i: { messages: BaseMessage[] }) => i.messages.slice(0, -1),
-    },
-    agentExecutor,
-    new StringOutputParser(),
-  ]);
-
-  console.log("[自动判断] 将使用 Agent Chain 处理请求。");
-  return { llmInstance: agentLLMInstance, chain: agentChain };
-}
-export async function POST(req: NextRequest) {
-  const body = await req.json();
-  const messages = body.messages ?? [];
-
-  // 1. 格式化 Vercel AI SDK 消息为 LangChain 格式 (支持多模态)
-  const formattedMessages = messages.map(formatMessage);
-
-  let chosenLLMInstance: BaseChatModel<BaseChatModelCallOptions, AIMessageChunk> | BaseLLM<BaseLLMCallOptions>;
-  let finalChain: Runnable<any, string>;
-
-  // 2. 调用自动判断逻辑，获取合适的 LLM 实例和 Chain
-  try {
-    const { llmInstance, chain } = await determineModelAndChain(formattedMessages);
-    chosenLLMInstance = llmInstance;
-    finalChain = chain;
-  } catch (error: any) {
-    console.error("自动模型判断或构建链失败:", error);
-    return new Response(
-      JSON.stringify({
-        error: `自动模型选择或构建链失败: ${error.message}`,
-        stack: error.stack,
-      }),
-      {
-        status: 500,
-        headers: { "Content-Type": "application/json" },
-      }
-    );
-  }
-
-  // 3. 确保获取到的 LLM 实例有效
-  // 检查 chosenLLMInstance 是否有 stream 方法 (用于流式响应)
-  if (!chosenLLMInstance || typeof (chosenLLMInstance as any).stream !== 'function') {
-    // 如果没有 stream 方法，尝试使用 invoke 方法
-    if (typeof (chosenLLMInstance as any).invoke === 'function') {
-      console.warn("Chosen LLM instance does not support streaming, will use invoke.");
-      // 对于不支持流式输出的模型，我们可以先完整运行，然后将结果一次性返回
-      // 这是一个简化的处理，实际生产中可能需要更复杂的适配
+    if (reasoningModelName) {
+      const providerEntry = MODEL_PROVIDERS[reasoningModelName];
       try {
-        const result = await finalChain.invoke({ messages: formattedMessages });
+        console.log(`[自动判断] 使用推理模型: ${reasoningModelName}`);
+        const llmInstance = new providerEntry.model({
+          temperature: 0.7,
+          streaming: true,
+          ...providerEntry.config,
+          model: providerEntry.config.model || reasoningModelName,
+        }) as BaseChatModel<BaseChatModelCallOptions, AIMessageChunk>;
+
+        const prompt = ChatPromptTemplate.fromMessages([
+          ["system", "You are a helpful AI assistant."],
+          ...formattedMessages.map(msg => [msg._getType(), msg.content])
+        ]);
+        const chain = prompt.pipe(llmInstance).pipe(new StringOutputParser());
+        return { llmInstance, chain };
+      } catch (error) {
+        console.warn(`[自动判断] 推理模型 ${reasoningModelName} 初始化失败: ${error.message}`);
+      }
+    }
+
+    // 4. 最终回退到简单的可用模型
+    console.log("[自动判断] 回退到简单可用模型");
+    const fallbackModel = createFallbackModel();
+    const simplePrompt = ChatPromptTemplate.fromMessages([
+      ["system", "You are a helpful AI assistant."],
+      ...formattedMessages.map(msg => [msg._getType(), msg.content])
+    ]);
+    const simpleChain = simplePrompt.pipe(fallbackModel).pipe(new StringOutputParser());
+    return { llmInstance: fallbackModel, chain: simpleChain };
+
+  } catch (error: any) {
+    console.error("[自动判断] 所有模型初始化都失败，使用最基本的回退:", error);
+    
+    // 最后的回退策略
+    const basicFallback = createFallbackModel();
+    const basicPrompt = ChatPromptTemplate.fromMessages([
+      ["system", "You are a helpful AI assistant."],
+      ["human", "{input}"]
+    ]);
+    const basicChain = basicPrompt.pipe(basicFallback).pipe(new StringOutputParser());
+    return { llmInstance: basicFallback, chain: basicChain };
+  }
+}
+
+export async function POST(req: NextRequest) {
+  try {
+    console.log('API request received');
+    
+    const body = await req.json();
+    const messages = body.messages ?? [];
+
+    if (!messages.length) {
+      console.error('No messages provided');
+      return new Response("No messages provided", { status: 400 });
+    }
+
+    // 检查至少有一个可用的 API key
+    const hasApiKey = process.env.OPENAI_API_KEY || 
+                      process.env.DEEPSEEK_API_KEY || 
+                      process.env.GOOGLE_API_KEY ||
+                      process.env.NEKO_API_KEY ||
+                      process.env.O3_API_KEY ||
+                      process.env.OPENROUTER_API_KEY ||
+                      process.env.DASHSCOPE_API_KEY ||
+                      process.env.CLOUDFLARE_API_TOKEN ||
+                      process.env.TENCENT_HUNYUAN_SECRET_KEY;
+    
+    if (!hasApiKey) {
+      console.error('No API keys found in environment variables');
+      return new Response(
+        JSON.stringify({ error: "No API keys configured" }), 
+        { status: 500, headers: { "Content-Type": "application/json" } }
+      );
+    }
+
+    console.log('Formatting messages...');
+    const formattedMessages = messages.map(formatMessage);
+
+    console.log('Determining model and chain...');
+    const { llmInstance, chain } = await determineModelAndChain(formattedMessages);
+
+    if (!llmInstance || !chain) {
+      console.error('Failed to create model instance or chain');
+      return new Response(
+        JSON.stringify({ error: "Failed to initialize AI model" }), 
+        { status: 500, headers: { "Content-Type": "application/json" } }
+      );
+    }
+
+    // 检查是否支持流式输出
+    if (typeof (llmInstance as any).stream !== 'function') {
+      console.warn("Model does not support streaming, using invoke instead");
+      try {
+        const result = await chain.invoke({ messages: formattedMessages });
         return new Response(result, {
           status: 200,
           headers: { 'Content-Type': 'text/plain' },
@@ -458,7 +516,7 @@ export async function POST(req: NextRequest) {
         console.error("Invoke failed:", invokeError);
         return new Response(
           JSON.stringify({
-            error: `Invoke 模式执行失败: ${invokeError.message}`,
+            error: `Invoke execution failed: ${invokeError.message}`,
             stack: invokeError.stack,
           }),
           {
@@ -468,17 +526,32 @@ export async function POST(req: NextRequest) {
         );
       }
     }
-    return new Response(JSON.stringify({ error: `无效的 LLM 实例，它既没有 stream 也没有 invoke 方法。` }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' },
+
+    console.log('Starting stream...');
+    const stream = await chain.stream({
+      messages: formattedMessages,
     });
+
+    return new StreamingTextResponse(stream);
+
+  } catch (error: any) {
+    console.error('API Error - Full details:', error);
+    console.error('Error stack:', error.stack);
+    console.error('Error name:', error.name);
+    console.error('Error message:', error.message);
+    
+    return new Response(
+      JSON.stringify({
+        error: 'Internal Server Error',
+        message: error.message,
+        stack: error.stack,
+        name: error.name
+      }),
+      {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' }
+      }
+    );
   }
-
-  // 4. 定义并执行流式传输过程
-  const stream = await finalChain.stream({
-    messages: formattedMessages, // 将完整的格式化消息数组传递给链
-  });
-
-  // 5. 返回流式响应
-  return new StreamingTextResponse(stream);
 }
+
