@@ -123,7 +123,7 @@ const MODEL_PROVIDERS: Record<string, {
     config: { apiKey: process.env.NEKO_API_KEY, baseURL: process.env.NEKO_BASE_URL },
     capabilities: { vision: true, reasoning: true },
   },
-  'deepseek-ai/DeepSeek-V3-search': {
+  'Qwen/QwQ-32B-search': {
     type: 'openai_compatible',
     model: ChatOpenAI,
     config: { apiKey: process.env.O3_API_KEY, baseURL: process.env.O3_BASE_URL },
