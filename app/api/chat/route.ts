@@ -104,7 +104,7 @@ const RouterOutputSchema = z.object({
     "complex_reasoning_request",
     "simple_chat_request",
   ]).describe("The user's intent based on the conversation history and current message."),
-  query: z.string().optional().describe("A concise query extracted from the user's message, relevant to the detected intent."),
+  query: z.string().nullable().optional().describe("A concise query extracted from the user's message, relevant to the detected intent."),
   requiresChineseOptimization: z.boolean().describe("Whether the request would benefit from Chinese language optimization."),
   complexity: z.enum(["low", "medium", "high"]).describe("The estimated complexity of the request to help with model selection."),
   contextDependency: z.boolean().describe("Whether the request heavily depends on conversation history/context."),
@@ -500,7 +500,7 @@ const visionResponderChain = RunnableLambda.from(async (input: { messages: BaseM
 });
 
 // Web Search / Agent Responder
-const webSearchResponderChain = RunnableLambda.from(async (input: { messages: BaseMessage[], query?: string }) => {
+const webSearchResponderChain = RunnableLambda.from(async (input: { messages: BaseMessage[], query?: string | null }) => {
   const models = [
     'gemini-flash',
     'deepseek-ai/DeepSeek-R1-search',
@@ -570,7 +570,7 @@ const webSearchResponderChain = RunnableLambda.from(async (input: { messages: Ba
 });
 
 // Complex Reasoning Responder
-const complexReasoningResponderChain = RunnableLambda.from(async (input: { messages: BaseMessage[], query?: string }) => {
+const complexReasoningResponderChain = RunnableLambda.from(async (input: { messages: BaseMessage[], query?: string | null }) => {
   const models = [
     'gemini-flash',
     'deepseek-reasoner',
@@ -692,14 +692,14 @@ export async function POST(req: NextRequest) {
         [
           (output: z.infer<typeof RouterOutputSchema>) => output.intent === "web_search_request",
           RunnableLambda.from(async (output: z.infer<typeof RouterOutputSchema>) => {
-            const result = await webSearchResponderChain.invoke({ messages: formattedMessages, query: output.query });
+            const result = await webSearchResponderChain.invoke({ messages: formattedMessages, query: output.query ?? undefined });
             return { chain: result.chain, llmInstance: result.llmInstance };
           }),
         ],
         [
           (output: z.infer<typeof RouterOutputSchema>) => output.intent === "complex_reasoning_request",
           RunnableLambda.from(async (output: z.infer<typeof RouterOutputSchema>) => {
-            const result = await complexReasoningResponderChain.invoke({ messages: formattedMessages, query: output.query });
+            const result = await complexReasoningResponderChain.invoke({ messages: formattedMessages, query: output.query ?? undefined });
             return { chain: result.chain, llmInstance: result.llmInstance };
           }),
         ],
