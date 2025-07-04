@@ -424,48 +424,22 @@ const { llmInstance: routerModel, modelName: actualRouterModelName } = getModel(
 const { llmInstance: routerFallbackModel } = getModel(ROUTER_FALLBACK_MODEL_NAME);
 
 const routerPrompt = ChatPromptTemplate.fromMessages([
-  ["system", `You are an intelligent routing assistant. Analyze user messages and conversation history to:
-
-1. Classify the user's intent as one of:
-- \`vision_request\`: Requests involving image analysis or visual content
-- \`web_search_request\`: Requests needing recent information, factual queries, real-time data, or web search
-- \`complex_reasoning_request\`: Multi-step reasoning, logic analysis, code generation, or complex problem-solving
-- \`simple_chat_request\`: Simple conversations, greetings, or general queries not requiring specific tools
-
-2. For each request, determine:
-- Chinese Optimization: Whether the request would benefit from Chinese language optimization
-- Complexity Level: low/medium/high based on reasoning steps and context needed
-- Context Dependency: Whether the request heavily relies on conversation history
-
-3. Extract a concise query when applicable.
-
-Output JSON format should strictly adhere to the following structure:
-\`\`\`json
-{
-  "intent": "vision_request" | "web_search_request" | "complex_reasoning_request" | "simple_chat_request",
-  "query": "concise query string" (optional),
-  "requiresChineseOptimization": true | false,
-  "complexity": "low" | "medium" | "high",
-  "contextDependency": true | false
-}
-\`\`\`
-Example:
-\`\`\`json
-{
-  "intent": "web_search_request",
-  "query": "latest news on AI",
-  "requiresChineseOptimization": false,
-  "complexity": "medium",
-  "contextDependency": false
-}
-\`\`\`
-
-Guidelines:
-- For vision_request: Set complexity based on the type of visual analysis needed
-- For web_search_request: Always include a clear, searchable query
-- For complex_reasoning_request: Assess steps needed and context requirements
-- For simple_chat_request: Focus on language optimization and context dependency
-`
+  ["system", "You are an intelligent routing assistant. Analyze user messages and conversation history to:\n\n" +
+             "1. Classify the user's intent as one of:\n" +
+             "- `vision_request`: Requests involving image analysis or visual content\n" +
+             "- `web_search_request`: Requests needing recent information, factual queries, real-time data, or web search\n" +
+             "- `complex_reasoning_request`: Multi-step reasoning, logic analysis, code generation, or complex problem-solving\n" +
+             "- `simple_chat_request`: Simple conversations, greetings, or general queries not requiring specific tools\n\n" +
+             "2. For each request, determine:\n" +
+             "- Chinese Optimization: Whether the request would benefit from Chinese language optimization\n" +
+             "- Complexity Level: low/medium/high based on reasoning steps and context needed\n" +
+             "- Context Dependency: Whether the request heavily relies on conversation history\n\n" +
+             "3. Extract a concise query when applicable.\n\n" +
+             "Guidelines:\n" +
+             "- For vision_request: Set complexity based on the type of visual analysis needed\n" +
+             "- For web_search_request: Always include a clear, searchable query\n" +
+             "- For complex_reasoning_request: Assess steps needed and context requirements\n" +
+             "- For simple_chat_request: Focus on language optimization and context dependency\n"
   ],
   new MessagesPlaceholder("chat_history"),
   ["human", "{input}"],
