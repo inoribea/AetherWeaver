@@ -189,30 +189,30 @@ const MODEL_PROVIDERS: Record<string, {
     capabilities: { reasoning: true },
   },
   // --- Cloudflare Workers AI Models ---
-  'cloudflare-llama-3-8b-instruct': {
+  'bge-reranker-base': {
     type: 'cloudflare',
     model: CloudflareWorkersAI,
     config: {
       cloudflareAccountId: process.env.CLOUDFLARE_ACCOUNT_ID,
       cloudflareApiToken: process.env.CLOUDFLARE_API_TOKEN,
-      model: '@cf/meta/llama-3-8b-instruct',
+      model: '@cf/baai/bge-reranker-base',
       temperature: 0.7,
     },
     capabilities: { reasoning: true },
   },
-  'cloudflare-gemma-7b-it': {
+  'bge-m3': {
     type: 'cloudflare',
     model: CloudflareWorkersAI,
     config: {
       cloudflareAccountId: process.env.CLOUDFLARE_ACCOUNT_ID,
       cloudflareApiToken: process.env.CLOUDFLARE_API_TOKEN,
-      model: '@cf/google/gemma-7b-it',
+      model: '@cf/baai/bge-m3',
       temperature: 0.7,
     },
     capabilities: { reasoning: true },
   },
   // --- Tencent Hunyuan Models ---
-  'tencent-hunyuan-t1': {
+  'hunyuan-t1': {
     type: 'tencent_hunyuan',
     model: ChatTencentHunyuan,
     config: {
@@ -223,7 +223,7 @@ const MODEL_PROVIDERS: Record<string, {
     },
     capabilities: { reasoning: true },
   },
-  'tencent-hunyuan-turbo': {
+  'hunyuan-turbos': {
     type: 'tencent_hunyuan',
     model: ChatTencentHunyuan,
     config: {
@@ -235,10 +235,10 @@ const MODEL_PROVIDERS: Record<string, {
     capabilities: { reasoning: true },
   },
   // --- Google Gemini Models ---
-  'gemini-pro': {
+  'gemini-flash-lite': {
     type: 'google_gemini',
     model: ChatGoogleGenerativeAI,
-    config: { apiKey: process.env.GOOGLE_API_KEY, model: 'gemini-2.5-pro-preview-05-06' },
+    config: { apiKey: process.env.GOOGLE_API_KEY, model: 'models/gemini-2.5-flash-lite-preview-06-17' },
     capabilities: { reasoning: true, tool_calling: true },
   },
   'gemini-pro-vision': {
