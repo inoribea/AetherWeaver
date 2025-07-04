@@ -8,13 +8,15 @@ import {
   SystemMessage,
   AIMessageChunk,
   BaseMessage,
-  MessageContent 
+  MessageContent
 } from '@langchain/core/messages';
 import { ChatPromptTemplate, MessagesPlaceholder } from '@langchain/core/prompts';
 import { StringOutputParser } from '@langchain/core/output_parsers';
 import { BaseChatModel, BaseChatModelCallOptions } from '@langchain/core/language_models/chat_models';
 import { BaseLLM, BaseLLMCallOptions } from '@langchain/core/language_models/llms';
-import { Runnable, RunnableLambda, RunnableSequence } from '@langchain/core/runnables';
+import { Runnable, RunnableLambda, RunnableSequence, RunnableBranch } from '@langchain/core/runnables';
+import { StructuredTool } from "@langchain/core/tools";
+import { z } from 'zod';
 
 // LangChain Integration Imports
 import { ChatOpenAI } from '@langchain/openai';
@@ -22,6 +24,37 @@ import { ChatDeepSeek } from "@langchain/deepseek";
 import { ChatAlibabaTongyi } from '@langchain/community/chat_models/alibaba_tongyi';
 import { CloudflareWorkersAI } from '@langchain/cloudflare';
 import { ChatTencentHunyuan } from '@langchain/community/chat_models/tencent_hunyuan';
+
+// Model wrapper functions
+function createAlibabaTongyiModel(config: {
+  temperature?: number;
+  streaming?: boolean;
+  model?: string;
+  apiKey?: string;
+}) {
+  return new ChatAlibabaTongyi({
+    temperature: config.temperature,
+    streaming: config.streaming,
+    model: config.model,
+    alibabaApiKey: config.apiKey
+  });
+}
+
+function createTencentHunyuanModel(config: {
+  temperature?: number;
+  streaming?: boolean;
+  model?: string;
+  secretId?: string;
+  secretKey?: string;
+}) {
+  return new ChatTencentHunyuan({
+    temperature: config.temperature,
+    streaming: config.streaming,
+    model: config.model,
+    tencentSecretId: config.secretId, // Corrected: direct tencentSecretId
+    tencentSecretKey: config.secretKey // Corrected: direct tencentSecretKey
+  });
+}
 import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
 
 // --- Imports for Tools and Agents ---
@@ -34,7 +67,7 @@ import { BufferMemory } from "langchain/memory";
 //export const runtime = 'edge'; // Keep this commented unless you intend to use edge runtime
 
 // Helper function to format messages from Vercel AI SDK to LangChain format
-interface ContentPart { 
+interface ContentPart {
   type?: string;
   text?: string;
   image_url?: { url: any };
@@ -53,140 +86,148 @@ function formatMessage(message: VercelChatMessage): BaseMessage {
         // Fallback for unexpected part types
         return { type: 'text', text: (part as any).text || String(part) };
       });
-      // Cast to MessageContent as it can be string or MessageContentComplex[]
       return new HumanMessage({ content: contentParts as MessageContent });
     }
     return new HumanMessage(message.content as string);
   } else if (message.role === 'assistant') {
-    // AIMessage content is typically string, but can be MessageContent if it contains tool calls etc.
-    // For simplicity here, assuming string content from assistant for now.
     return new AIMessage(message.content as string);
-  } else { // Assuming system message for other roles
+  } else {
     return new SystemMessage(message.content as string);
   }
 }
 
-import { ChatPromptValueInterface } from "@langchain/core/prompt_values";
-
-// Helper to convert chat messages to a text string, useful for debugging or specific models.
-// Note: This might not be used directly in the current chain logic but can be helpful.
-const messagesToText = new RunnableLambda({
-  func: (input: ChatPromptValueInterface) => {
-    const messages = input.messages;
-    return messages.map((m: BaseMessage) => {
-      if (m._getType() === 'human' && Array.isArray(m.content)) {
-        return `Human: ${m.content.map(part => {
-          if (part.type === 'text') return part.text;
-          if (part.type === 'image_url') return `[Image: ${part.image_url.url}]`;
-          return ''; // Ignore other types for this text conversion
-        }).join(' ')}`;
-      }
-      return `${m._getType()}: ${m.content}`;
-    }).join("\n");
-  },
+// Router Output Schema with enhanced intent classification
+const RouterOutputSchema = z.object({
+  intent: z.enum([
+    "vision_request",
+    "web_search_request",
+    "complex_reasoning_request",
+    "simple_chat_request",
+  ]).describe("The user's intent based on the conversation history and current message."),
+  query: z.string().optional().describe("A concise query extracted from the user's message, relevant to the detected intent."),
+  requiresChineseOptimization: z.boolean().describe("Whether the request would benefit from Chinese language optimization."),
+  complexity: z.enum(["low", "medium", "high"]).describe("The estimated complexity of the request to help with model selection."),
+  contextDependency: z.boolean().describe("Whether the request heavily depends on conversation history/context."),
 });
 
-// Define model configuration mapping
+// 定义模型配置映射 – note that we now give configuration an extraHeaders property.
 const MODEL_PROVIDERS: Record<string, {
   type: string;
   model: new (...args: any[]) => BaseChatModel<BaseChatModelCallOptions, AIMessageChunk> | BaseLLM<BaseLLMCallOptions>;
-  config: Record<string, any>;
+  config: {
+    apiKey?: string;
+    baseURL?: string;
+    model?: string;
+    secretId?: string;
+    secretKey?: string;
+    temperature?: number;
+    extraHeaders?: Record<string, string>;
+    configuration?: {
+      baseURL?: string;
+      apiKey?: string;
+      secretId?: string;
+      secretKey?: string;
+      cloudflareAccountId?: string;
+      cloudflareApiToken?: string;
+      extraHeaders?: Record<string, string>;
+    };
+  };
   capabilities: {
     vision?: boolean;
     reasoning?: boolean;
     tool_calling?: boolean;
+    search?: boolean;
+    chinese?: boolean;
   };
 }> = {
-  // --- Base Models (OpenAI) ---
-  'gpt4.1': {
-    type: 'openai_compatible',
-    model: ChatOpenAI,
-    config: { apiKey: process.env.NEKO_API_KEY, baseURL: process.env.NEKO_BASE_URL },
-    capabilities: { vision: true, reasoning: true, tool_calling: true },
-  },
-  // --- Custom Models (OpenAI Compatible via Neko/O3) ---
+  // --- OpenAI Compatible Models (via Neko/O3/OpenRouter) ---
   'gpt-4o-all': {
     type: 'openai_compatible',
     model: ChatOpenAI,
-    config: { apiKey: process.env.NEKO_API_KEY, baseURL: process.env.NEKO_BASE_URL },
+    config: { apiKey: process.env.NEKO_API_KEY, configuration: { baseURL: process.env.NEKO_BASE_URL }, model: 'gpt-4o-all' },
     capabilities: { vision: true, reasoning: true, tool_calling: true },
   },
   'o4-mini': {
     type: 'openai_compatible',
     model: ChatOpenAI,
-    config: { apiKey: process.env.NEKO_API_KEY, baseURL: process.env.NEKO_BASE_URL },
+    config: { apiKey: process.env.NEKO_API_KEY, configuration: { baseURL: process.env.NEKO_BASE_URL }, model: 'o4-mini' },
     capabilities: { reasoning: true },
   },
   'claude-sonnet-4-all': {
     type: 'openai_compatible',
     model: ChatOpenAI,
-    config: { apiKey: process.env.NEKO_API_KEY, baseURL: process.env.NEKO_BASE_URL },
+    config: { apiKey: process.env.NEKO_API_KEY, configuration: { baseURL: process.env.NEKO_BASE_URL }, model: 'claude-sonnet-4-all' },
     capabilities: { vision: true, reasoning: true },
   },
   'Qwen/QwQ-32B-search': {
     type: 'openai_compatible',
     model: ChatOpenAI,
-    config: { apiKey: process.env.O3_API_KEY, baseURL: process.env.O3_BASE_URL },
-    capabilities: { reasoning: true, tool_calling: true },
+    config: { apiKey: process.env.O3_API_KEY, configuration: { baseURL: process.env.O3_BASE_URL }, model: 'Qwen/QwQ-32B-search' },
+    capabilities: { reasoning: true, tool_calling: true, search: true },
   },
   'deepseek-ai/DeepSeek-R1-search': {
     type: 'openai_compatible',
     model: ChatOpenAI,
-    config: { apiKey: process.env.O3_API_KEY, baseURL: process.env.O3_BASE_URL },
-    capabilities: { reasoning: true, tool_calling: true },
+    config: { apiKey: process.env.O3_API_KEY, configuration: { baseURL: process.env.O3_BASE_URL }, model: 'deepseek-ai/DeepSeek-R1-search' },
+    capabilities: { reasoning: true, tool_calling: true, search: true },
   },
-  // --- OpenRouter Models ---
   'rekaai/reka-flash-3:free': {
     type: 'openai_compatible',
     model: ChatOpenAI,
     config: {
       apiKey: process.env.OPENROUTER_API_KEY,
-      baseURL: process.env.OPENROUTER_BASE_URL,
-      extraHeaders: {
-        "HTTP-Referer": process.env.VERCEL_APP_URL || "https://your-vercel-app-url.com",
-        "X-Title": process.env.APP_TITLE || "Your App Title",
+      configuration: {
+        baseURL: process.env.OPENROUTER_BASE_URL,
+        extraHeaders: {
+          "HTTP-Referer": process.env.VERCEL_APP_URL || "https://your-vercel-app-url.com",
+          "X-Title": process.env.APP_TITLE || "Your App Title"
+        }
       },
+      model: 'rekaai/reka-flash-3:free'
     },
-    capabilities: { reasoning: true },
+    capabilities: { reasoning: true, search: true },
   },
   'qwen/qwen3-8b:free': {
     type: 'openai_compatible',
     model: ChatOpenAI,
     config: {
       apiKey: process.env.OPENROUTER_API_KEY,
-      baseURL: process.env.OPENROUTER_BASE_URL,
-      extraHeaders: {
-        "HTTP-Referer": process.env.VERCEL_APP_URL || "https://your-vercel-app-url.com",
-        "X-Title": process.env.APP_TITLE || "Your App Title",
+      configuration: {
+        baseURL: process.env.OPENROUTER_BASE_URL,
+        extraHeaders: {
+          "HTTP-Referer": process.env.VERCEL_APP_URL || "https://your-vercel-app-url.com",
+          "X-Title": process.env.APP_TITLE || "Your App Title"
+        }
       },
+      model: 'qwen/qwen3-8b:free'
     },
-    capabilities: { reasoning: true },
+    capabilities: { reasoning: true }
   },
   // --- DeepSeek Models ---
   'deepseek-chat': {
     type: 'deepseek',
     model: ChatDeepSeek,
-    config: { deepseekApiKey: process.env.DEEPSEEK_API_KEY },
-    capabilities: { reasoning: true },
+    config: { configuration: { apiKey: process.env.DEEPSEEK_API_KEY }, model: 'deepseek-chat' },
+    capabilities: { reasoning: true, chinese: true }
   },
   'deepseek-reasoner': {
     type: 'deepseek',
     model: ChatDeepSeek,
-    config: { deepseekApiKey: process.env.DEEPSEEK_API_KEY, model: 'deepseek-reasoner' },
-    capabilities: { reasoning: true },
+    config: { configuration: { apiKey: process.env.DEEPSEEK_API_KEY }, model: 'deepseek-reasoner' },
+    capabilities: { reasoning: true, chinese: true }
   },
   // --- Aliyun Bailian (Tongyi) Models ---
   'qwen-turbo': {
     type: 'alibaba_tongyi',
     model: ChatAlibabaTongyi,
     config: { apiKey: process.env.DASHSCOPE_API_KEY, model: 'qwen-turbo-latest' },
-    capabilities: { reasoning: true, tool_calling: true },
+    capabilities: { reasoning: true, tool_calling: true, chinese: true }
   },
   'qvq-plus': {
     type: 'alibaba_tongyi',
     model: ChatAlibabaTongyi,
     config: { apiKey: process.env.DASHSCOPE_API_KEY, model: 'qvq-plus' },
-    capabilities: { reasoning: true },
+    capabilities: { vision: true, chinese: true }
   },
   // --- Tencent Hunyuan Models ---
   'hunyuan-t1': {
@@ -196,9 +237,9 @@ const MODEL_PROVIDERS: Record<string, {
       secretId: process.env.TENCENT_HUNYUAN_SECRET_ID,
       secretKey: process.env.TENCENT_HUNYUAN_SECRET_KEY,
       model: 'hunyuan-t1-latest',
-      temperature: 0.7,
+      temperature: 0.7
     },
-    capabilities: { reasoning: true },
+    capabilities: { reasoning: true, chinese: true }
   },
   'hunyuan-turbos': {
     type: 'tencent_hunyuan',
@@ -207,31 +248,30 @@ const MODEL_PROVIDERS: Record<string, {
       secretId: process.env.TENCENT_HUNYUAN_SECRET_ID,
       secretKey: process.env.TENCENT_HUNYUAN_SECRET_KEY,
       model: 'hunyuan-turbos-latest',
-      temperature: 0.7,
+      temperature: 0.7
     },
-    capabilities: { reasoning: true },
+    capabilities: { reasoning: true, chinese: true }
   },
   // --- Google Gemini Models ---
   'gemini-flash-lite': {
     type: 'google_gemini',
     model: ChatGoogleGenerativeAI,
     config: { apiKey: process.env.GOOGLE_API_KEY, model: 'models/gemini-2.5-flash-lite-preview-06-17' },
-    capabilities: { reasoning: true, tool_calling: true },
+    capabilities: { reasoning: true, tool_calling: true }
   },
   'gemini-flash': {
     type: 'google_gemini',
     model: ChatGoogleGenerativeAI,
     config: { apiKey: process.env.GOOGLE_API_KEY, model: 'gemini-2.5-flash-preview-05-20' },
-    capabilities: { reasoning: true, tool_calling: true },
-  },
+    capabilities: { reasoning: true, tool_calling: true, search: true }
+  }
 };
 
-// Helper function to check if messages contain image content
+// 辅助函数：检查消息是否包含图片内容
 function containsImage(messages: BaseMessage[]): boolean {
   for (const msg of messages) {
     if (msg._getType() === 'human' && Array.isArray(msg.content)) {
       for (const part of msg.content) {
-        // Ensure part is not a string before accessing properties
         if (typeof part === 'object' && part !== null && part.type === 'image_url') {
           return true;
         }
@@ -241,337 +281,472 @@ function containsImage(messages: BaseMessage[]): boolean {
   return false;
 }
 
-// Create a fallback model
-function createFallbackModel(): BaseChatModel<BaseChatModelCallOptions, AIMessageChunk> {
-  // Prioritize OpenAI if available, then DeepSeek, then Google
-  if (process.env.OPENAI_API_KEY) {
-    console.log("Using OpenAI as fallback model");
-    return new ChatOpenAI({
+// 辅助函数：检查文本是否主要为中文
+function isChinese(text: string): boolean {
+  const chineseChars = (text.match(/[-]/g) || []).length;
+  const totalChars = text.length;
+  return totalChars > 0 && (chineseChars / totalChars) > 0.5;
+}
+
+// 辅助函数：获取模型实例
+function getModel(modelName: string): { llmInstance: BaseChatModel<BaseChatModelCallOptions, AIMessageChunk>, modelName: string } {
+  const providerEntry = MODEL_PROVIDERS[modelName];
+  if (!providerEntry) {
+    console.warn(`Model configuration for ${modelName} not found. Attempting fallback.`);
+    return createFallbackModel();
+  }
+
+  // Simplified API key check – only checking for properties we expect.
+  let isApiKeyAvailable = false;
+  if (providerEntry.config.apiKey) {
+    isApiKeyAvailable = true;
+  } else if (providerEntry.config.secretId && providerEntry.config.secretKey) {
+    isApiKeyAvailable = true;
+  } else if (providerEntry.type === 'google_gemini' && providerEntry.config.apiKey) {
+    isApiKeyAvailable = true;
+  }
+  if (!isApiKeyAvailable) {
+    console.warn(`API key for model ${modelName} is missing. Attempting fallback.`);
+    return createFallbackModel();
+  }
+
+  try {
+    console.log(`Initializing model: ${modelName}`);
+    let modelInstance: BaseChatModel<BaseChatModelCallOptions, AIMessageChunk>;
+    if (providerEntry.type === 'openai_compatible') {
+      modelInstance = new ChatOpenAI({
+        temperature: 0.7,
+        streaming: true,
+        apiKey: providerEntry.config.apiKey!,
+        configuration: providerEntry.config.configuration,
+        model: providerEntry.config.model || modelName,
+      }) as BaseChatModel<BaseChatModelCallOptions, AIMessageChunk>;
+    } else if (providerEntry.type === 'deepseek') {
+      modelInstance = new ChatDeepSeek({
+        temperature: 0.7,
+        streaming: true,
+        apiKey: providerEntry.config.apiKey!, 
+        model: providerEntry.config.model || modelName,
+      }) as BaseChatModel<BaseChatModelCallOptions, AIMessageChunk>;
+    } else if (providerEntry.type === 'alibaba_tongyi') {
+      modelInstance = createAlibabaTongyiModel({
+        temperature: 0.7,
+        streaming: true,
+        model: providerEntry.config.model || modelName,
+        apiKey: providerEntry.config.apiKey // Use apiKey for alibabaApiKey
+      });
+    } else if (providerEntry.type === 'tencent_hunyuan') {
+      modelInstance = createTencentHunyuanModel({
+        temperature: 0.7,
+        streaming: true,
+        model: providerEntry.config.model || modelName,
+        secretId: providerEntry.config.secretId,
+        secretKey: providerEntry.config.secretKey
+      });
+    } else if (providerEntry.type === 'google_gemini') {
+      modelInstance = new ChatGoogleGenerativeAI({
+        temperature: 0.7,
+        streaming: true,
+        apiKey: providerEntry.config.apiKey!,
+        model: providerEntry.config.model || modelName,
+      }) as BaseChatModel<BaseChatModelCallOptions, AIMessageChunk>;
+    } else {
+      throw new Error(`Unsupported model type: ${providerEntry.type}`);
+    }
+    return { llmInstance: modelInstance, modelName: modelName };
+  } catch (error) {
+    console.error(`Failed to initialize model ${modelName}:`, error);
+    return createFallbackModel();
+  }
+}
+
+// 创建一个通用的回退模型
+function createFallbackModel(): { llmInstance: BaseChatModel<BaseChatModelCallOptions, AIMessageChunk>, modelName: string } {
+  let fallbackModel: BaseChatModel<BaseChatModelCallOptions, AIMessageChunk>;
+  let fallbackModelName: string;
+  if (process.env.NEKO_API_KEY || process.env.OPENAI_API_KEY) {
+    console.log("使用 OpenAI 兼容模型作为回退模型");
+    fallbackModelName = process.env.NEKO_BASE_URL ? 'gpt-4o-all' : 'gpt-4o-mini';
+    fallbackModel = new ChatOpenAI({
       temperature: 0.7,
       streaming: true,
-      apiKey: process.env.OPENAI_API_KEY,
-      // Prefer a capable model like gpt-4o-mini if available, otherwise a basic one.
-      model: process.env.NEKO_BASE_URL ? 'gpt-4o-all' : 'gpt-4o-mini', // Assuming NEKO_BASE_URL implies Neko/O3, use gpt-4o-all
-      // Correctly configure baseURL via configuration object
-      configuration: {
-        baseURL: process.env.NEKO_BASE_URL || process.env.OPENAI_BASE_URL,
-      },
+      apiKey: process.env.NEKO_API_KEY || process.env.OPENAI_API_KEY,
+      configuration: { baseURL: process.env.NEKO_BASE_URL || process.env.OPENAI_BASE_URL },
+      model: fallbackModelName,
     });
   } else if (process.env.DEEPSEEK_API_KEY) {
-    console.log("Using DeepSeek as fallback model");
-    return new ChatDeepSeek({
+    console.log("使用 DeepSeek 作为回退模型");
+    fallbackModelName = 'deepseek-chat';
+    fallbackModel = new ChatDeepSeek({
       temperature: 0.7,
       streaming: true,
-      configuration: {
-        apiKey: process.env.DEEPSEEK_API_KEY,
-      },
-      model: 'deepseek-chat', // Or 'deepseek-reasoner' if preferred for fallback
+      apiKey: process.env.DEEPSEEK_API_KEY,
+      model: fallbackModelName,
     });
   } else if (process.env.GOOGLE_API_KEY) {
-    console.log("Using Google Gemini as fallback model");
-    return new ChatGoogleGenerativeAI({
+    console.log("使用 Google Gemini 作为回退模型");
+    fallbackModelName = 'gemini-pro';
+    fallbackModel = new ChatGoogleGenerativeAI({
       temperature: 0.7,
       streaming: true,
       apiKey: process.env.GOOGLE_API_KEY,
-      model: 'gemini-pro', // Or 'gemini-flash'
+      model: fallbackModelName,
     });
+  } else if (process.env.DASHSCOPE_API_KEY) {
+    console.log("使用 Aliyun Tongyi 作为回退模型");
+    fallbackModelName = 'qwen-turbo-latest';
+    fallbackModel = createAlibabaTongyiModel({
+      temperature: 0.7,
+      streaming: true,
+      model: fallbackModelName,
+      apiKey: process.env.DASHSCOPE_API_KEY // Use apiKey for alibabaApiKey
+    });
+  } else if (process.env.TENCENT_HUNYUAN_SECRET_ID && process.env.TENCENT_HUNYUAN_SECRET_KEY) {
+    console.log("使用 Tencent Hunyuan 作为回退模型");
+    fallbackModelName = 'hunyuan-turbos-latest';
+    fallbackModel = createTencentHunyuanModel({
+      temperature: 0.7,
+      streaming: true,
+      model: fallbackModelName,
+      secretId: process.env.TENCENT_HUNYUAN_SECRET_ID,
+      secretKey: process.env.TENCENT_HUNYUAN_SECRET_KEY
+    });
+  } else {
+    throw new Error("未找到可用的 API 密钥，无法创建回退模型。请配置 OPENAI_API_KEY, DEEPSEEK_API_KEY, GOOGLE_API_KEY, DASHSCOPE_API_KEY 或 TENCENT_HUNYUAN_SECRET_KEY。");
   }
-  // Add other fallbacks if necessary (e.g., Cloudflare, Tencent)
-  
-  throw new Error("No available API keys found for fallback model. Please configure OPENAI_API_KEY, DEEPSEEK_API_KEY, or GOOGLE_API_KEY.");
+  return { llmInstance: fallbackModel, modelName: fallbackModelName };
 }
 
-// Core logic: auto-detect and return the appropriate LLM instance and LangChain Chain
-async function determineModelAndChain(
-  formattedMessages: BaseMessage[],
-): Promise<{ llmInstance: BaseChatModel<BaseChatModelCallOptions, AIMessageChunk> | BaseLLM<BaseLLMCallOptions>, chain: Runnable<any, string> }> {
+// --- Router Chain ---
+const ROUTER_MODEL_NAME = 'Qwen/QwQ-32B-search';
+const ROUTER_FALLBACK_MODEL_NAME = 'qwen/qwen3-8b:free';
+const { llmInstance: routerModel, modelName: actualRouterModelName } = getModel(ROUTER_MODEL_NAME);
+const { llmInstance: routerFallbackModel } = getModel(ROUTER_FALLBACK_MODEL_NAME);
 
-  try {
-    // 1. Prioritize vision models if image content is present
-    const hasImage = containsImage(formattedMessages);
-    if (hasImage) {
-      const visionModelName = Object.keys(MODEL_PROVIDERS).find(name =>
-        MODEL_PROVIDERS[name].capabilities.vision
-      );
+const routerPrompt = ChatPromptTemplate.fromMessages([
+  ["system", `You are an intelligent routing assistant. Analyze user messages and conversation history to:
 
-      if (visionModelName) {
-        const providerEntry = MODEL_PROVIDERS[visionModelName];
-        // Check if the required API key for this vision model is available
-        let apiKeyEnvVar: string | undefined;
-        // This logic needs to be robust for all potential API key env var names
-        if (providerEntry.config.apiKey) apiKeyEnvVar = providerEntry.config.apiKey.replace('process.env.', '');
-        else if (providerEntry.config.deepseekApiKey) apiKeyEnvVar = providerEntry.config.deepseekApiKey.replace('process.env.', '');
-        else if (providerEntry.config.secretId && providerEntry.config.secretKey) apiKeyEnvVar = "TENCENT_HUNYUAN_SECRET_KEY"; // Placeholder logic
-        else if (providerEntry.config.cloudflareAccountId && providerEntry.config.cloudflareApiToken) apiKeyEnvVar = "CLOUDFLARE_API_TOKEN"; // Placeholder logic
-        // Add more checks for other API key types if needed
+1. Classify the user's intent as one of:
+- \`vision_request\`: Requests involving image analysis or visual content
+- \`web_search_request\`: Requests needing recent information, factual queries, real-time data, or web search
+- \`complex_reasoning_request\`: Multi-step reasoning, logic analysis, code generation, or complex problem-solving
+- \`simple_chat_request\`: Simple conversations, greetings, or general queries not requiring specific tools
 
-        const isApiKeyAvailable = apiKeyEnvVar ? !!process.env[apiKeyEnvVar] : false;
+2. For each request, determine:
+- Chinese Optimization: Whether the request would benefit from Chinese language optimization
+- Complexity Level: low/medium/high based on reasoning steps and context needed
+- Context Dependency: Whether the request heavily relies on conversation history
 
-        if (isApiKeyAvailable) {
-          console.log(`[Auto-detect] Image input detected, selecting vision model: ${visionModelName}`);
-          const llmInstance = new providerEntry.model({
-            temperature: 0.7,
-            streaming: true,
-            ...providerEntry.config,
-            model: providerEntry.config.model || visionModelName,
-          }) as BaseChatModel<BaseChatModelCallOptions, AIMessageChunk>;
+3. Extract a concise query when applicable.
 
-          // Use the already correctly formatted BaseMessage array
-          const prompt = ChatPromptTemplate.fromMessages(formattedMessages);
-          const chain = prompt.pipe(llmInstance).pipe(new StringOutputParser());
-          return { llmInstance, chain };
-        } else {
-          console.log(`[Auto-detect] Vision model ${visionModelName} selected, but API key is missing.`);
+Output JSON format:
+${JSON.stringify(RouterOutputSchema.shape, null, 2)}
+
+Guidelines:
+- For vision_request: Set complexity based on the type of visual analysis needed
+- For web_search_request: Always include a clear, searchable query
+- For complex_reasoning_request: Assess steps needed and context requirements
+- For simple_chat_request: Focus on language optimization and context dependency
+`],
+  new MessagesPlaceholder("chat_history"),
+  ["human", "{input}"],
+]);
+
+const routerChain = RunnableSequence.from([
+  {
+    input: (input: { messages: BaseMessage[] }) => {
+      const lastMessage = input.messages[input.messages.length - 1];
+      if (lastMessage._getType() === "human") {
+        if (Array.isArray(lastMessage.content)) {
+          const textPart = lastMessage.content.find((part) => typeof part === 'object' && part !== null && part.type === 'text') as { text: string };
+          return textPart ? textPart.text : "";
         }
-      } else {
-        console.log("[Auto-detect] Image input detected, but no vision model found with available API key.");
+        return lastMessage.content as string;
       }
+      return "";
+    },
+    chat_history: (input: { messages: BaseMessage[] }) => input.messages.slice(0, -1),
+  },
+  routerPrompt,
+  routerModel.withStructuredOutput(RouterOutputSchema, {
+    name: "RouterOutput", // Optional: provide a name for better context
+  }).withFallbacks({ fallbacks: [routerFallbackModel] }),
+]);
+
+// --- Responder Chains ---
+
+// Vision Responder
+const visionResponderChain = RunnableLambda.from(async (input: { messages: BaseMessage[] }) => {
+  const models = [
+    'gpt-4o-all',
+    'qvq-plus',
+    'claude-sonnet-4-all',
+  ];
+  let selectedModel: BaseChatModel<BaseChatModelCallOptions, AIMessageChunk> | null = null;
+  let selectedModelName: string | null = null;
+  for (const modelName of models) {
+    try {
+      const { llmInstance, modelName: actualName } = getModel(modelName);
+      selectedModel = llmInstance;
+      selectedModelName = actualName;
+      console.log(`Vision Responder: Using model ${selectedModelName}`);
+      break;
+    } catch (e) {
+      console.warn(`Vision Responder: Model ${modelName} unavailable or API key missing. Trying next.`, e);
     }
+  }
+  if (!selectedModel) {
+    console.error("Vision Responder: No vision models available. Falling back to general chat.");
+    const fallback = getModel('gemini-flash-lite');
+    selectedModel = fallback.llmInstance;
+    selectedModelName = fallback.modelName;
+  }
+  const prompt = ChatPromptTemplate.fromMessages(input.messages);
+  const chain = prompt.pipe(selectedModel).pipe(new StringOutputParser());
+  return { chain, llmInstance: selectedModel };
+});
 
-    // 2. Attempt to use Agent for reasoning and tool calling
-    const agentCapableModelName = Object.keys(MODEL_PROVIDERS).find(name => {
-      const provider = MODEL_PROVIDERS[name];
-      // Prioritize models that can handle tool_calling and reasoning
-      return provider.capabilities.reasoning && provider.capabilities.tool_calling;
-    });
-
-    // Check if a suitable agent model and TAVILY_API_KEY are available
-    if (agentCapableModelName && process.env.TAVILY_API_KEY) {
-      const providerEntry = MODEL_PROVIDERS[agentCapableModelName];
-      let apiKeyEnvVar: string | undefined;
-      if (providerEntry.config.apiKey) apiKeyEnvVar = providerEntry.config.apiKey.replace('process.env.', '');
-      else if (providerEntry.config.deepseekApiKey) apiKeyEnvVar = providerEntry.config.deepseekApiKey.replace('process.env.', '');
-      // Add more checks for other API key types if needed
-
-      const isApiKeyAvailable = apiKeyEnvVar ? !!process.env[apiKeyEnvVar] : false;
-
-      if (isApiKeyAvailable) {
-        try {
-          console.log(`[Auto-detect] Attempting to initialize Agent with model: ${agentCapableModelName}`);
-          const agentLLMInstance = new providerEntry.model({
-            temperature: 0.7,
-            streaming: true,
-            ...providerEntry.config,
-            model: providerEntry.config.model || agentCapableModelName,
-          }) as BaseChatModel<BaseChatModelCallOptions, AIMessageChunk>;
-
-          // Create tools
-          const tools: Tool[] = [
-            new TavilySearchResults({ maxResults: 5, apiKey: process.env.TAVILY_API_KEY }),
-          ];
-
-          // Use locally defined prompt, avoid fetching from hub
-          const agentPrompt = ChatPromptTemplate.fromMessages([
-            ["system", "You are a helpful AI assistant. You have access to tools to help answer questions. Use them when necessary to provide accurate and up-to-date information."],
-            new MessagesPlaceholder("chat_history"),
-            ["human", "{input}"],
-            new MessagesPlaceholder("agent_scratchpad"),
-          ]);
-
-          const memory = new BufferMemory({
-            memoryKey: "chat_history",
-            returnMessages: true,
-          });
-
-          const agentExecutor = await initializeAgentExecutorWithOptions(tools, agentLLMInstance, {
-            agentType: "openai-functions", // Assumes the model supports OpenAI's function calling format
-            memory,
-            returnIntermediateSteps: true,
-            agentArgs: {
-              prefix: `Do your best to answer the questions. Feel free to use any tools available to look up relevant information, only if necessary.`,
-            },
-          });
-
-          // AgentExecutor itself handles messages, so we can pipe it.
-          // The input to agentExecutor should be structured correctly by the RunnableSequence.
-          const agentChain = RunnableSequence.from([
-            {
-              // Map the incoming messages to the agent's expected input format
-              input: (i: { messages: BaseMessage[] }) => {
-                // Get the last human message content
-                const lastMessage = i.messages[i.messages.length - 1];
-                if (lastMessage._getType() === "human") {
-                  if (Array.isArray(lastMessage.content)) {
-                    // Extract text part if content is complex (with images, etc.)
-                    const textPart = lastMessage.content.find((part) => typeof part === 'object' && part !== null && part.type === 'text') as { text: string };
-                    return textPart ? textPart.text : "";
-                  }
-                  return lastMessage.content as string; // Plain string content
-                }
-                return ""; // Should not happen if last message is always human
-              },
-              chat_history: (i: { messages: BaseMessage[] }) => i.messages.slice(0, -1), // All messages except the last one for history
-            },
-            agentExecutor,
-            new StringOutputParser(), // Parse the final output from the agent
-          ]);
-
-          console.log(`[Auto-detect] Successfully initialized Agent Chain with model: ${agentCapableModelName}`);
-          // AgentExecutor itself needs the LLM, so return it.
-          return { llmInstance: agentLLMInstance, chain: agentChain };
-
-        } catch (agentError: any) { // Use 'any' or 'Error' for type safety
-          console.warn(`[Auto-detect] Agent initialization failed: ${agentError.message}. Falling back to simple model.`);
-          // If agent initialization fails, we will fall through to the next logic.
-        }
-      } else {
-        console.log(`[Auto-detect] Agent model ${agentCapableModelName} selected, but API key is missing.`);
-      }
-    } else {
-      if (!process.env.TAVILY_API_KEY) console.log("[Auto-detect] Agent model selected, but TAVILY_API_KEY is missing.");
-      else console.log("[Auto-detect] No agent-capable model found with available API key.");
+// Web Search / Agent Responder
+const webSearchResponderChain = RunnableLambda.from(async (input: { messages: BaseMessage[], query?: string }) => {
+  const models = [
+    'gemini-flash',
+    'deepseek-ai/DeepSeek-R1-search',
+    'gpt-4o-all',
+    'Qwen/QwQ-32B-search',
+    'rekaai/reka-flash-3:free',
+  ];
+  let selectedModel: BaseChatModel<BaseChatModelCallOptions, AIMessageChunk> | null = null;
+  let selectedModelName: string | null = null;
+  for (const modelName of models) {
+    try {
+      const { llmInstance, modelName: actualName } = getModel(modelName);
+      selectedModel = llmInstance;
+      selectedModelName = actualName;
+      console.log(`Web Search Responder: Using model ${selectedModelName}`);
+      break;
+    } catch (e) {
+      console.warn(`Web Search Responder: Model ${modelName} unavailable or API key missing. Trying next.`, e);
     }
-
-    // 3. Fallback to simple reasoning models
-    const reasoningModelName = Object.keys(MODEL_PROVIDERS).find(name =>
-      MODEL_PROVIDERS[name].capabilities.reasoning
-    );
-
-    if (reasoningModelName) {
-      const providerEntry = MODEL_PROVIDERS[reasoningModelName];
-      let apiKeyEnvVar: string | undefined;
-      if (providerEntry.config.apiKey) apiKeyEnvVar = providerEntry.config.apiKey.replace('process.env.', '');
-      // Add other API key checks if needed for this provider
-
-      const isApiKeyAvailable = apiKeyEnvVar ? !!process.env[apiKeyEnvVar] : false;
-
-      if (isApiKeyAvailable) {
-        try {
-          console.log(`[Auto-detect] Using reasoning model: ${reasoningModelName}`);
-          const llmInstance = new providerEntry.model({
-            temperature: 0.7,
-            streaming: true,
-            ...providerEntry.config,
-            model: providerEntry.config.model || reasoningModelName,
-          }) as BaseChatModel<BaseChatModelCallOptions, AIMessageChunk>;
-
-          const prompt = ChatPromptTemplate.fromMessages(formattedMessages);
-          const chain = prompt.pipe(llmInstance).pipe(new StringOutputParser());
-          return { llmInstance, chain };
-        } catch (error: any) { // Use 'any' or 'Error' for type safety
-          console.warn(`[Auto-detect] Reasoning model ${reasoningModelName} initialization failed: ${error.message}`);
-          // Fall through if this model also fails to initialize
-        }
-      } else {
-        console.log(`[Auto-detect] Reasoning model ${reasoningModelName} selected, but API key is missing.`);
-      }
-    } else {
-      console.log("[Auto-detect] No reasoning model found with available API key.");
-    }
-
-    // 4. Final fallback to any available simple model
-    console.log("[Auto-detect] Falling back to a generally available simple model.");
-    const fallbackModel = createFallbackModel(); // This function already handles API key checks and throws if none found.
-    const simplePrompt = ChatPromptTemplate.fromMessages(formattedMessages);
-    const simpleChain = simplePrompt.pipe(fallbackModel).pipe(new StringOutputParser());
-    return { llmInstance: fallbackModel, chain: simpleChain };
-
-  } catch (error: any) { // Catch-all for any unforeseen errors during model/chain determination
-    console.error("[Auto-detect] An unexpected error occurred during model/chain determination:", error);
-    
-    // If all attempts fail, provide a very basic fallback.
-    // This might not handle complex messages like images.
-    console.warn("[Auto-detect] All model initialization attempts failed, using a most basic fallback.");
-    
-    const basicFallback = createFallbackModel(); // This will throw if no keys are set at all
-    const basicPrompt = ChatPromptTemplate.fromMessages([
-      ["system", "You are a helpful AI assistant."],
-      // For the absolute basic fallback, assume text-only input
-      ["human", "{input}"] 
+  }
+  if (!selectedModel) {
+    console.error("Web Search Responder: No search models available. Falling back to general chat.");
+    const fallback = getModel('gemini-flash-lite');
+    selectedModel = fallback.llmInstance;
+    selectedModelName = fallback.modelName;
+  }
+  // Access MODEL_PROVIDERS only if selectedModelName is non-null.
+  if (selectedModelName && (MODEL_PROVIDERS[selectedModelName]?.capabilities.search || MODEL_PROVIDERS[selectedModelName]?.capabilities.tool_calling) && process.env.TAVILY_API_KEY) {
+    console.log(`Web Search Responder: Initializing agent with ${selectedModelName}`);
+    const tools: Tool[] = [
+      new TavilySearchResults({ maxResults: 5, apiKey: process.env.TAVILY_API_KEY }),
+    ];
+    const agentPrompt = ChatPromptTemplate.fromMessages([
+      ["system", "你是一个有用的AI助手。你可以使用工具来帮助回答问题。在必要时使用它们来提供准确和最新的信息。"],
+      new MessagesPlaceholder("chat_history"),
+      ["human", "{input}"],
+      new MessagesPlaceholder("agent_scratchpad"),
     ]);
-    const basicChain = basicPrompt.pipe(basicFallback).pipe(new StringOutputParser());
-    return { llmInstance: basicFallback, chain: basicChain };
+    const memory = new BufferMemory({
+      memoryKey: "chat_history",
+      returnMessages: true,
+    });
+    const agentExecutor = await initializeAgentExecutorWithOptions(tools, selectedModel, {
+      agentType: "openai-functions",
+      memory,
+      returnIntermediateSteps: true,
+      agentArgs: {
+        prefix: `尽力回答问题。如果需要，可以随意使用任何可用的工具来查找相关信息。`,
+      },
+    });
+    const chain = RunnableSequence.from([
+      {
+        input: (i: { messages: BaseMessage[], query?: string }) =>
+          i.query || (i.messages[i.messages.length - 1] as HumanMessage).content,
+        chat_history: (i: { messages: BaseMessage[] }) => i.messages.slice(0, -1),
+      },
+      agentExecutor,
+      new StringOutputParser(),
+    ]);
+    return { chain, llmInstance: selectedModel };
+  } else {
+    console.log(`Web Search Responder: Using simple chat for ${selectedModelName} (no agent/search capability or missing TAVILY_API_KEY).`);
+    const prompt = ChatPromptTemplate.fromMessages(input.messages);
+    const chain = prompt.pipe(selectedModel).pipe(new StringOutputParser());
+    return { chain, llmInstance: selectedModel };
   }
-}
+});
+
+// Complex Reasoning Responder
+const complexReasoningResponderChain = RunnableLambda.from(async (input: { messages: BaseMessage[], query?: string }) => {
+  const models = [
+    'gemini-flash',
+    'deepseek-reasoner',
+    'hunyuan-t1',
+    'o4-mini',
+    'claude-sonnet-4-all',
+  ];
+  const lastMessageText = (input.messages[input.messages.length - 1] as HumanMessage).content;
+  const isChineseRequest = typeof lastMessageText === 'string' && isChinese(lastMessageText);
+  let selectedModel: BaseChatModel<BaseChatModelCallOptions, AIMessageChunk> | null = null;
+  let selectedModelName: string | null = null;
+  for (const modelName of models) {
+    const providerEntry = MODEL_PROVIDERS[modelName];
+    if (providerEntry) {
+      if (isChineseRequest && providerEntry.capabilities.chinese) {
+        try {
+          const { llmInstance, modelName: actualName } = getModel(modelName);
+          selectedModel = llmInstance;
+          selectedModelName = actualName;
+          console.log(`Complex Reasoning Responder: Using Chinese-preferred model ${selectedModelName}`);
+          break;
+        } catch (e) {
+          console.warn(`Complex Reasoning Responder: Chinese model ${modelName} unavailable. Trying next.`, e);
+        }
+      } else if (!isChineseRequest && !providerEntry.capabilities.chinese) {
+        try {
+          const { llmInstance, modelName: actualName } = getModel(modelName);
+          selectedModel = llmInstance;
+          selectedModelName = actualName;
+          console.log(`Complex Reasoning Responder: Using model ${selectedModelName}`);
+          break;
+        } catch (e) {
+          console.warn(`Complex Reasoning Responder: Model ${modelName} unavailable. Trying next.`, e);
+        }
+      }
+    }
+  }
+  if (!selectedModel) {
+    console.error("Complex Reasoning Responder: No suitable reasoning models available. Falling back to general chat.");
+    const fallback = getModel('gemini-flash-lite');
+    selectedModel = fallback.llmInstance;
+    selectedModelName = fallback.modelName;
+  }
+  const prompt = ChatPromptTemplate.fromMessages(input.messages);
+  const chain = prompt.pipe(selectedModel).pipe(new StringOutputParser());
+  return { chain, llmInstance: selectedModel };
+});
+
+// General Chat Responder
+const generalChatResponderChain = RunnableLambda.from(async (input: { messages: BaseMessage[] }) => {
+  const defaultModels = [
+    'gemini-flash-lite',
+    'gpt4.1',
+    'hunyuan-turbos',
+    'deepseek-chat',
+    'qwen-turbo',
+  ];
+  const chineseModels = [
+    'hunyuan-turbos',
+    'deepseek-chat',
+    'gemini-flash-lite',
+    'gpt4.1',
+    'qwen-turbo',
+  ];
+  const lastMessageText = (input.messages[input.messages.length - 1] as HumanMessage).content;
+  const isChineseRequest = typeof lastMessageText === 'string' && isChinese(lastMessageText);
+  const modelsToTry = isChineseRequest ? chineseModels : defaultModels;
+  let selectedModel: BaseChatModel<BaseChatModelCallOptions, AIMessageChunk> | null = null;
+  let selectedModelName: string | null = null;
+  for (const modelName of modelsToTry) {
+    try {
+      const { llmInstance, modelName: actualName } = getModel(modelName);
+      selectedModel = llmInstance;
+      selectedModelName = actualName;
+      console.log(`General Chat Responder: Using model ${selectedModelName} (Chinese preference: ${isChineseRequest})`);
+      break;
+    } catch (e) {
+      console.warn(`General Chat Responder: Model ${modelName} unavailable. Trying next.`, e);
+    }
+  }
+  if (!selectedModel) {
+    console.error("General Chat Responder: No general chat models available. Falling back to a generic model.");
+    const fallback = createFallbackModel();
+    selectedModel = fallback.llmInstance;
+    selectedModelName = fallback.modelName;
+  }
+  const prompt = ChatPromptTemplate.fromMessages(input.messages);
+  const chain = prompt.pipe(selectedModel).pipe(new StringOutputParser());
+  return { chain, llmInstance: selectedModel };
+});
 
 export async function POST(req: NextRequest) {
   try {
     console.log('API request received');
-    
     const body = await req.json();
     const messages = body.messages ?? [];
-
     if (!messages.length) {
       console.error('No messages provided');
       return new Response("No messages provided", { status: 400 });
     }
-
-    // Check if at least one API key is available across all providers
-    const allApiKeysPresent = 
-      !!process.env.OPENAI_API_KEY || 
-      !!process.env.DEEPSEEK_API_KEY || 
-      !!process.env.GOOGLE_API_KEY ||
-      !!process.env.NEKO_API_KEY || 
-      !!process.env.O3_API_KEY || 
-      !!process.env.OPENROUTER_API_KEY || 
-      !!process.env.DASHSCOPE_API_KEY || 
-      !!process.env.CLOUDFLARE_API_TOKEN || 
-      (!!process.env.TENCENT_HUNYUAN_SECRET_ID && !!process.env.TENCENT_HUNYUAN_SECRET_KEY);
-    
-    if (!allApiKeysPresent) {
-      console.error('No API keys found in environment variables. Please configure keys for supported providers.');
-      return new Response(
-        JSON.stringify({ error: "No API keys configured for any supported AI provider." }), 
-        { status: 500, headers: { "Content-Type": "application/json" } }
-      );
-    }
-
     console.log('Formatting messages...');
     const formattedMessages = messages.map(formatMessage);
+    let finalChain: Runnable<any, string>;
+    let llmInstance: BaseChatModel<BaseChatModelCallOptions, AIMessageChunk> | BaseLLM<BaseLLMCallOptions>;
+    const hasImage = containsImage(formattedMessages);
+    if (hasImage) {
+      console.log("[Main Router] Image input detected, routing to Vision Responder.");
+      const result = await visionResponderChain.invoke({ messages: formattedMessages });
+      finalChain = result.chain;
+      llmInstance = result.llmInstance;
+    } else {
+      console.log("[Main Router] No image input, routing through Router Chain.");
+      const routerOutput = await routerChain.invoke({ messages: formattedMessages }) as z.infer<typeof RouterOutputSchema>;
+      const intent = routerOutput.intent;
+      const query = routerOutput.query || "";
+      console.log(`[Main Router] Detected intent: ${intent}, Query: ${query}`);
 
-    console.log('Determining model and chain...');
-    // The determineModelAndChain function now correctly uses the formattedMessages directly.
-    const { llmInstance, chain } = await determineModelAndChain(formattedMessages);
+      const branch = RunnableBranch.from([
+        [
+          (output: z.infer<typeof RouterOutputSchema>) => output.intent === "web_search_request",
+          RunnableLambda.from(async (output: z.infer<typeof RouterOutputSchema>) => {
+            const result = await webSearchResponderChain.invoke({ messages: formattedMessages, query: output.query });
+            return { chain: result.chain, llmInstance: result.llmInstance };
+          }),
+        ],
+        [
+          (output: z.infer<typeof RouterOutputSchema>) => output.intent === "complex_reasoning_request",
+          RunnableLambda.from(async (output: z.infer<typeof RouterOutputSchema>) => {
+            const result = await complexReasoningResponderChain.invoke({ messages: formattedMessages, query: output.query });
+            return { chain: result.chain, llmInstance: result.llmInstance };
+          }),
+        ],
+        [
+          (output: z.infer<typeof RouterOutputSchema>) => output.intent === "simple_chat_request",
+          RunnableLambda.from(async () => {
+            const result = await generalChatResponderChain.invoke({ messages: formattedMessages });
+            return { chain: result.chain, llmInstance: result.llmInstance };
+          }),
+        ],
+        // Default case if no intent matches (should not happen with enum, but good for robustness)
+        RunnableLambda.from(async () => {
+          console.warn("[Main Router] No specific intent matched, falling back to general chat.");
+          const result = await generalChatResponderChain.invoke({ messages: formattedMessages });
+          return { chain: result.chain, llmInstance: result.llmInstance };
+        }),
+      ]);
 
-    if (!llmInstance || !chain) {
-      console.error('Failed to create model instance or chain');
+      const branchResult = await branch.invoke(routerOutput);
+      finalChain = branchResult.chain;
+      llmInstance = branchResult.llmInstance;
+    }
+    if (!llmInstance || !finalChain) {
+      console.error('Failed to create model instance or chain after routing');
       return new Response(
-        JSON.stringify({ error: "Failed to initialize AI model" }), 
+        JSON.stringify({ error: "Failed to initialize AI model after routing" }), 
         { status: 500, headers: { "Content-Type": "application/json" } }
       );
     }
-
-    // Check if the model instance supports streaming. Some models might only support invoke.
-    // LangChain's BaseChatModel doesn't have a 'stream' method directly, but its Runnable adapter does.
-    // A more reliable check is to see if the chain can be streamed.
-    // However, for simpler cases, we might assume streaming if 'streaming: true' was set.
-    // A robust check would be more complex, checking specific model implementations.
-    // For now, let's assume 'chain.stream' will work if the model was configured for streaming.
-
     console.log('Starting stream...');
     try {
-      const stream = await chain.stream({
-        messages: formattedMessages, // Pass the correctly formatted messages
-      });
-
+      const stream = await finalChain.stream({ messages: formattedMessages });
       return new StreamingTextResponse(stream);
-
     } catch (streamError: any) {
       console.error("Streaming failed, attempting to invoke:", streamError);
-      // If streaming fails, try a non-streaming invoke.
       try {
-        // The input to chain.invoke might need to match the expected input structure.
-        // For a typical chain like prompt.pipe(model).pipe(parser), it's often { input: ..., chat_history: ... } or just { messages: ... }
-        // Since our chain is `prompt.pipe(llmInstance).pipe(parser)`, it expects the input format matching the prompt.
-        // `ChatPromptTemplate.fromMessages(formattedMessages)` doesn't explicitly define input variables like `input` or `chat_history`.
-        // However, `agentExecutor` in the AgentChain part does define `input` and `chat_history`.
-        // Let's assume `chain.invoke` can handle an object with `messages` if the chain was built that way.
-        // For chains constructed with fromMessages, it usually expects the variable name used in the prompt, or just implicitly uses the messages.
-        // The most common pattern for prompt.pipe(model) is expecting an object that gets passed to the prompt.
-        // Since `fromMessages` takes the full message array, the chain might expect `{ messages: formattedMessages }` or similar.
-        // If the chain was built using `messages:formattedMessages`, the invoke might need a compatible object.
-        // Let's try passing the formattedMessages directly if it's a simple chain.
-        
-        const result = await chain.invoke({ messages: formattedMessages });
-
-        // If invoke succeeds, return it as a plain text response.
-        return new Response(result, {
-          status: 200,
-          headers: { 'Content-Type': 'text/plain' },
-        });
+        const result = await finalChain.invoke({ messages: formattedMessages });
+        return new Response(result, { status: 200, headers: { 'Content-Type': 'text/plain' } });
       } catch (invokeError: any) {
         console.error("Invoke also failed:", invokeError);
-        // If both stream and invoke fail, return an error.
         return new Response(
           JSON.stringify({
             error: `AI processing failed. Streaming error: ${streamError.message}, Invoke error: ${invokeError.message}`,
@@ -581,20 +756,12 @@ export async function POST(req: NextRequest) {
               invokeStack: invokeError.stack,
             }
           }),
-          {
-            status: 500,
-            headers: { "Content-Type": "application/json" },
-          }
+          { status: 500, headers: { "Content-Type": "application/json" } }
         );
       }
     }
-
-  } catch (error: any) { // Catch-all for errors during request parsing, message formatting, etc.
+  } catch (error: any) {
     console.error('API Error - Request processing failed:', error);
-    console.error('Error stack:', error.stack);
-    console.error('Error name:', error.name);
-    console.error('Error message:', error.message);
-    
     return new Response(
       JSON.stringify({
         error: 'Internal Server Error during request processing',
@@ -602,10 +769,7 @@ export async function POST(req: NextRequest) {
         stack: error.stack,
         name: error.name
       }),
-      {
-        status: 500,
-        headers: { 'Content-Type': 'application/json' }
-      }
+      { status: 500, headers: { 'Content-Type': 'application/json' } }
     );
   }
-} // <-- Semicolon added here to ensure statement termination.
+}
