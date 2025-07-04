@@ -675,12 +675,15 @@ export async function POST(req: NextRequest) {
     const formattedMessages = messages.map(formatMessage);
     let finalChain: Runnable<any, string>;
     let llmInstance: BaseChatModel<BaseChatModelCallOptions, AIMessageChunk> | BaseLLM<BaseLLMCallOptions>;
+    let selectedModelName: string | undefined;
     const hasImage = containsImage(formattedMessages);
     if (hasImage) {
       console.log("[Main Router] Image input detected, routing to Vision Responder.");
       const result = await visionResponderChain.invoke({ messages: formattedMessages });
       finalChain = result.chain;
       llmInstance = result.llmInstance;
+      // 获取模型名
+      selectedModelName = (llmInstance as any)?.model || (llmInstance as any)?.modelName || (llmInstance as any)?.constructor?.name || "UnknownModel";
     } else {
       console.log("[Main Router] No image input, routing through Router Chain.");
       const routerOutput = await routerChain.invoke({ messages: formattedMessages }) as z.infer<typeof RouterOutputSchema>;
@@ -721,6 +724,8 @@ export async function POST(req: NextRequest) {
       const branchResult = await branch.invoke(routerOutput);
       finalChain = branchResult.chain;
       llmInstance = branchResult.llmInstance;
+      // 获取模型名
+      selectedModelName = (llmInstance as any)?.model || (llmInstance as any)?.modelName || (llmInstance as any)?.constructor?.name || "UnknownModel";
     }
     if (!llmInstance || !finalChain) {
       console.error('Failed to create model instance or chain after routing');
@@ -729,15 +734,28 @@ export async function POST(req: NextRequest) {
         { status: 500, headers: { "Content-Type": "application/json" } }
       );
     }
+    // 统一输出模型名
+    const modelNameForOutput = selectedModelName || (llmInstance as any)?.model || (llmInstance as any)?.modelName || (llmInstance as any)?.constructor?.name || "UnknownModel";
     console.log('Starting stream...');
     try {
       const stream = await finalChain.stream({ messages: formattedMessages });
-      return new StreamingTextResponse(stream);
+      // 包装 stream，在开头插入模型名
+      const encoder = new TextEncoder();
+      const transformedStream = new ReadableStream({
+        async start(controller) {
+          controller.enqueue(encoder.encode(`${modelNameForOutput}:\n`));
+          for await (const chunk of stream) {
+            controller.enqueue(typeof chunk === "string" ? encoder.encode(chunk) : chunk);
+          }
+          controller.close();
+        }
+      });
+      return new StreamingTextResponse(transformedStream);
     } catch (streamError: any) {
       console.error("Streaming failed, attempting to invoke:", streamError);
       try {
         const result = await finalChain.invoke({ messages: formattedMessages });
-        return new Response(result, { status: 200, headers: { 'Content-Type': 'text/plain' } });
+        return new Response(`${modelNameForOutput}:\n${result}`, { status: 200, headers: { 'Content-Type': 'text/plain' } });
       } catch (invokeError: any) {
         console.error("Invoke also failed:", invokeError);
         return new Response(
