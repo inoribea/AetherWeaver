@@ -188,29 +188,6 @@ const MODEL_PROVIDERS: Record<string, {
     config: { apiKey: process.env.DASHSCOPE_API_KEY, model: 'qvq-plus' },
     capabilities: { reasoning: true },
   },
-  // --- Cloudflare Workers AI Models ---
-  'bge-reranker-base': {
-    type: 'cloudflare',
-    model: CloudflareWorkersAI,
-    config: {
-      cloudflareAccountId: process.env.CLOUDFLARE_ACCOUNT_ID,
-      cloudflareApiToken: process.env.CLOUDFLARE_API_TOKEN,
-      model: '@cf/baai/bge-reranker-base',
-      temperature: 0.7,
-    },
-    capabilities: { reasoning: true },
-  },
-  'bge-m3': {
-    type: 'cloudflare',
-    model: CloudflareWorkersAI,
-    config: {
-      cloudflareAccountId: process.env.CLOUDFLARE_ACCOUNT_ID,
-      cloudflareApiToken: process.env.CLOUDFLARE_API_TOKEN,
-      model: '@cf/baai/bge-m3',
-      temperature: 0.7,
-    },
-    capabilities: { reasoning: true },
-  },
   // --- Tencent Hunyuan Models ---
   'hunyuan-t1': {
     type: 'tencent_hunyuan',
@@ -240,12 +217,6 @@ const MODEL_PROVIDERS: Record<string, {
     model: ChatGoogleGenerativeAI,
     config: { apiKey: process.env.GOOGLE_API_KEY, model: 'models/gemini-2.5-flash-lite-preview-06-17' },
     capabilities: { reasoning: true, tool_calling: true },
-  },
-  'gemini-pro-vision': {
-    type: 'google_gemini',
-    model: ChatGoogleGenerativeAI,
-    config: { apiKey: process.env.GOOGLE_API_KEY, model: 'gemini-pro-vision' },
-    capabilities: { vision: true, reasoning: true },
   },
   'gemini-flash': {
     type: 'google_gemini',
@@ -638,4 +609,3 @@ export async function POST(req: NextRequest) {
     );
   }
 } // <-- Semicolon added here to ensure statement termination.
-
