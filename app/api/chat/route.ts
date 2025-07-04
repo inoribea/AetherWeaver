@@ -283,7 +283,7 @@ function containsImage(messages: BaseMessage[]): boolean {
 
 // 辅助函数：检查文本是否主要为中文
 function isChinese(text: string): boolean {
-  const chineseChars = (text.match(/[-]/g) || []).length;
+  const chineseChars = (text.match(/[\u4E00-\u9FFF]/g) || []).length; // Corrected regex for Chinese characters
   const totalChars = text.length;
   return totalChars > 0 && (chineseChars / totalChars) > 0.5;
 }
@@ -439,15 +439,34 @@ const routerPrompt = ChatPromptTemplate.fromMessages([
 
 3. Extract a concise query when applicable.
 
-Output JSON format:
-${JSON.stringify(RouterOutputSchema.shape, null, 2)}
+Output JSON format should strictly adhere to the following structure:
+\`\`\`json
+{
+  "intent": "vision_request" | "web_search_request" | "complex_reasoning_request" | "simple_chat_request",
+  "query": "concise query string" (optional),
+  "requiresChineseOptimization": true | false,
+  "complexity": "low" | "medium" | "high",
+  "contextDependency": true | false
+}
+\`\`\`
+Example:
+\`\`\`json
+{
+  "intent": "web_search_request",
+  "query": "latest news on AI",
+  "requiresChineseOptimization": false,
+  "complexity": "medium",
+  "contextDependency": false
+}
+\`\`\`
 
 Guidelines:
 - For vision_request: Set complexity based on the type of visual analysis needed
 - For web_search_request: Always include a clear, searchable query
 - For complex_reasoning_request: Assess steps needed and context requirements
 - For simple_chat_request: Focus on language optimization and context dependency
-`],
+`
+  ],
   new MessagesPlaceholder("chat_history"),
   ["human", "{input}"],
 ]);
