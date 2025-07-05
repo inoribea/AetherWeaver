@@ -23,8 +23,6 @@ import { ChatOpenAI } from '@langchain/openai';
 import { ChatDeepSeek } from "@langchain/deepseek";
 import { ChatAlibabaTongyi } from '@langchain/community/chat_models/alibaba_tongyi';
 import { CloudflareWorkersAI } from '@langchain/cloudflare';
-import { ChatTencentHunyuan } from '@langchain/community/chat_models/tencent_hunyuan';
-
 // Model wrapper functions
 function createAlibabaTongyiModel(config: {
   temperature?: number;
@@ -37,22 +35,6 @@ function createAlibabaTongyiModel(config: {
     streaming: config.streaming,
     model: config.model,
     alibabaApiKey: config.apiKey
-  });
-}
-
-function createTencentHunyuanModel(config: {
-  temperature?: number;
-  streaming?: boolean;
-  model?: string;
-  secretId?: string;
-  secretKey?: string;
-}) {
-  return new ChatTencentHunyuan({
-    temperature: config.temperature,
-    streaming: config.streaming,
-    model: config.model,
-    tencentSecretId: config.secretId, // Corrected: direct tencentSecretId
-    tencentSecretKey: config.secretKey // Corrected: direct tencentSecretKey
   });
 }
 import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
@@ -229,29 +211,6 @@ const MODEL_PROVIDERS: Record<string, {
     config: { apiKey: process.env.DASHSCOPE_API_KEY, model: 'qvq-plus' },
     capabilities: { vision: true, chinese: true }
   },
-  // --- Tencent Hunyuan Models ---
-  'hunyuan-t1': {
-    type: 'tencent_hunyuan',
-    model: ChatTencentHunyuan,
-    config: {
-      secretId: process.env.TENCENT_HUNYUAN_SECRET_ID,
-      secretKey: process.env.TENCENT_HUNYUAN_SECRET_KEY,
-      model: 'hunyuan-t1-latest',
-      temperature: 0.7
-    },
-    capabilities: { reasoning: true, chinese: true }
-  },
-  'hunyuan-turbos': {
-    type: 'tencent_hunyuan',
-    model: ChatTencentHunyuan,
-    config: {
-      secretId: process.env.TENCENT_HUNYUAN_SECRET_ID,
-      secretKey: process.env.TENCENT_HUNYUAN_SECRET_KEY,
-      model: 'hunyuan-turbos-latest',
-      temperature: 0.7
-    },
-    capabilities: { reasoning: true, chinese: true }
-  },
   // --- Google Gemini Models ---
   'gemini-flash-lite': {
     type: 'google_gemini',
@@ -335,14 +294,6 @@ function getModel(modelName: string): { llmInstance: BaseChatModel<BaseChatModel
         model: providerEntry.config.model || modelName,
         apiKey: providerEntry.config.apiKey // Use apiKey for alibabaApiKey
       });
-    } else if (providerEntry.type === 'tencent_hunyuan') {
-      modelInstance = createTencentHunyuanModel({
-        temperature: 0.7,
-        streaming: true,
-        model: providerEntry.config.model || modelName,
-        secretId: providerEntry.config.secretId,
-        secretKey: providerEntry.config.secretKey
-      });
     } else if (providerEntry.type === 'google_gemini') {
       modelInstance = new ChatGoogleGenerativeAI({
         temperature: 0.7,
@@ -401,18 +352,8 @@ function createFallbackModel(): { llmInstance: BaseChatModel<BaseChatModelCallOp
       model: fallbackModelName,
       apiKey: process.env.DASHSCOPE_API_KEY // Use apiKey for alibabaApiKey
     });
-  } else if (process.env.TENCENT_HUNYUAN_SECRET_ID && process.env.TENCENT_HUNYUAN_SECRET_KEY) {
-    console.log("使用 Tencent Hunyuan 作为回退模型");
-    fallbackModelName = 'hunyuan-turbos-latest';
-    fallbackModel = createTencentHunyuanModel({
-      temperature: 0.7,
-      streaming: true,
-      model: fallbackModelName,
-      secretId: process.env.TENCENT_HUNYUAN_SECRET_ID,
-      secretKey: process.env.TENCENT_HUNYUAN_SECRET_KEY
-    });
   } else {
-    throw new Error("未找到可用的 API 密钥，无法创建回退模型。请配置 OPENAI_API_KEY, DEEPSEEK_API_KEY, GOOGLE_API_KEY, DASHSCOPE_API_KEY 或 TENCENT_HUNYUAN_SECRET_KEY。");
+    throw new Error("未找到可用的 API 密钥，无法创建回退模型。请配置 OPENAI_API_KEY, DEEPSEEK_API_KEY, GOOGLE_API_KEY 或 DASHSCOPE_API_KEY。");
   }
   return { llmInstance: fallbackModel, modelName: fallbackModelName };
 }
@@ -496,7 +437,7 @@ const visionResponderChain = RunnableLambda.from(async (input: { messages: BaseM
   }
   const prompt = ChatPromptTemplate.fromMessages(input.messages);
   const chain = prompt.pipe(selectedModel).pipe(new StringOutputParser());
-  return { chain, llmInstance: selectedModel };
+  return { chain, llmInstance: selectedModel, modelName: selectedModelName };
 });
 
 // Web Search / Agent Responder
@@ -560,12 +501,12 @@ const webSearchResponderChain = RunnableLambda.from(async (input: { messages: Ba
       agentExecutor,
       new StringOutputParser(),
     ]);
-    return { chain, llmInstance: selectedModel };
+    return { chain, llmInstance: selectedModel, modelName: selectedModelName };
   } else {
     console.log(`Web Search Responder: Using simple chat for ${selectedModelName} (no agent/search capability or missing TAVILY_API_KEY).`);
     const prompt = ChatPromptTemplate.fromMessages(input.messages);
     const chain = prompt.pipe(selectedModel).pipe(new StringOutputParser());
-    return { chain, llmInstance: selectedModel };
+    return { chain, llmInstance: selectedModel, modelName: selectedModelName };
   }
 });
 
@@ -574,7 +515,6 @@ const complexReasoningResponderChain = RunnableLambda.from(async (input: { messa
   const models = [
     'gemini-flash',
     'deepseek-reasoner',
-    'hunyuan-t1',
     'o4-mini',
     'claude-sonnet-4-all',
   ];
@@ -616,7 +556,7 @@ const complexReasoningResponderChain = RunnableLambda.from(async (input: { messa
   }
   const prompt = ChatPromptTemplate.fromMessages(input.messages);
   const chain = prompt.pipe(selectedModel).pipe(new StringOutputParser());
-  return { chain, llmInstance: selectedModel };
+  return { chain, llmInstance: selectedModel, modelName: selectedModelName };
 });
 
 // General Chat Responder
@@ -624,12 +564,10 @@ const generalChatResponderChain = RunnableLambda.from(async (input: { messages: 
   const defaultModels = [
     'gemini-flash-lite',
     'gpt4.1',
-    'hunyuan-turbos',
     'deepseek-chat',
     'qwen-turbo',
   ];
   const chineseModels = [
-    'hunyuan-turbos',
     'deepseek-chat',
     'gemini-flash-lite',
     'gpt4.1',
@@ -659,7 +597,7 @@ const generalChatResponderChain = RunnableLambda.from(async (input: { messages: 
   }
   const prompt = ChatPromptTemplate.fromMessages(input.messages);
   const chain = prompt.pipe(selectedModel).pipe(new StringOutputParser());
-  return { chain, llmInstance: selectedModel };
+  return { chain, llmInstance: selectedModel, modelName: selectedModelName };
 });
 
 export async function POST(req: NextRequest) {
@@ -675,57 +613,73 @@ export async function POST(req: NextRequest) {
     const formattedMessages = messages.map(formatMessage);
     let finalChain: Runnable<any, string>;
     let llmInstance: BaseChatModel<BaseChatModelCallOptions, AIMessageChunk> | BaseLLM<BaseLLMCallOptions>;
-    let selectedModelName: string | undefined;
+    let selectedModelName: string | null | undefined; // Changed type to allow null
     const hasImage = containsImage(formattedMessages);
     if (hasImage) {
       console.log("[Main Router] Image input detected, routing to Vision Responder.");
       const result = await visionResponderChain.invoke({ messages: formattedMessages });
       finalChain = result.chain;
       llmInstance = result.llmInstance;
-      // 获取模型名
-      selectedModelName = (llmInstance as any)?.model || (llmInstance as any)?.modelName || (llmInstance as any)?.constructor?.name || "UnknownModel";
+      selectedModelName = result.modelName; // Use the modelName returned by the responder chain
     } else {
       console.log("[Main Router] No image input, routing through Router Chain.");
-      const routerOutput = await routerChain.invoke({ messages: formattedMessages }) as z.infer<typeof RouterOutputSchema>;
+      let routerOutput: z.infer<typeof RouterOutputSchema>;
+      try {
+        routerOutput = await Promise.race([
+          routerChain.invoke({ messages: formattedMessages }),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error("Router chain timed out")), 5000) // 5 second timeout
+          ),
+        ]) as z.infer<typeof RouterOutputSchema>;
+        console.log(`[Main Router] Detected intent: ${routerOutput.intent}, Query: ${routerOutput.query || ""}`);
+      } catch (routerError: any) {
+        console.error(`[Main Router] Router chain failed or timed out: ${routerError.message}. Falling back to simple chat.`);
+        // Fallback to simple chat if router fails or times out
+        routerOutput = {
+          intent: "simple_chat_request",
+          query: null,
+          requiresChineseOptimization: isChinese((formattedMessages[formattedMessages.length - 1] as HumanMessage).content as string),
+          complexity: "low",
+          contextDependency: false,
+        };
+      }
       const intent = routerOutput.intent;
       const query = routerOutput.query || "";
-      console.log(`[Main Router] Detected intent: ${intent}, Query: ${query}`);
 
       const branch = RunnableBranch.from([
         [
           (output: z.infer<typeof RouterOutputSchema>) => output.intent === "web_search_request",
           RunnableLambda.from(async (output: z.infer<typeof RouterOutputSchema>) => {
             const result = await webSearchResponderChain.invoke({ messages: formattedMessages, query: output.query ?? undefined });
-            return { chain: result.chain, llmInstance: result.llmInstance };
+            return { chain: result.chain, llmInstance: result.llmInstance, modelName: result.modelName };
           }),
         ],
         [
           (output: z.infer<typeof RouterOutputSchema>) => output.intent === "complex_reasoning_request",
           RunnableLambda.from(async (output: z.infer<typeof RouterOutputSchema>) => {
             const result = await complexReasoningResponderChain.invoke({ messages: formattedMessages, query: output.query ?? undefined });
-            return { chain: result.chain, llmInstance: result.llmInstance };
+            return { chain: result.chain, llmInstance: result.llmInstance, modelName: result.modelName };
           }),
         ],
         [
           (output: z.infer<typeof RouterOutputSchema>) => output.intent === "simple_chat_request",
           RunnableLambda.from(async () => {
             const result = await generalChatResponderChain.invoke({ messages: formattedMessages });
-            return { chain: result.chain, llmInstance: result.llmInstance };
+            return { chain: result.chain, llmInstance: result.llmInstance, modelName: result.modelName };
           }),
         ],
         // Default case if no intent matches (should not happen with enum, but good for robustness)
         RunnableLambda.from(async () => {
           console.warn("[Main Router] No specific intent matched, falling back to general chat.");
           const result = await generalChatResponderChain.invoke({ messages: formattedMessages });
-          return { chain: result.chain, llmInstance: result.llmInstance };
+          return { chain: result.chain, llmInstance: result.llmInstance, modelName: result.modelName };
         }),
       ]);
 
       const branchResult = await branch.invoke(routerOutput);
       finalChain = branchResult.chain;
       llmInstance = branchResult.llmInstance;
-      // 获取模型名
-      selectedModelName = (llmInstance as any)?.model || (llmInstance as any)?.modelName || (llmInstance as any)?.constructor?.name || "UnknownModel";
+      selectedModelName = branchResult.modelName; // Use the modelName returned by the branch
     }
     if (!llmInstance || !finalChain) {
       console.error('Failed to create model instance or chain after routing');
@@ -735,7 +689,7 @@ export async function POST(req: NextRequest) {
       );
     }
     // 统一输出模型名
-    const modelNameForOutput = selectedModelName || (llmInstance as any)?.model || (llmInstance as any)?.modelName || (llmInstance as any)?.constructor?.name || "UnknownModel";
+    const modelNameForOutput = selectedModelName || "UnknownModel"; // Use selectedModelName directly
     console.log('Starting stream...');
     try {
       const stream = await finalChain.stream({ messages: formattedMessages });
