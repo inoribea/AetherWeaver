@@ -59,28 +59,62 @@ function createAlibabaTongyiModel(config: {
   });
 }
 
-// Helper function to get available model for agents
-function getAvailableAgentModel(): BaseChatModel<BaseChatModelCallOptions, AIMessageChunk> {
-  // Try models that support tool calling
+// Helper function to get available model for agents with token counting
+function getAvailableAgentModel(): { model: BaseChatModel<BaseChatModelCallOptions, AIMessageChunk>, modelName: string } {
+  // Token counting callbacks
+  const tokenCountingCallbacks = [
+    {
+      handleLLMStart: async (llm: any, prompts: string[]) => {
+        console.log(`[${new Date().toISOString()}] 🚀 Agent Model Started`);
+        console.log(`[${new Date().toISOString()}] 📝 Prompts: ${prompts.length} prompt(s)`);
+      },
+      handleLLMEnd: async (output: any) => {
+        if (output.llmOutput?.tokenUsage) {
+          const usage = output.llmOutput.tokenUsage;
+          console.log(`[${new Date().toISOString()}] 📊 Agent Token Usage:`);
+          console.log(`  - Prompt Tokens: ${usage.promptTokens || 0}`);
+          console.log(`  - Completion Tokens: ${usage.completionTokens || 0}`);
+          console.log(`  - Total Tokens: ${usage.totalTokens || 0}`);
+        }
+      },
+      handleLLMError: async (error: any) => {
+        console.error(`[${new Date().toISOString()}] ❌ Agent Model Error:`, error);
+      },
+    },
+  ];
+
+  // Try models that support tool calling for agents
   if (process.env.OPENAI_API_KEY || process.env.NEKO_API_KEY) {
-    return new ChatOpenAI({
-      model: "gpt-4o-mini",
-      temperature: 0,
-      apiKey: process.env.NEKO_API_KEY || process.env.OPENAI_API_KEY,
-      configuration: { baseURL: process.env.NEKO_BASE_URL || process.env.OPENAI_BASE_URL },
-    });
+    return {
+      model: new ChatOpenAI({
+        model: "gpt-4o-mini",
+        temperature: 0.2,
+        apiKey: process.env.NEKO_API_KEY || process.env.OPENAI_API_KEY,
+        configuration: { baseURL: process.env.NEKO_BASE_URL || process.env.OPENAI_BASE_URL },
+        callbacks: tokenCountingCallbacks,
+      }),
+      modelName: "gpt-4o-mini"
+    };
   } else if (process.env.GOOGLE_API_KEY) {
-    return new ChatGoogleGenerativeAI({
-      model: "gemini-2.5-flash-preview-05-20",
-      temperature: 0,
-      apiKey: process.env.GOOGLE_API_KEY,
-    });
+    return {
+      model: new ChatGoogleGenerativeAI({
+        model: "gemini-2.5-flash-preview-05-20",
+        temperature: 0.2,
+        apiKey: process.env.GOOGLE_API_KEY,
+        callbacks: tokenCountingCallbacks,
+      }),
+      modelName: "gemini-flash"
+    };
   } else if (process.env.DASHSCOPE_API_KEY) {
-    return createAlibabaTongyiModel({
-      model: "qwen-turbo-latest",
-      temperature: 0,
-      apiKey: process.env.DASHSCOPE_API_KEY,
-    });
+    return {
+      model: new ChatAlibabaTongyi({
+        model: "qwen-turbo-latest",
+        temperature: 0.2,
+        alibabaApiKey: process.env.DASHSCOPE_API_KEY,
+        callbacks: tokenCountingCallbacks,
+      }),
+      modelName: "qwen-turbo"
+    };
   } else {
     throw new Error("No API keys configured for agent models. Please set up OpenAI, Google, or Alibaba Tongyi API keys.");
   }
@@ -119,7 +153,8 @@ export async function POST(req: NextRequest) {
       tools.push(new TavilySearchResults({ maxResults: 5, apiKey: process.env.TAVILY_API_KEY }));
     }
     
-    const chat = getAvailableAgentModel();
+    const { model: chat, modelName } = getAvailableAgentModel();
+    console.log(`[Agents] Using model: ${modelName}`);
 
     /**
      * Use a prebuilt LangGraph agent.
@@ -169,7 +204,13 @@ export async function POST(req: NextRequest) {
         },
       });
 
-      return new StreamingTextResponse(transformStream);
+      return new StreamingTextResponse(transformStream, {
+        headers: {
+          "X-Model-Used": modelName,
+          "X-Model-Provider": "Multiple",
+          "X-Feature": "Agent Chat",
+        },
+      });
     } else {
       /**
        * We could also pick intermediate steps out from `streamEvents` chunks, but

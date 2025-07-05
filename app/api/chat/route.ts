@@ -265,7 +265,7 @@ const MODEL_PROVIDERS: Record<string, {
   }
 };
 
-// Helper function to get model instance
+// Helper function to get model instance with token counting
 function getModel(modelName: string): { llmInstance: BaseChatModel<BaseChatModelCallOptions, AIMessageChunk>, modelName: string } {
   const providerEntry = MODEL_PROVIDERS[modelName];
   if (!providerEntry) {
@@ -276,6 +276,28 @@ function getModel(modelName: string): { llmInstance: BaseChatModel<BaseChatModel
   try {
     let modelInstance: BaseChatModel<BaseChatModelCallOptions, AIMessageChunk>;
     
+    // Token counting callbacks
+    const tokenCountingCallbacks = [
+      {
+        handleLLMStart: async (llm: any, prompts: string[]) => {
+          console.log(`[${new Date().toISOString()}] 🚀 Model Started: ${modelName}`);
+          console.log(`[${new Date().toISOString()}] 📝 Prompts: ${prompts.length} prompt(s)`);
+        },
+        handleLLMEnd: async (output: any) => {
+          if (output.llmOutput?.tokenUsage) {
+            const usage = output.llmOutput.tokenUsage;
+            console.log(`[${new Date().toISOString()}] 📊 Token Usage for ${modelName}:`);
+            console.log(`  - Prompt Tokens: ${usage.promptTokens || 0}`);
+            console.log(`  - Completion Tokens: ${usage.completionTokens || 0}`);
+            console.log(`  - Total Tokens: ${usage.totalTokens || 0}`);
+          }
+        },
+        handleLLMError: async (error: any) => {
+          console.error(`[${new Date().toISOString()}] ❌ Model Error for ${modelName}:`, error);
+        },
+      },
+    ];
+    
     if (providerEntry.type === 'openai_compatible') {
       modelInstance = new ChatOpenAI({
         temperature: providerEntry.config.temperature || 0.7,
@@ -283,6 +305,7 @@ function getModel(modelName: string): { llmInstance: BaseChatModel<BaseChatModel
         apiKey: providerEntry.config.apiKey!,
         configuration: providerEntry.config.configuration,
         model: providerEntry.config.model || modelName,
+        callbacks: tokenCountingCallbacks,
       });
     } else if (providerEntry.type === 'deepseek') {
       modelInstance = new ChatDeepSeek({
@@ -290,13 +313,15 @@ function getModel(modelName: string): { llmInstance: BaseChatModel<BaseChatModel
         streaming: true,
         apiKey: providerEntry.config.apiKey!,
         model: providerEntry.config.model || modelName,
+        callbacks: tokenCountingCallbacks,
       });
     } else if (providerEntry.type === 'alibaba_tongyi') {
-      modelInstance = createAlibabaTongyiModel({
+      modelInstance = new ChatAlibabaTongyi({
         temperature: providerEntry.config.temperature || 0.7,
         streaming: true,
         model: providerEntry.config.model || modelName,
-        apiKey: providerEntry.config.apiKey
+        alibabaApiKey: providerEntry.config.apiKey,
+        callbacks: tokenCountingCallbacks,
       });
     } else if (providerEntry.type === 'google_gemini') {
       modelInstance = new ChatGoogleGenerativeAI({
@@ -304,6 +329,7 @@ function getModel(modelName: string): { llmInstance: BaseChatModel<BaseChatModel
         streaming: true,
         apiKey: providerEntry.config.apiKey!,
         model: providerEntry.config.model || modelName,
+        callbacks: tokenCountingCallbacks,
       });
     } else {
       throw new Error(`Unsupported model type: ${providerEntry.type}`);

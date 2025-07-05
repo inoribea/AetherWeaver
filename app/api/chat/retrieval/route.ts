@@ -11,6 +11,15 @@ import { RunnableSequence } from "@langchain/core/runnables";
 import { StringOutputParser } from "@langchain/core/output_parsers";
 import { BaseChatModel, BaseChatModelCallOptions } from "@langchain/core/language_models/chat_models";
 import { AIMessageChunk } from "@langchain/core/messages";
+import { 
+  createVectorStore, 
+  getBestEmbeddingProvider, 
+  SimpleVectorStore,
+  enhancedRetrieval
+} from "../../../../utils/vectorstore";
+import { CloudflareEmbeddings } from "../../../../utils/embeddings";
+
+// export const runtime = "edge"; // Commented out to avoid edge runtime issues
 
 // Helper function to create Alibaba Tongyi model
 function createAlibabaTongyiModel(config: {
@@ -27,34 +36,76 @@ function createAlibabaTongyiModel(config: {
   });
 }
 
-// Helper function to get available model
-function getAvailableModel(): BaseChatModel<BaseChatModelCallOptions, AIMessageChunk> {
+// Helper function to get available model with token counting
+function getAvailableModel(): { model: BaseChatModel<BaseChatModelCallOptions, AIMessageChunk>, modelName: string } {
+  // Token counting callbacks
+  const tokenCountingCallbacks = [
+    {
+      handleLLMStart: async (llm: any, prompts: string[]) => {
+        console.log(`[${new Date().toISOString()}] 🚀 Retrieval Model Started`);
+        console.log(`[${new Date().toISOString()}] 📝 Prompts: ${prompts.length} prompt(s)`);
+      },
+      handleLLMEnd: async (output: any) => {
+        if (output.llmOutput?.tokenUsage) {
+          const usage = output.llmOutput.tokenUsage;
+          console.log(`[${new Date().toISOString()}] 📊 Retrieval Token Usage:`);
+          console.log(`  - Prompt Tokens: ${usage.promptTokens || 0}`);
+          console.log(`  - Completion Tokens: ${usage.completionTokens || 0}`);
+          console.log(`  - Total Tokens: ${usage.totalTokens || 0}`);
+        }
+      },
+      handleLLMError: async (error: any) => {
+        console.error(`[${new Date().toISOString()}] ❌ Retrieval Model Error:`, error);
+      },
+    },
+  ];
+
   // Try different models in order of preference
   if (process.env.OPENAI_API_KEY || process.env.NEKO_API_KEY) {
-    return new ChatOpenAI({
-      model: "gpt-4o-mini",
-      temperature: 0.2,
-      apiKey: process.env.NEKO_API_KEY || process.env.OPENAI_API_KEY,
-      configuration: { baseURL: process.env.NEKO_BASE_URL || process.env.OPENAI_BASE_URL },
-    });
+    return {
+      model: new ChatOpenAI({
+        model: "gpt-4o-mini",
+        temperature: 0.2,
+        streaming: true,
+        apiKey: process.env.NEKO_API_KEY || process.env.OPENAI_API_KEY,
+        configuration: { baseURL: process.env.NEKO_BASE_URL || process.env.OPENAI_BASE_URL },
+        callbacks: tokenCountingCallbacks,
+      }),
+      modelName: "gpt-4o-mini"
+    };
   } else if (process.env.GOOGLE_API_KEY) {
-    return new ChatGoogleGenerativeAI({
-      model: "gemini-2.5-flash-lite-preview-06-17",
-      temperature: 0.2,
-      apiKey: process.env.GOOGLE_API_KEY,
-    });
+    return {
+      model: new ChatGoogleGenerativeAI({
+        model: "gemini-2.5-flash-lite-preview-06-17",
+        temperature: 0.2,
+        streaming: true,
+        apiKey: process.env.GOOGLE_API_KEY,
+        callbacks: tokenCountingCallbacks,
+      }),
+      modelName: "gemini-flash-lite"
+    };
   } else if (process.env.DEEPSEEK_API_KEY) {
-    return new ChatDeepSeek({
-      model: "deepseek-chat",
-      temperature: 0.2,
-      apiKey: process.env.DEEPSEEK_API_KEY,
-    });
+    return {
+      model: new ChatDeepSeek({
+        model: "deepseek-chat",
+        temperature: 0.2,
+        streaming: true,
+        apiKey: process.env.DEEPSEEK_API_KEY,
+        callbacks: tokenCountingCallbacks,
+      }),
+      modelName: "deepseek-chat"
+    };
   } else if (process.env.DASHSCOPE_API_KEY) {
-    return createAlibabaTongyiModel({
-      model: "qwen-turbo-latest",
-      temperature: 0.2,
-      apiKey: process.env.DASHSCOPE_API_KEY,
-    });
+    return {
+      model: new ChatAlibabaTongyi({
+        model: "qwen-turbo-latest",
+        temperature: 0.2,
+        streaming: true,
+        alibabaApiKey: process.env.DASHSCOPE_API_KEY,
+        callbacks: tokenCountingCallbacks,
+      }),
+      modelName: "qwen-turbo"
+    };
   } else {
     throw new Error("No API keys configured. Please set up at least one model provider.");
   }
@@ -107,8 +158,8 @@ Question: {question}
 const answerPrompt = PromptTemplate.fromTemplate(ANSWER_TEMPLATE);
 
 /**
- * This handler provides a retrieval-style chat using sample documents
- * instead of requiring external vector store setup.
+ * This handler provides a retrieval-style chat using enhanced vector store
+ * with Cloudflare embeddings support and sample documents fallback.
  */
 export async function POST(req: NextRequest) {
   try {
@@ -117,40 +168,68 @@ export async function POST(req: NextRequest) {
     const previousMessages = messages.slice(0, -1);
     const currentMessageContent = messages[messages.length - 1].content;
 
-    // Get available model
-    const model = getAvailableModel();
+    // Get available model with token counting
+    const { model, modelName } = getAvailableModel();
+    console.log(`[Retrieval] Using model: ${modelName}`);
 
-    // Sample documents for demonstration
+    // Sample documents for demonstration (enhanced with Cloudflare context)
     const sampleDocuments = [
       new Document({
-        pageContent: "LangChain is a framework for developing applications powered by language models. It provides tools for prompt management, chains, and agents. Dana the puppy loves using LangChain because it makes building AI applications paw-some!",
+        pageContent: "LangChain is a framework for developing applications powered by language models. BEEP BOOP! It provides tools for prompt management, chains, and agents. Dana the puppy loves using LangChain because it makes building AI applications paw-some! Woof woof!",
         metadata: { source: "langchain_docs", type: "framework" }
       }),
       new Document({
-        pageContent: "Vector databases store high-dimensional vectors and enable similarity search. They are essential for RAG (Retrieval-Augmented Generation) applications. Dana thinks vectors are like fetch - you throw a query and get back the most similar results!",
+        pageContent: "Vector databases store high-dimensional vectors and enable similarity search. They are essential for RAG (Retrieval-Augmented Generation) applications. Dana thinks vectors are like fetch - you throw a query and get back the most similar results! It's totally paws-itive!",
         metadata: { source: "vector_db_guide", type: "database" }
       }),
       new Document({
-        pageContent: "Retrieval-Augmented Generation (RAG) combines the power of retrieval systems with generative models to provide more accurate and contextual responses. It's like having a super smart dog that can fetch exactly the right information!",
+        pageContent: "Retrieval-Augmented Generation (RAG) combines the power of retrieval systems with generative models to provide more accurate and contextual responses. It's like having a super smart dog that can fetch exactly the right information! Ruff ruff!",
         metadata: { source: "rag_guide", type: "technique" }
       }),
       new Document({
-        pageContent: "Dana is an energetic talking puppy who loves helping with AI and machine learning questions. She's always ready to fetch the best answers and make lots of puns along the way! Woof woof!",
+        pageContent: "Cloudflare Workers AI provides embedding models like BGE (BAAI General Embedding) that can be used for vector similarity search. Dana says it's like having a super-fast nose for sniffing out the right documents! Arf arf!",
+        metadata: { source: "cloudflare_embeddings", type: "embedding" }
+      }),
+      new Document({
+        pageContent: "Dana is an energetic talking puppy who loves helping with AI and machine learning questions. She's always ready to fetch the best answers and make lots of puns along the way! Her tail never stops wagging when talking about embeddings and retrieval! Woof!",
         metadata: { source: "dana_bio", type: "character" }
       }),
     ];
 
-    // Simple keyword-based retrieval (fallback for missing vector store)
-    const query = currentMessageContent.toLowerCase();
-    const relevantDocs = sampleDocuments.filter(doc => {
-      const content = doc.pageContent.toLowerCase();
-      const queryWords = query.split(' ');
-      return queryWords.some((word: string) => word.length > 2 && content.includes(word));
-    });
+    // Try to use enhanced vector store with Cloudflare embeddings
+    let relevantDocs: Document[] = [];
+    let retrievalMethod = "keyword-based";
+
+    try {
+      // Attempt to create vector store with embeddings
+      const embeddingProvider = getBestEmbeddingProvider();
+      if (embeddingProvider) {
+        console.log(`[Retrieval] Using ${embeddingProvider.name} embeddings`);
+        const { vectorStore } = await createVectorStore(sampleDocuments);
+        relevantDocs = await enhancedRetrieval(vectorStore, currentMessageContent, {
+          k: 3,
+          scoreThreshold: 0.1
+        });
+        retrievalMethod = `vector-based (${embeddingProvider.name})`;
+      } else {
+        throw new Error("No embedding providers available");
+      }
+    } catch (error) {
+      console.warn("[Retrieval] Vector search failed, falling back to keyword search:", error);
+      // Fallback to simple keyword-based retrieval
+      const query = currentMessageContent.toLowerCase();
+      relevantDocs = sampleDocuments.filter(doc => {
+        const content = doc.pageContent.toLowerCase();
+        const queryWords = query.split(' ');
+        return queryWords.some((word: string) => word.length > 2 && content.includes(word));
+      });
+    }
 
     // If no relevant docs found, use all docs
     const docsToUse = relevantDocs.length > 0 ? relevantDocs : sampleDocuments;
     const context = combineDocumentsFn(docsToUse);
+
+    console.log(`[Retrieval] Found ${docsToUse.length} relevant documents using ${retrievalMethod}`);
 
     // Create standalone question chain
     const standaloneQuestionChain = RunnableSequence.from([
@@ -215,6 +294,11 @@ export async function POST(req: NextRequest) {
 
     return new StreamingTextResponse(readableStream, {
       headers: {
+        "X-Model-Used": modelName,
+        "X-Model-Provider": "Multiple",
+        "X-Feature": "Retrieval Chat",
+        "X-Retrieval-Method": retrievalMethod,
+        "X-Documents-Found": docsToUse.length.toString(),
         "x-message-index": (previousMessages.length + 1).toString(),
         "x-sources": serializedSources,
       },
