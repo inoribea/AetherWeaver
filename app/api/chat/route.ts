@@ -640,45 +640,45 @@ const complexReasoningResponderChain = RunnableLambda.from(async (input: { messa
 
 // General Chat Responder
 const generalChatResponderChain = RunnableLambda.from(async (input: { messages: BaseMessage[] }) => {
-  const defaultModels = [
-    'gemini-flash-lite',
-    'gpt4.1',
-    'hunyuan-turbos',
-    'deepseek-chat',
-    'qwen-turbo',
-  ];
-  const chineseModels = [
-    'hunyuan-turbos',
-    'deepseek-chat',
-    'gemini-flash-lite',
-    'gpt4.1',
-    'qwen-turbo',
-  ];
-  const lastMessageText = (input.messages[input.messages.length - 1] as HumanMessage).content;
-  const isChineseRequest = typeof lastMessageText === 'string' && isChinese(lastMessageText);
-  const modelsToTry = isChineseRequest ? chineseModels : defaultModels;
-  let selectedModel: BaseChatModel<BaseChatModelCallOptions, AIMessageChunk> | null = null;
-  let selectedModelName: string | null = null;
-  for (const modelName of modelsToTry) {
-    try {
-      const { llmInstance, modelName: actualName } = getModel(modelName);
-      selectedModel = llmInstance;
-      selectedModelName = actualName;
-      console.log(`General Chat Responder: Using model ${selectedModelName} (Chinese preference: ${isChineseRequest})`);
-      break;
-    } catch (e) {
-      console.warn(`General Chat Responder: Model ${modelName} unavailable. Trying next.`, e);
-    }
+const defaultModels = [
+  'gemini-flash-lite',
+  'gpt4.1',
+  'hunyuan-turbos',
+  'deepseek-chat',
+  'qwen-turbo',
+];
+const chineseModels = [
+  'gemini-flash-lite',
+  'gpt4.1',
+  'hunyuan-turbos',
+  'deepseek-chat',
+  'qwen-turbo',
+];
+const lastMessageText = (input.messages[input.messages.length - 1] as HumanMessage).content;
+const isChineseRequest = typeof lastMessageText === 'string' && isChinese(lastMessageText);
+const modelsToTry = isChineseRequest ? chineseModels : defaultModels;
+let selectedModel: BaseChatModel<BaseChatModelCallOptions, AIMessageChunk> | null = null;
+let selectedModelName: string | null = null;
+for (const modelName of modelsToTry) {
+  try {
+    const { llmInstance, modelName: actualName } = getModel(modelName);
+    selectedModel = llmInstance;
+    selectedModelName = actualName;
+    console.log(`General Chat Responder: Using model ${selectedModelName} (Chinese preference: ${isChineseRequest})`);
+    break;
+  } catch (e) {
+    console.warn(`General Chat Responder: Model ${modelName} unavailable. Trying next.`, e);
   }
-  if (!selectedModel) {
-    console.error("General Chat Responder: No general chat models available. Falling back to a generic model.");
-    const fallback = createFallbackModel();
-    selectedModel = fallback.llmInstance;
-    selectedModelName = fallback.modelName;
-  }
-  const prompt = ChatPromptTemplate.fromMessages(input.messages);
-  const chain = prompt.pipe(selectedModel).pipe(new StringOutputParser());
-  return { chain, llmInstance: selectedModel };
+}
+if (!selectedModel) {
+  console.error("General Chat Responder: No general chat models available. Falling back to a generic model.");
+  const fallback = createFallbackModel();
+  selectedModel = fallback.llmInstance;
+  selectedModelName = fallback.modelName;
+}
+const prompt = ChatPromptTemplate.fromMessages(input.messages);
+const chain = prompt.pipe(selectedModel).pipe(new StringOutputParser());
+return { chain, llmInstance: selectedModel };
 });
 
 export async function POST(req: NextRequest) {
@@ -701,8 +701,7 @@ export async function POST(req: NextRequest) {
       console.log("[Main Router] Image input detected, routing to Vision Responder.");
       const result = await visionResponderChain.invoke({ messages: formattedMessages });
       finalChain = result.chain;
-      llmInstance = result.llmInstance;
-      // 获取模型名
+      llmInstance = result.llmInstance
       selectedModelName = (llmInstance as any)?.model || (llmInstance as any)?.modelName || (llmInstance as any)?.constructor?.name || "UnknownModel";
     } else {
       console.log("[Main Router] No image input, routing through Router Chain.");
