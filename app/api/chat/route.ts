@@ -556,15 +556,29 @@ const webSearchResponderChain = RunnableLambda.from(async (input: { messages: Ba
         prefix: `尽力回答问题。如果需要，可以随意使用任何可用的工具来查找相关信息。`,
       },
     });
-    const chain = RunnableSequence.from([
-      {
-        input: (i: { messages: BaseMessage[], query?: string }) =>
-          i.query || (i.messages[i.messages.length - 1] as HumanMessage).content,
-        chat_history: (i: { messages: BaseMessage[] }) => i.messages.slice(0, -1),
-      },
-      agentExecutor,
-      new StringOutputParser(),
-    ]);
+    // 包装 chain，输出 agent 思考过程和 token 消耗
+    const chain = RunnableLambda.from(async (input2: { messages: BaseMessage[], query?: string }) => {
+      const userInput = input2.query || (input2.messages[input2.messages.length - 1] as HumanMessage).content;
+      const chatHistory = input2.messages.slice(0, -1);
+      // 统计 token 消耗
+      let tokenCount = 0;
+      if (typeof (selectedModel as any).getNumTokensFromMessages === 'function') {
+        try {
+          tokenCount = await (selectedModel as any).getNumTokensFromMessages(input2.messages);
+        } catch (e) {
+          tokenCount = 0;
+        }
+      }
+      // 执行 agent
+      const agentResult = await agentExecutor.invoke({ input: userInput, chat_history: chatHistory });
+      // 返回结构化结果
+      return {
+        output: agentResult.output,
+        steps: agentResult.intermediateSteps || [],
+        tokenCount,
+        model: selectedModelName
+      };
+    });
     return { chain, llmInstance: selectedModel };
   } else {
     console.log(`Web Search Responder: Using simple chat for ${selectedModelName} (not openai_compatible or no agent/search capability or missing TAVILY_API_KEY).`);
@@ -678,7 +692,8 @@ export async function POST(req: NextRequest) {
     }
     console.log('Formatting messages...');
     const formattedMessages = messages.map(formatMessage);
-    let finalChain: Runnable<any, string>;
+    // 允许返回 string 或结构化对象
+    let finalChain: Runnable<any, any>;
     let llmInstance: BaseChatModel<BaseChatModelCallOptions, AIMessageChunk> | BaseLLM<BaseLLMCallOptions>;
     let selectedModelName: string | undefined;
     const hasImage = containsImage(formattedMessages);
@@ -743,24 +758,50 @@ export async function POST(req: NextRequest) {
     const modelNameForOutput = selectedModelName || (llmInstance as any)?.model || (llmInstance as any)?.modelName || (llmInstance as any)?.constructor?.name || "UnknownModel";
     console.log('Starting stream...');
     try {
-      const stream = await finalChain.stream({ messages: formattedMessages });
-      // 包装 stream，在开头插入模型名
-      const encoder = new TextEncoder();
-      const transformedStream = new ReadableStream({
-        async start(controller) {
-          controller.enqueue(encoder.encode(`${modelNameForOutput}:\n`));
-          for await (const chunk of stream) {
-            controller.enqueue(typeof chunk === "string" ? encoder.encode(chunk) : chunk);
-          }
-          controller.close();
-        }
-      });
-      return new StreamingTextResponse(transformedStream);
+      // 判断是否为 agent 结构化输出
+      const result = await finalChain.invoke({ messages: formattedMessages });
+      if (
+        result &&
+        typeof result === 'object' &&
+        result !== null &&
+        'output' in result &&
+        'steps' in result &&
+        'tokenCount' in result
+      ) {
+        // 结构化 agent 输出
+        const agentResult = result as { model?: string; output: any; steps: any; tokenCount: number };
+        return new Response(JSON.stringify({
+          model: agentResult.model || modelNameForOutput,
+          output: agentResult.output,
+          steps: agentResult.steps,
+          tokenCount: agentResult.tokenCount
+        }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      } else {
+        // 普通输出
+        return new Response(`${modelNameForOutput}:\n${result}`, { status: 200, headers: { 'Content-Type': 'text/plain' } });
+      }
     } catch (streamError: any) {
       console.error("Streaming failed, attempting to invoke:", streamError);
       try {
         const result = await finalChain.invoke({ messages: formattedMessages });
-        return new Response(`${modelNameForOutput}:\n${result}`, { status: 200, headers: { 'Content-Type': 'text/plain' } });
+        if (
+          result &&
+          typeof result === 'object' &&
+          result !== null &&
+          'output' in result &&
+          'steps' in result &&
+          'tokenCount' in result
+        ) {
+          const agentResult = result as { model?: string; output: any; steps: any; tokenCount: number };
+          return new Response(JSON.stringify({
+            model: agentResult.model || modelNameForOutput,
+            output: agentResult.output,
+            steps: agentResult.steps,
+            tokenCount: agentResult.tokenCount
+          }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+        } else {
+          return new Response(`${modelNameForOutput}:\n${result}`, { status: 200, headers: { 'Content-Type': 'text/plain' } });
+        }
       } catch (invokeError: any) {
         console.error("Invoke also failed:", invokeError);
         return new Response(
