@@ -64,7 +64,7 @@ import { initializeAgentExecutorWithOptions } from "langchain/agents";
 import { AgentStep } from "@langchain/core/agents";
 import { BufferMemory } from "langchain/memory";
 
-//export const runtime = 'edge'; // Keep this commented unless you intend to use edge runtime
+export const runtime = 'edge';
 
 // Helper function to format messages from Vercel AI SDK to LangChain format
 interface ContentPart {
@@ -755,43 +755,22 @@ export async function POST(req: NextRequest) {
     }
     // 统一输出模型名
     const modelNameForOutput = selectedModelName || (llmInstance as any)?.model || (llmInstance as any)?.modelName || (llmInstance as any)?.constructor?.name || "UnknownModel";
-    console.log('Starting stream...');
-    try {
-      // 判断是否为 agent 结构化输出
-      const result = await finalChain.invoke({ messages: formattedMessages });
-      if (
-        result &&
-        typeof result === 'object' &&
-        result !== null &&
-        'output' in result &&
-        'steps' in result &&
-        'tokenCount' in result
-      ) {
-        // 结构化 agent 输出
-        const agentResult = result as { model?: string; output: any; steps: any; tokenCount: number };
-        return new Response(JSON.stringify({
-          model: agentResult.model || modelNameForOutput,
-          output: agentResult.output,
-          steps: agentResult.steps,
-          tokenCount: agentResult.tokenCount
-        }), { status: 200, headers: { 'Content-Type': 'application/json' } });
-      } else {
-        // 普通输出
-        return new Response(`${modelNameForOutput}:\n${result}`, { status: 200, headers: { 'Content-Type': 'text/plain' } });
-      }
-    } catch (streamError: any) {
-      console.error("Streaming failed, attempting to invoke:", streamError);
+    console.log('Starting response processing...');
+    // 判断是否为 agent 结构化输出
+    const isAgentOutput = (llmInstance as any)?.agentType === "openai-functions"; // A simple heuristic, might need refinement
+
+    if (isAgentOutput) {
       try {
-        const result = await finalChain.invoke({ messages: formattedMessages });
+        const agentResult = await finalChain.invoke({ messages: formattedMessages });
         if (
-          result &&
-          typeof result === 'object' &&
-          result !== null &&
-          'output' in result &&
-          'steps' in result &&
-          'tokenCount' in result
+          agentResult &&
+          typeof agentResult === 'object' &&
+          agentResult !== null &&
+          'output' in agentResult &&
+          'steps' in agentResult &&
+          'tokenCount' in agentResult
         ) {
-          const agentResult = result as { model?: string; output: any; steps: any; tokenCount: number };
+          // 结构化 agent 输出
           return new Response(JSON.stringify({
             model: agentResult.model || modelNameForOutput,
             output: agentResult.output,
@@ -799,17 +778,36 @@ export async function POST(req: NextRequest) {
             tokenCount: agentResult.tokenCount
           }), { status: 200, headers: { 'Content-Type': 'application/json' } });
         } else {
-          return new Response(`${modelNameForOutput}:\n${result}`, { status: 200, headers: { 'Content-Type': 'text/plain' } });
+          // Fallback for unexpected agent output structure
+          console.warn("Agent output did not match expected structure, returning as plain text.");
+          return new Response(`${modelNameForOutput}:\n${JSON.stringify(agentResult)}`, { status: 200, headers: { 'Content-Type': 'text/plain' } });
         }
-      } catch (invokeError: any) {
-        console.error("Invoke also failed:", invokeError);
+      } catch (agentError: any) {
+        console.error("Agent invocation failed:", agentError);
         return new Response(
           JSON.stringify({
-            error: `AI processing failed. Streaming error: ${streamError.message}, Invoke error: ${invokeError.message}`,
+            error: `Agent processing failed: ${agentError.message}`,
             details: {
-              streamError: streamError.message,
-              invokeError: invokeError.message,
-              invokeStack: invokeError.stack,
+              message: agentError.message,
+              stack: agentError.stack,
+            }
+          }),
+          { status: 500, headers: { "Content-Type": "application/json" } }
+        );
+      }
+    } else {
+      // 普通输出，使用流式传输
+      try {
+        const stream = await finalChain.stream({ messages: formattedMessages });
+        return new StreamingTextResponse(stream);
+      } catch (streamError: any) {
+        console.error("Streaming failed:", streamError);
+        return new Response(
+          JSON.stringify({
+            error: `AI streaming failed: ${streamError.message}`,
+            details: {
+              message: streamError.message,
+              stack: streamError.stack,
             }
           }),
           { status: 500, headers: { "Content-Type": "application/json" } }
