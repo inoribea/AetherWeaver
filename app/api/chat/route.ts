@@ -776,7 +776,14 @@ export async function POST(req: NextRequest) {
       // 普通输出，使用流式传输
       try {
         const stream = await finalChain.stream({ messages: formattedMessages });
-        return new StreamingTextResponse(stream);
+        // Create a TransformStream to encode string chunks to Uint8Array
+        const encoder = new TextEncoder();
+        const transformStream = new TransformStream({
+          transform(chunk, controller) {
+            controller.enqueue(encoder.encode(chunk));
+          },
+        });
+        return new StreamingTextResponse(stream.pipeThrough(transformStream));
       } catch (streamError: any) {
         console.error("Streaming failed:", streamError);
         return new Response(
