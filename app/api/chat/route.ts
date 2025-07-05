@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { Message as VercelChatMessage, StreamingTextResponse } from 'ai';
 import { z } from 'zod';
+import { selectBestModelForAuto, OpenAICompletionRequest } from '@/utils/openai-compat';
 
 // Core LangChain imports
 import {
@@ -394,6 +395,15 @@ export async function POST(req: NextRequest) {
 
     const formattedMessages = messages.map(formatMessage);
     
+    // Check if auto model is requested
+    const requestedModel = body.model;
+    let useAutoSelection = false;
+    
+    if (requestedModel === 'auto' || !requestedModel) {
+      useAutoSelection = true;
+      console.log("[Auto Model] Auto model selection enabled");
+    }
+
     // Simple intent detection based on message content
     const lastMessage = formattedMessages[formattedMessages.length - 1];
     const messageText = Array.isArray(lastMessage.content) 
@@ -409,6 +419,44 @@ export async function POST(req: NextRequest) {
     let selectedModel: BaseChatModel<BaseChatModelCallOptions, AIMessageChunk>;
     let modelNameForOutput: string;
     let chain: Runnable<any, string>;
+
+    // Auto model selection logic
+    if (useAutoSelection) {
+      // Convert to OpenAI format for auto selection
+      const openaiRequest: OpenAICompletionRequest = {
+        model: 'auto',
+        messages: messages.map((msg: VercelChatMessage) => ({
+          role: msg.role as 'system' | 'user' | 'assistant',
+          content: msg.content as string
+        }))
+      };
+      
+      const autoSelectedModel = selectBestModelForAuto(openaiRequest);
+      console.log(`[Auto Model] Selected model: ${autoSelectedModel}`);
+      
+      try {
+        const { llmInstance, modelName } = getModel(autoSelectedModel);
+        selectedModel = llmInstance;
+        modelNameForOutput = `${modelName} (auto-selected)`;
+        const prompt = ChatPromptTemplate.fromMessages(formattedMessages);
+        chain = prompt.pipe(selectedModel).pipe(new StringOutputParser());
+      } catch (error) {
+        console.error(`[Auto Model] Failed to initialize auto-selected model ${autoSelectedModel}:`, error);
+        const fallback = createFallbackModel();
+        selectedModel = fallback.llmInstance;
+        modelNameForOutput = `${fallback.modelName} (auto-fallback)`;
+        const prompt = ChatPromptTemplate.fromMessages(formattedMessages);
+        chain = prompt.pipe(selectedModel).pipe(new StringOutputParser());
+      }
+    } else if (requestedModel && MODEL_PROVIDERS[requestedModel]) {
+      // Use specifically requested model
+      console.log(`[Specific Model] Using requested model: ${requestedModel}`);
+      const { llmInstance, modelName } = getModel(requestedModel);
+      selectedModel = llmInstance;
+      modelNameForOutput = modelName;
+      const prompt = ChatPromptTemplate.fromMessages(formattedMessages);
+      chain = prompt.pipe(selectedModel).pipe(new StringOutputParser());
+    } else
 
     if (hasImage) {
       // Vision processing
@@ -600,15 +648,25 @@ Input: {input}`;
       chain = prompt.pipe(selectedModel).pipe(new StringOutputParser());
     }
 
-    // Execute the chain and stream the response
+    // Execute the chain and stream the response with model name injection
     const stream = await chain.stream({ messages: formattedMessages });
     
     const readableStream = new ReadableStream({
       async start(controller) {
         try {
+          let isFirstChunk = true;
+          
           for await (const chunk of stream) {
             const text = typeof chunk === 'string' ? chunk : String(chunk);
-            controller.enqueue(new TextEncoder().encode(text));
+            
+            // Inject model name at the beginning of the response
+            if (isFirstChunk && text.trim()) {
+              const modelPrefix = `${modelNameForOutput}:\n`;
+              controller.enqueue(new TextEncoder().encode(modelPrefix + text));
+              isFirstChunk = false;
+            } else {
+              controller.enqueue(new TextEncoder().encode(text));
+            }
           }
           controller.close();
         } catch (error) {

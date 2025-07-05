@@ -92,7 +92,7 @@ export const MODEL_MAPPING: Record<string, string> = {
   'gemini-1.5-flash': 'gemini-flash-lite',
   
   // 自定义模型
-  'auto': 'auto', // 特殊标识，让系统自动选择
+  'auto': 'auto', // 特殊标识，让系统自动选择最佳模型
   'langchain-chat': 'auto',
   'langchain-vision': 'gpt-4o-all',
   'langchain-search': 'gemini-flash',
@@ -108,6 +108,78 @@ export const MODEL_MAPPING: Record<string, string> = {
   'qwen-plus': 'qwen-turbo',
   'qwen-max': 'qwen-turbo',
 };
+
+// Auto模型智能选择逻辑
+export function selectBestModelForAuto(request: OpenAICompletionRequest): string {
+  const lastMessage = request.messages[request.messages.length - 1];
+  const content = Array.isArray(lastMessage.content) 
+    ? lastMessage.content.map(c => c.type === 'text' ? c.text : '').join(' ')
+    : lastMessage.content;
+
+  // 检查是否包含图片 - 视觉能力
+  const hasImage = request.messages.some(msg => 
+    Array.isArray(msg.content) && 
+    msg.content.some(c => c.type === 'image_url')
+  );
+
+  if (hasImage) {
+    return 'gpt-4o-all'; // 最佳视觉模型
+  }
+
+  const lowerContent = content.toLowerCase();
+
+  // 检测联网搜索需求
+  if (lowerContent.includes('search') || 
+      lowerContent.includes('latest') || 
+      lowerContent.includes('current') ||
+      lowerContent.includes('news') ||
+      lowerContent.includes('today') ||
+      lowerContent.includes('recent')) {
+    return 'gemini-flash'; // 支持搜索的模型
+  }
+
+  // 检测工具调用需求
+  if (request.tools && request.tools.length > 0 ||
+      lowerContent.includes('tool') || 
+      lowerContent.includes('function') || 
+      lowerContent.includes('calculate') ||
+      lowerContent.includes('compute')) {
+    return 'gpt-4o-all'; // 最佳工具调用模型
+  }
+
+  // 检测复杂推理需求
+  if (lowerContent.includes('analyze') || 
+      lowerContent.includes('reasoning') || 
+      lowerContent.includes('logic') ||
+      lowerContent.includes('solve') ||
+      lowerContent.includes('explain') ||
+      lowerContent.includes('why') ||
+      lowerContent.includes('how') ||
+      content.length > 500) { // 长文本通常需要推理
+    return 'deepseek-reasoner'; // 最佳推理模型
+  }
+
+  // 检测结构化输出需求
+  if (lowerContent.includes('json') || 
+      lowerContent.includes('format') || 
+      lowerContent.includes('structure') ||
+      lowerContent.includes('table') ||
+      lowerContent.includes('list')) {
+    return 'gpt-4o-all'; // 最佳结构化输出模型
+  }
+
+  // 检测中文内容
+  const chineseChars = (content.match(/[\u4E00-\u9FFF]/g) || []).length;
+  const totalChars = content.length;
+  const isChineseContent = totalChars > 0 && (chineseChars / totalChars) > 0.3;
+
+  if (isChineseContent) {
+    return 'deepseek-chat'; // 中文优化模型
+  }
+
+  // 默认使用快速通用模型
+  return 'gemini-flash-lite';
+}
 
 // 将 OpenAI 格式转换为 LangChain 格式
 export function convertOpenAIToLangChain(request: OpenAICompletionRequest): {
