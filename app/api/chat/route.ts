@@ -23,7 +23,7 @@ import { ChatOpenAI } from '@langchain/openai';
 import { ChatDeepSeek } from "@langchain/deepseek";
 import { ChatAlibabaTongyi } from '@langchain/community/chat_models/alibaba_tongyi';
 import { CloudflareWorkersAI } from '@langchain/cloudflare';
-// import { ChatTencentHunyuan } from '@langchain/community/chat_models/tencent_hunyuan'; // Commented out due to Edge runtime incompatibility
+import { ChatTencentHunyuan } from '@langchain/community/chat_models/tencent_hunyuan';
 
 // Model wrapper functions
 function createAlibabaTongyiModel(config: {
@@ -40,21 +40,21 @@ function createAlibabaTongyiModel(config: {
   });
 }
 
-// function createTencentHunyuanModel(config: { // Commented out due to Edge runtime incompatibility
-//   temperature?: number;
-//   streaming?: boolean;
-//   model?: string;
-//   secretId?: string;
-//   secretKey?: string;
-// }) {
-//   return new ChatTencentHunyuan({
-//     temperature: config.temperature,
-//     streaming: config.streaming,
-//     model: config.model,
-//     tencentSecretId: config.secretId,
-//     tencentSecretKey: config.secretKey
-//   });
-// }
+function createTencentHunyuanModel(config: {
+  temperature?: number;
+  streaming?: boolean;
+  model?: string;
+  secretId?: string;
+  secretKey?: string;
+}) {
+  return new ChatTencentHunyuan({
+    temperature: config.temperature,
+    streaming: config.streaming,
+    model: config.model,
+    tencentSecretId: config.secretId, // Corrected: direct tencentSecretId
+    tencentSecretKey: config.secretKey // Corrected: direct tencentSecretKey
+  });
+}
 import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
 
 // --- Imports for Tools and Agents ---
@@ -64,7 +64,7 @@ import { initializeAgentExecutorWithOptions } from "langchain/agents";
 import { AgentStep } from "@langchain/core/agents";
 import { BufferMemory } from "langchain/memory";
 
-export const runtime = 'edge';
+//export const runtime = 'edge'; // Keep this commented unless you intend to use edge runtime
 
 // Helper function to format messages from Vercel AI SDK to LangChain format
 interface ContentPart {
@@ -230,28 +230,28 @@ const MODEL_PROVIDERS: Record<string, {
     capabilities: { vision: true, chinese: true }
   },
   // --- Tencent Hunyuan Models ---
-  // 'hunyuan-t1': { // Commented out due to Edge runtime incompatibility
-  //   type: 'tencent_hunyuan',
-  //   model: ChatTencentHunyuan,
-  //   config: {
-  //     secretId: process.env.TENCENT_HUNYUAN_SECRET_ID,
-  //     secretKey: process.env.TENCENT_HUNYUAN_SECRET_KEY,
-  //     model: 'hunyuan-t1-latest',
-  //     temperature: 0.7
-  //   },
-  //   capabilities: { reasoning: true, chinese: true }
-  // },
-  // 'hunyuan-turbos': { // Commented out due to Edge runtime incompatibility
-  //   type: 'tencent_hunyuan',
-  //   model: ChatTencentHunyuan,
-  //   config: {
-  //     secretId: process.env.TENCENT_HUNYUAN_SECRET_ID,
-  //     secretKey: process.env.TENCENT_HUNYUAN_SECRET_KEY,
-  //     model: 'hunyuan-turbos-latest',
-  //     temperature: 0.7
-  //   },
-  //   capabilities: { reasoning: true, chinese: true }
-  // },
+  'hunyuan-t1': {
+    type: 'tencent_hunyuan',
+    model: ChatTencentHunyuan,
+    config: {
+      secretId: process.env.TENCENT_HUNYUAN_SECRET_ID,
+      secretKey: process.env.TENCENT_HUNYUAN_SECRET_KEY,
+      model: 'hunyuan-t1-latest',
+      temperature: 0.7
+    },
+    capabilities: { reasoning: true, chinese: true }
+  },
+  'hunyuan-turbos': {
+    type: 'tencent_hunyuan',
+    model: ChatTencentHunyuan,
+    config: {
+      secretId: process.env.TENCENT_HUNYUAN_SECRET_ID,
+      secretKey: process.env.TENCENT_HUNYUAN_SECRET_KEY,
+      model: 'hunyuan-turbos-latest',
+      temperature: 0.7
+    },
+    capabilities: { reasoning: true, chinese: true }
+  },
   // --- Google Gemini Models ---
   'gemini-flash-lite': {
     type: 'google_gemini',
@@ -335,6 +335,14 @@ function getModel(modelName: string): { llmInstance: BaseChatModel<BaseChatModel
         model: providerEntry.config.model || modelName,
         apiKey: providerEntry.config.apiKey // Use apiKey for alibabaApiKey
       });
+    } else if (providerEntry.type === 'tencent_hunyuan') {
+      modelInstance = createTencentHunyuanModel({
+        temperature: 0.7,
+        streaming: true,
+        model: providerEntry.config.model || modelName,
+        secretId: providerEntry.config.secretId,
+        secretKey: providerEntry.config.secretKey
+      });
     } else if (providerEntry.type === 'google_gemini') {
       modelInstance = new ChatGoogleGenerativeAI({
         temperature: 0.7,
@@ -393,8 +401,18 @@ function createFallbackModel(): { llmInstance: BaseChatModel<BaseChatModelCallOp
       model: fallbackModelName,
       apiKey: process.env.DASHSCOPE_API_KEY // Use apiKey for alibabaApiKey
     });
+  } else if (process.env.TENCENT_HUNYUAN_SECRET_ID && process.env.TENCENT_HUNYUAN_SECRET_KEY) {
+    console.log("使用 Tencent Hunyuan 作为回退模型");
+    fallbackModelName = 'hunyuan-turbos-latest';
+    fallbackModel = createTencentHunyuanModel({
+      temperature: 0.7,
+      streaming: true,
+      model: fallbackModelName,
+      secretId: process.env.TENCENT_HUNYUAN_SECRET_ID,
+      secretKey: process.env.TENCENT_HUNYUAN_SECRET_KEY
+    });
   } else {
-    throw new Error("未找到可用的 API 密钥，无法创建回退模型。请配置 OPENAI_API_KEY, DEEPSEEK_API_KEY, GOOGLE_API_KEY, 或 DASHSCOPE_API_KEY。");
+    throw new Error("未找到可用的 API 密钥，无法创建回退模型。请配置 OPENAI_API_KEY, DEEPSEEK_API_KEY, GOOGLE_API_KEY, DASHSCOPE_API_KEY 或 TENCENT_HUNYUAN_SECRET_KEY。");
   }
   return { llmInstance: fallbackModel, modelName: fallbackModelName };
 }
@@ -509,13 +527,8 @@ const webSearchResponderChain = RunnableLambda.from(async (input: { messages: Ba
     selectedModel = fallback.llmInstance;
     selectedModelName = fallback.modelName;
   }
-  // 只允许 openai_compatible 类型模型走 agent
-  if (
-    selectedModelName &&
-    MODEL_PROVIDERS[selectedModelName]?.type === 'openai_compatible' &&
-    (MODEL_PROVIDERS[selectedModelName]?.capabilities.search || MODEL_PROVIDERS[selectedModelName]?.capabilities.tool_calling) &&
-    process.env.TAVILY_API_KEY
-  ) {
+  // Access MODEL_PROVIDERS only if selectedModelName is non-null.
+  if (selectedModelName && (MODEL_PROVIDERS[selectedModelName]?.capabilities.search || MODEL_PROVIDERS[selectedModelName]?.capabilities.tool_calling) && process.env.TAVILY_API_KEY) {
     console.log(`Web Search Responder: Initializing agent with ${selectedModelName}`);
     const tools: Tool[] = [
       new TavilySearchResults({ maxResults: 5, apiKey: process.env.TAVILY_API_KEY }),
@@ -538,32 +551,18 @@ const webSearchResponderChain = RunnableLambda.from(async (input: { messages: Ba
         prefix: `尽力回答问题。如果需要，可以随意使用任何可用的工具来查找相关信息。`,
       },
     });
-    // 包装 chain，输出 agent 思考过程和 token 消耗
-    const chain = RunnableLambda.from(async (input2: { messages: BaseMessage[], query?: string }) => {
-      const userInput = input2.query || (input2.messages[input2.messages.length - 1] as HumanMessage).content;
-      const chatHistory = input2.messages.slice(0, -1);
-      // 统计 token 消耗
-      let tokenCount = 0;
-      if (typeof (selectedModel as any).getNumTokensFromMessages === 'function') {
-        try {
-          tokenCount = await (selectedModel as any).getNumTokensFromMessages(input2.messages);
-        } catch (e) {
-          tokenCount = 0;
-        }
-      }
-      // 执行 agent
-      const agentResult = await agentExecutor.invoke({ input: userInput, chat_history: chatHistory });
-      // 返回结构化结果
-      return {
-        output: agentResult.output,
-        steps: agentResult.intermediateSteps || [],
-        tokenCount,
-        model: selectedModelName
-      };
-    });
+    const chain = RunnableSequence.from([
+      {
+        input: (i: { messages: BaseMessage[], query?: string }) =>
+          i.query || (i.messages[i.messages.length - 1] as HumanMessage).content,
+        chat_history: (i: { messages: BaseMessage[] }) => i.messages.slice(0, -1),
+      },
+      agentExecutor,
+      new StringOutputParser(),
+    ]);
     return { chain, llmInstance: selectedModel };
   } else {
-    console.log(`Web Search Responder: Using simple chat for ${selectedModelName} (not openai_compatible or no agent/search capability or missing TAVILY_API_KEY).`);
+    console.log(`Web Search Responder: Using simple chat for ${selectedModelName} (no agent/search capability or missing TAVILY_API_KEY).`);
     const prompt = ChatPromptTemplate.fromMessages(input.messages);
     const chain = prompt.pipe(selectedModel).pipe(new StringOutputParser());
     return { chain, llmInstance: selectedModel };
@@ -572,12 +571,13 @@ const webSearchResponderChain = RunnableLambda.from(async (input: { messages: Ba
 
 // Complex Reasoning Responder
 const complexReasoningResponderChain = RunnableLambda.from(async (input: { messages: BaseMessage[], query?: string | null }) => {
-const models = [
-  'gemini-flash',
-  'deepseek-reasoner',
-  'o4-mini',
-  'claude-sonnet-4-all',
-];
+  const models = [
+    'gemini-flash',
+    'deepseek-reasoner',
+    'hunyuan-t1',
+    'o4-mini',
+    'claude-sonnet-4-all',
+  ];
   const lastMessageText = (input.messages[input.messages.length - 1] as HumanMessage).content;
   const isChineseRequest = typeof lastMessageText === 'string' && isChinese(lastMessageText);
   let selectedModel: BaseChatModel<BaseChatModelCallOptions, AIMessageChunk> | null = null;
@@ -621,41 +621,45 @@ const models = [
 
 // General Chat Responder
 const generalChatResponderChain = RunnableLambda.from(async (input: { messages: BaseMessage[] }) => {
-const defaultModels = [
-  'gemini-flash-lite',
-  'deepseek-chat',
-  'qwen-turbo',
-];
-const chineseModels = [
-  'gemini-flash-lite',
-  'deepseek-chat',
-  'qwen-turbo',
-];
-const lastMessageText = (input.messages[input.messages.length - 1] as HumanMessage).content;
-const isChineseRequest = typeof lastMessageText === 'string' && isChinese(lastMessageText);
-const modelsToTry = isChineseRequest ? chineseModels : defaultModels;
-let selectedModel: BaseChatModel<BaseChatModelCallOptions, AIMessageChunk> | null = null;
-let selectedModelName: string | null = null;
-for (const modelName of modelsToTry) {
-  try {
-    const { llmInstance, modelName: actualName } = getModel(modelName);
-    selectedModel = llmInstance;
-    selectedModelName = actualName;
-    console.log(`General Chat Responder: Using model ${selectedModelName} (Chinese preference: ${isChineseRequest})`);
-    break;
-  } catch (e) {
-    console.warn(`General Chat Responder: Model ${modelName} unavailable. Trying next.`, e);
+  const defaultModels = [
+    'gemini-flash-lite',
+    'gpt4.1',
+    'hunyuan-turbos',
+    'deepseek-chat',
+    'qwen-turbo',
+  ];
+  const chineseModels = [
+    'hunyuan-turbos',
+    'deepseek-chat',
+    'gemini-flash-lite',
+    'gpt4.1',
+    'qwen-turbo',
+  ];
+  const lastMessageText = (input.messages[input.messages.length - 1] as HumanMessage).content;
+  const isChineseRequest = typeof lastMessageText === 'string' && isChinese(lastMessageText);
+  const modelsToTry = isChineseRequest ? chineseModels : defaultModels;
+  let selectedModel: BaseChatModel<BaseChatModelCallOptions, AIMessageChunk> | null = null;
+  let selectedModelName: string | null = null;
+  for (const modelName of modelsToTry) {
+    try {
+      const { llmInstance, modelName: actualName } = getModel(modelName);
+      selectedModel = llmInstance;
+      selectedModelName = actualName;
+      console.log(`General Chat Responder: Using model ${selectedModelName} (Chinese preference: ${isChineseRequest})`);
+      break;
+    } catch (e) {
+      console.warn(`General Chat Responder: Model ${modelName} unavailable. Trying next.`, e);
+    }
   }
-}
-if (!selectedModel) {
-  console.error("General Chat Responder: No general chat models available. Falling back to a generic model.");
-  const fallback = createFallbackModel();
-  selectedModel = fallback.llmInstance;
-  selectedModelName = fallback.modelName;
-}
-const prompt = ChatPromptTemplate.fromMessages(input.messages);
-const chain = prompt.pipe(selectedModel).pipe(new StringOutputParser());
-return { chain, llmInstance: selectedModel };
+  if (!selectedModel) {
+    console.error("General Chat Responder: No general chat models available. Falling back to a generic model.");
+    const fallback = createFallbackModel();
+    selectedModel = fallback.llmInstance;
+    selectedModelName = fallback.modelName;
+  }
+  const prompt = ChatPromptTemplate.fromMessages(input.messages);
+  const chain = prompt.pipe(selectedModel).pipe(new StringOutputParser());
+  return { chain, llmInstance: selectedModel };
 });
 
 export async function POST(req: NextRequest) {
@@ -669,8 +673,7 @@ export async function POST(req: NextRequest) {
     }
     console.log('Formatting messages...');
     const formattedMessages = messages.map(formatMessage);
-    // 允许返回 string 或结构化对象
-    let finalChain: Runnable<any, any>;
+    let finalChain: Runnable<any, string>;
     let llmInstance: BaseChatModel<BaseChatModelCallOptions, AIMessageChunk> | BaseLLM<BaseLLMCallOptions>;
     let selectedModelName: string | undefined;
     const hasImage = containsImage(formattedMessages);
@@ -678,7 +681,8 @@ export async function POST(req: NextRequest) {
       console.log("[Main Router] Image input detected, routing to Vision Responder.");
       const result = await visionResponderChain.invoke({ messages: formattedMessages });
       finalChain = result.chain;
-      llmInstance = result.llmInstance
+      llmInstance = result.llmInstance;
+      // 获取模型名
       selectedModelName = (llmInstance as any)?.model || (llmInstance as any)?.modelName || (llmInstance as any)?.constructor?.name || "UnknownModel";
     } else {
       console.log("[Main Router] No image input, routing through Router Chain.");
@@ -732,66 +736,35 @@ export async function POST(req: NextRequest) {
     }
     // 统一输出模型名
     const modelNameForOutput = selectedModelName || (llmInstance as any)?.model || (llmInstance as any)?.modelName || (llmInstance as any)?.constructor?.name || "UnknownModel";
-    console.log('Starting response processing...');
-    // 判断是否为 agent 结构化输出
-    const isAgentOutput = (llmInstance as any)?.agentType === "openai-functions"; // A simple heuristic, might need refinement
-
-    if (isAgentOutput) {
-      try {
-        const agentResult = await finalChain.invoke({ messages: formattedMessages });
-        if (
-          agentResult &&
-          typeof agentResult === 'object' &&
-          agentResult !== null &&
-          'output' in agentResult &&
-          'steps' in agentResult &&
-          'tokenCount' in agentResult
-        ) {
-          // 结构化 agent 输出
-          return new Response(JSON.stringify({
-            model: agentResult.model || modelNameForOutput,
-            output: agentResult.output,
-            steps: agentResult.steps,
-            tokenCount: agentResult.tokenCount
-          }), { status: 200, headers: { 'Content-Type': 'application/json' } });
-        } else {
-          // Fallback for unexpected agent output structure
-          console.warn("Agent output did not match expected structure, returning as plain text.");
-          return new Response(`${modelNameForOutput}:\n${JSON.stringify(agentResult)}`, { status: 200, headers: { 'Content-Type': 'text/plain' } });
+    console.log('Starting stream...');
+    try {
+      const stream = await finalChain.stream({ messages: formattedMessages });
+      // 包装 stream，在开头插入模型名
+      const encoder = new TextEncoder();
+      const transformedStream = new ReadableStream({
+        async start(controller) {
+          controller.enqueue(encoder.encode(`${modelNameForOutput}:\n`));
+          for await (const chunk of stream) {
+            controller.enqueue(typeof chunk === "string" ? encoder.encode(chunk) : chunk);
+          }
+          controller.close();
         }
-      } catch (agentError: any) {
-        console.error("Agent invocation failed:", agentError);
-        return new Response(
-          JSON.stringify({
-            error: `Agent processing failed: ${agentError.message}`,
-            details: {
-              message: agentError.message,
-              stack: agentError.stack,
-            }
-          }),
-          { status: 500, headers: { "Content-Type": "application/json" } }
-        );
-      }
-    } else {
-      // 普通输出，使用流式传输
+      });
+      return new StreamingTextResponse(transformedStream);
+    } catch (streamError: any) {
+      console.error("Streaming failed, attempting to invoke:", streamError);
       try {
-        const stream = await finalChain.stream({ messages: formattedMessages });
-        // Create a TransformStream to encode string chunks to Uint8Array
-        const encoder = new TextEncoder();
-        const transformStream = new TransformStream({
-          transform(chunk, controller) {
-            controller.enqueue(encoder.encode(chunk));
-          },
-        });
-        return new StreamingTextResponse(stream.pipeThrough(transformStream));
-      } catch (streamError: any) {
-        console.error("Streaming failed:", streamError);
+        const result = await finalChain.invoke({ messages: formattedMessages });
+        return new Response(`${modelNameForOutput}:\n${result}`, { status: 200, headers: { 'Content-Type': 'text/plain' } });
+      } catch (invokeError: any) {
+        console.error("Invoke also failed:", invokeError);
         return new Response(
           JSON.stringify({
-            error: `AI streaming failed: ${streamError.message}`,
+            error: `AI processing failed. Streaming error: ${streamError.message}, Invoke error: ${invokeError.message}`,
             details: {
-              message: streamError.message,
-              stack: streamError.stack,
+              streamError: streamError.message,
+              invokeError: invokeError.message,
+              invokeStack: invokeError.stack,
             }
           }),
           { status: 500, headers: { "Content-Type": "application/json" } }
