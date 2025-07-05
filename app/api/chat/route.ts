@@ -527,8 +527,13 @@ const webSearchResponderChain = RunnableLambda.from(async (input: { messages: Ba
     selectedModel = fallback.llmInstance;
     selectedModelName = fallback.modelName;
   }
-  // Access MODEL_PROVIDERS only if selectedModelName is non-null.
-  if (selectedModelName && (MODEL_PROVIDERS[selectedModelName]?.capabilities.search || MODEL_PROVIDERS[selectedModelName]?.capabilities.tool_calling) && process.env.TAVILY_API_KEY) {
+  // 只允许 openai_compatible 类型模型走 agent
+  if (
+    selectedModelName &&
+    MODEL_PROVIDERS[selectedModelName]?.type === 'openai_compatible' &&
+    (MODEL_PROVIDERS[selectedModelName]?.capabilities.search || MODEL_PROVIDERS[selectedModelName]?.capabilities.tool_calling) &&
+    process.env.TAVILY_API_KEY
+  ) {
     console.log(`Web Search Responder: Initializing agent with ${selectedModelName}`);
     const tools: Tool[] = [
       new TavilySearchResults({ maxResults: 5, apiKey: process.env.TAVILY_API_KEY }),
@@ -562,7 +567,7 @@ const webSearchResponderChain = RunnableLambda.from(async (input: { messages: Ba
     ]);
     return { chain, llmInstance: selectedModel };
   } else {
-    console.log(`Web Search Responder: Using simple chat for ${selectedModelName} (no agent/search capability or missing TAVILY_API_KEY).`);
+    console.log(`Web Search Responder: Using simple chat for ${selectedModelName} (not openai_compatible or no agent/search capability or missing TAVILY_API_KEY).`);
     const prompt = ChatPromptTemplate.fromMessages(input.messages);
     const chain = prompt.pipe(selectedModel).pipe(new StringOutputParser());
     return { chain, llmInstance: selectedModel };
