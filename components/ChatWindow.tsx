@@ -198,15 +198,19 @@ export function ChatWindow(props: {
         ? JSON.parse(Buffer.from(sourcesHeader, "base64").toString("utf8"))
         : [];
 
-      // Get model information from response headers
-      const modelUsed = response.headers.get("X-Model-Used");
-      const modelProvider = response.headers.get("X-Model-Provider");
-      const feature = response.headers.get("X-Feature");
-      const retrievalMethod = response.headers.get("X-Retrieval-Method");
-      const documentsFound = response.headers.get("X-Documents-Found");
+      // Get model information from response headers (try both cases)
+      const modelUsed = response.headers.get("X-Model-Used") || response.headers.get("x-model-used");
+      const modelProvider = response.headers.get("X-Model-Provider") || response.headers.get("x-model-provider");
+      const feature = response.headers.get("X-Feature") || response.headers.get("x-feature");
+      const retrievalMethod = response.headers.get("X-Retrieval-Method") || response.headers.get("x-retrieval-method");
+      const documentsFound = response.headers.get("X-Documents-Found") || response.headers.get("x-documents-found");
 
-      const messageIndexHeader = response.headers.get("x-message-index");
-      const messageIndex = messageIndexHeader || (chat.messages.length).toString();
+      const messageIndexHeader = response.headers.get("x-message-index") || response.headers.get("X-Message-Index");
+      // The assistant message will be at chat.messages.length (next index)
+      const messageIndex = messageIndexHeader || chat.messages.length.toString();
+      
+      console.log('Response headers:', Object.fromEntries(response.headers.entries()));
+      console.log('Model info received:', { modelUsed, modelProvider, feature, messageIndex });
       
       if (sources.length && messageIndexHeader !== null) {
         setSourcesForMessages({
@@ -217,6 +221,7 @@ export function ChatWindow(props: {
 
       // Store model information for this message
       if (modelUsed) {
+        console.log('Setting model info for message index:', messageIndex);
         setModelInfoForMessages(prev => ({
           ...prev,
           [messageIndex]: {

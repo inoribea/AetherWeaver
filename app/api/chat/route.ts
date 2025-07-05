@@ -347,15 +347,23 @@ function createFallbackModel(): { llmInstance: BaseChatModel<BaseChatModelCallOp
   let fallbackModel: BaseChatModel<BaseChatModelCallOptions, AIMessageChunk>;
   let fallbackModelName: string;
   
-  if (process.env.NEKO_API_KEY || process.env.OPENAI_API_KEY) {
-    console.log("使用 OpenAI 兼容模型作为回退模型");
-    fallbackModelName = 'gpt-4o-all';
+  if (process.env.GOOGLE_API_KEY) {
+    console.log("使用 Google Gemini 作为回退模型");
+    fallbackModelName = 'gemini-flash-lite';
+    fallbackModel = new ChatGoogleGenerativeAI({
+      temperature: 0.7,
+      streaming: true,
+      apiKey: process.env.GOOGLE_API_KEY,
+      model: 'models/gemini-2.5-flash-lite-preview-06-17',
+    });
+  } else if (process.env.OPENAI_API_KEY) {
+    console.log("使用 OpenAI 作为回退模型");
+    fallbackModelName = 'gpt-4o-mini';
     fallbackModel = new ChatOpenAI({
       temperature: 0.7,
       streaming: true,
-      apiKey: process.env.NEKO_API_KEY || process.env.OPENAI_API_KEY,
-      configuration: { baseURL: process.env.NEKO_BASE_URL || process.env.OPENAI_BASE_URL },
-      model: fallbackModelName,
+      apiKey: process.env.OPENAI_API_KEY,
+      model: 'gpt-4o-mini',
     });
   } else if (process.env.DEEPSEEK_API_KEY) {
     console.log("使用 DeepSeek 作为回退模型");
@@ -364,29 +372,12 @@ function createFallbackModel(): { llmInstance: BaseChatModel<BaseChatModelCallOp
       temperature: 0.7,
       streaming: true,
       apiKey: process.env.DEEPSEEK_API_KEY,
-      model: fallbackModelName,
-    });
-  } else if (process.env.GOOGLE_API_KEY) {
-    console.log("使用 Google Gemini 作为回退模型");
-    fallbackModelName = 'gemini-flash-lite';
-    fallbackModel = new ChatGoogleGenerativeAI({
-      temperature: 0.7,
-      streaming: true,
-      apiKey: process.env.GOOGLE_API_KEY,
-      model: fallbackModelName,
-    });
-  } else if (process.env.DASHSCOPE_API_KEY) {
-    console.log("使用 Aliyun Tongyi 作为回退模型");
-    fallbackModelName = 'qwen-turbo-latest';
-    fallbackModel = createAlibabaTongyiModel({
-      temperature: 0.7,
-      streaming: true,
-      model: fallbackModelName,
-      apiKey: process.env.DASHSCOPE_API_KEY
+      model: 'deepseek-chat',
     });
   } else {
-    throw new Error("未找到可用的 API 密钥，无法创建回退模型。请配置 OPENAI_API_KEY, DEEPSEEK_API_KEY, GOOGLE_API_KEY 或 DASHSCOPE_API_KEY。");
+    throw new Error("未找到可用的 API 密钥，请在 .env.local 文件中配置 GOOGLE_API_KEY、OPENAI_API_KEY 或 DEEPSEEK_API_KEY");
   }
+  
   return { llmInstance: fallbackModel, modelName: fallbackModelName };
 }
 
@@ -449,7 +440,7 @@ export async function POST(req: NextRequest) {
       chain = prompt.pipe(selectedModel).pipe(new StringOutputParser());
       
     } else if (messageText.toLowerCase().includes('search') || 
-               messageText.toLowerCase().includes('最新') || 
+               messageText.toLowerCase().includes('latest') || 
                messageText.toLowerCase().includes('current')) {
       // Web search processing
       console.log("[Enhanced Router] Search request detected");
@@ -601,29 +592,10 @@ Input: {input}`;
       // Simple chat processing
       console.log("[Enhanced Router] Simple chat request");
       
-      const chatModels = ['gemini-flash-lite', 'qwen-turbo', 'deepseek-chat'];
-      let chatModel = null;
-      let chatModelName = '';
+      const fallback = createFallbackModel();
+      selectedModel = fallback.llmInstance;
+      modelNameForOutput = fallback.modelName;
       
-      for (const modelName of chatModels) {
-        try {
-          const { llmInstance, modelName: actualName } = getModel(modelName);
-          chatModel = llmInstance;
-          chatModelName = actualName;
-          break;
-        } catch (e) {
-          console.warn(`Chat model ${modelName} unavailable`);
-        }
-      }
-      
-      if (!chatModel) {
-        const fallback = createFallbackModel();
-        chatModel = fallback.llmInstance;
-        chatModelName = fallback.modelName;
-      }
-      
-      selectedModel = chatModel;
-      modelNameForOutput = chatModelName;
       const prompt = ChatPromptTemplate.fromMessages(formattedMessages);
       chain = prompt.pipe(selectedModel).pipe(new StringOutputParser());
     }
@@ -646,9 +618,30 @@ Input: {input}`;
       },
     });
 
+    // Determine feature type based on the routing logic
+    let featureType = 'chat';
+    if (hasImage) {
+      featureType = 'vision';
+    } else if (messageText.toLowerCase().includes('search') || 
+               messageText.toLowerCase().includes('lastest') || 
+               messageText.toLowerCase().includes('current')) {
+      featureType = 'search';
+    } else if (messageText.toLowerCase().includes('analyze') || 
+               messageText.toLowerCase().includes('structure') || 
+               messageText.toLowerCase().includes('format')) {
+      featureType = 'structured';
+    } else if (messageText.toLowerCase().includes('langchain') || 
+               messageText.toLowerCase().includes('rag') || 
+               messageText.toLowerCase().includes('vector')) {
+      featureType = 'retrieval';
+    }
+
     return new StreamingTextResponse(readableStream, {
       headers: {
         'X-Model-Used': modelNameForOutput,
+        'X-Model-Provider': selectedModel.constructor.name || 'Unknown',
+        'X-Feature': featureType,
+        'X-Message-Index': (messages.length - 1).toString(),
         'Content-Type': 'text/plain; charset=utf-8',
       },
     });
