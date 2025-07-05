@@ -23,7 +23,7 @@ import { ChatOpenAI } from '@langchain/openai';
 import { ChatDeepSeek } from "@langchain/deepseek";
 import { ChatAlibabaTongyi } from '@langchain/community/chat_models/alibaba_tongyi';
 import { CloudflareWorkersAI } from '@langchain/cloudflare';
-import { ChatTencentHunyuan } from '@langchain/community/chat_models/tencent_hunyuan';
+// import { ChatTencentHunyuan } from '@langchain/community/chat_models/tencent_hunyuan'; // Commented out due to Edge runtime incompatibility
 
 // Model wrapper functions
 function createAlibabaTongyiModel(config: {
@@ -40,21 +40,21 @@ function createAlibabaTongyiModel(config: {
   });
 }
 
-function createTencentHunyuanModel(config: {
-  temperature?: number;
-  streaming?: boolean;
-  model?: string;
-  secretId?: string;
-  secretKey?: string;
-}) {
-  return new ChatTencentHunyuan({
-    temperature: config.temperature,
-    streaming: config.streaming,
-    model: config.model,
-    tencentSecretId: config.secretId, // Corrected: direct tencentSecretId
-    tencentSecretKey: config.secretKey // Corrected: direct tencentSecretKey
-  });
-}
+// function createTencentHunyuanModel(config: { // Commented out due to Edge runtime incompatibility
+//   temperature?: number;
+//   streaming?: boolean;
+//   model?: string;
+//   secretId?: string;
+//   secretKey?: string;
+// }) {
+//   return new ChatTencentHunyuan({
+//     temperature: config.temperature,
+//     streaming: config.streaming,
+//     model: config.model,
+//     tencentSecretId: config.secretId,
+//     tencentSecretKey: config.secretKey
+//   });
+// }
 import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
 
 // --- Imports for Tools and Agents ---
@@ -230,28 +230,28 @@ const MODEL_PROVIDERS: Record<string, {
     capabilities: { vision: true, chinese: true }
   },
   // --- Tencent Hunyuan Models ---
-  'hunyuan-t1': {
-    type: 'tencent_hunyuan',
-    model: ChatTencentHunyuan,
-    config: {
-      secretId: process.env.TENCENT_HUNYUAN_SECRET_ID,
-      secretKey: process.env.TENCENT_HUNYUAN_SECRET_KEY,
-      model: 'hunyuan-t1-latest',
-      temperature: 0.7
-    },
-    capabilities: { reasoning: true, chinese: true }
-  },
-  'hunyuan-turbos': {
-    type: 'tencent_hunyuan',
-    model: ChatTencentHunyuan,
-    config: {
-      secretId: process.env.TENCENT_HUNYUAN_SECRET_ID,
-      secretKey: process.env.TENCENT_HUNYUAN_SECRET_KEY,
-      model: 'hunyuan-turbos-latest',
-      temperature: 0.7
-    },
-    capabilities: { reasoning: true, chinese: true }
-  },
+  // 'hunyuan-t1': { // Commented out due to Edge runtime incompatibility
+  //   type: 'tencent_hunyuan',
+  //   model: ChatTencentHunyuan,
+  //   config: {
+  //     secretId: process.env.TENCENT_HUNYUAN_SECRET_ID,
+  //     secretKey: process.env.TENCENT_HUNYUAN_SECRET_KEY,
+  //     model: 'hunyuan-t1-latest',
+  //     temperature: 0.7
+  //   },
+  //   capabilities: { reasoning: true, chinese: true }
+  // },
+  // 'hunyuan-turbos': { // Commented out due to Edge runtime incompatibility
+  //   type: 'tencent_hunyuan',
+  //   model: ChatTencentHunyuan,
+  //   config: {
+  //     secretId: process.env.TENCENT_HUNYUAN_SECRET_ID,
+  //     secretKey: process.env.TENCENT_HUNYUAN_SECRET_KEY,
+  //     model: 'hunyuan-turbos-latest',
+  //     temperature: 0.7
+  //   },
+  //   capabilities: { reasoning: true, chinese: true }
+  // },
   // --- Google Gemini Models ---
   'gemini-flash-lite': {
     type: 'google_gemini',
@@ -335,14 +335,6 @@ function getModel(modelName: string): { llmInstance: BaseChatModel<BaseChatModel
         model: providerEntry.config.model || modelName,
         apiKey: providerEntry.config.apiKey // Use apiKey for alibabaApiKey
       });
-    } else if (providerEntry.type === 'tencent_hunyuan') {
-      modelInstance = createTencentHunyuanModel({
-        temperature: 0.7,
-        streaming: true,
-        model: providerEntry.config.model || modelName,
-        secretId: providerEntry.config.secretId,
-        secretKey: providerEntry.config.secretKey
-      });
     } else if (providerEntry.type === 'google_gemini') {
       modelInstance = new ChatGoogleGenerativeAI({
         temperature: 0.7,
@@ -401,18 +393,8 @@ function createFallbackModel(): { llmInstance: BaseChatModel<BaseChatModelCallOp
       model: fallbackModelName,
       apiKey: process.env.DASHSCOPE_API_KEY // Use apiKey for alibabaApiKey
     });
-  } else if (process.env.TENCENT_HUNYUAN_SECRET_ID && process.env.TENCENT_HUNYUAN_SECRET_KEY) {
-    console.log("使用 Tencent Hunyuan 作为回退模型");
-    fallbackModelName = 'hunyuan-turbos-latest';
-    fallbackModel = createTencentHunyuanModel({
-      temperature: 0.7,
-      streaming: true,
-      model: fallbackModelName,
-      secretId: process.env.TENCENT_HUNYUAN_SECRET_ID,
-      secretKey: process.env.TENCENT_HUNYUAN_SECRET_KEY
-    });
   } else {
-    throw new Error("未找到可用的 API 密钥，无法创建回退模型。请配置 OPENAI_API_KEY, DEEPSEEK_API_KEY, GOOGLE_API_KEY, DASHSCOPE_API_KEY 或 TENCENT_HUNYUAN_SECRET_KEY。");
+    throw new Error("未找到可用的 API 密钥，无法创建回退模型。请配置 OPENAI_API_KEY, DEEPSEEK_API_KEY, GOOGLE_API_KEY, 或 DASHSCOPE_API_KEY。");
   }
   return { llmInstance: fallbackModel, modelName: fallbackModelName };
 }
@@ -590,13 +572,12 @@ const webSearchResponderChain = RunnableLambda.from(async (input: { messages: Ba
 
 // Complex Reasoning Responder
 const complexReasoningResponderChain = RunnableLambda.from(async (input: { messages: BaseMessage[], query?: string | null }) => {
-  const models = [
-    'gemini-flash',
-    'deepseek-reasoner',
-    'hunyuan-t1',
-    'o4-mini',
-    'claude-sonnet-4-all',
-  ];
+const models = [
+  'gemini-flash',
+  'deepseek-reasoner',
+  'o4-mini',
+  'claude-sonnet-4-all',
+];
   const lastMessageText = (input.messages[input.messages.length - 1] as HumanMessage).content;
   const isChineseRequest = typeof lastMessageText === 'string' && isChinese(lastMessageText);
   let selectedModel: BaseChatModel<BaseChatModelCallOptions, AIMessageChunk> | null = null;
@@ -642,15 +623,11 @@ const complexReasoningResponderChain = RunnableLambda.from(async (input: { messa
 const generalChatResponderChain = RunnableLambda.from(async (input: { messages: BaseMessage[] }) => {
 const defaultModels = [
   'gemini-flash-lite',
-  'gpt4.1',
-  'hunyuan-turbos',
   'deepseek-chat',
   'qwen-turbo',
 ];
 const chineseModels = [
   'gemini-flash-lite',
-  'gpt4.1',
-  'hunyuan-turbos',
   'deepseek-chat',
   'qwen-turbo',
 ];
