@@ -27,6 +27,7 @@ function ChatMessages(props: {
   messages: Message[];
   emptyStateComponent: ReactNode;
   sourcesForMessages: Record<string, any>;
+  modelInfoForMessages: Record<string, any>;
   aiEmoji?: string;
   className?: string;
 }) {
@@ -38,12 +39,14 @@ function ChatMessages(props: {
         }
 
         const sourceKey = (props.messages.length - 1 - i).toString();
+        const modelInfoKey = i.toString();
         return (
           <ChatMessageBubble
             key={m.id}
             message={m}
             aiEmoji={props.aiEmoji}
             sources={props.sourcesForMessages[sourceKey]}
+            modelInfo={props.modelInfoForMessages[modelInfoKey]}
           />
         );
       })}
@@ -183,6 +186,10 @@ export function ChatWindow(props: {
     Record<string, any>
   >({});
 
+  const [modelInfoForMessages, setModelInfoForMessages] = useState<
+    Record<string, any>
+  >({});
+
   const chat = useChat({
     api: props.endpoint,
     onResponse(response) {
@@ -191,12 +198,35 @@ export function ChatWindow(props: {
         ? JSON.parse(Buffer.from(sourcesHeader, "base64").toString("utf8"))
         : [];
 
+      // Get model information from response headers
+      const modelUsed = response.headers.get("X-Model-Used");
+      const modelProvider = response.headers.get("X-Model-Provider");
+      const feature = response.headers.get("X-Feature");
+      const retrievalMethod = response.headers.get("X-Retrieval-Method");
+      const documentsFound = response.headers.get("X-Documents-Found");
+
       const messageIndexHeader = response.headers.get("x-message-index");
+      const messageIndex = messageIndexHeader || (chat.messages.length).toString();
+      
       if (sources.length && messageIndexHeader !== null) {
         setSourcesForMessages({
           ...sourcesForMessages,
           [messageIndexHeader]: sources,
         });
+      }
+
+      // Store model information for this message
+      if (modelUsed) {
+        setModelInfoForMessages(prev => ({
+          ...prev,
+          [messageIndex]: {
+            modelUsed,
+            modelProvider,
+            feature,
+            retrievalMethod,
+            documentsFound,
+          }
+        }));
       }
     },
     streamMode: "text",
@@ -300,6 +330,7 @@ export function ChatWindow(props: {
             messages={chat.messages}
             emptyStateComponent={props.emptyStateComponent}
             sourcesForMessages={sourcesForMessages}
+            modelInfoForMessages={modelInfoForMessages}
           />
         )
       }

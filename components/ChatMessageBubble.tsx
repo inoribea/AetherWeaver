@@ -5,6 +5,7 @@ export function ChatMessageBubble(props: {
   message: Message;
   aiEmoji?: string;
   sources: any[];
+  modelInfo?: any;
 }) {
   return (
     <div
@@ -23,7 +24,36 @@ export function ChatMessageBubble(props: {
       )}
 
       <div className="whitespace-pre-wrap flex flex-col">
+        {/* Model info display - only for AI messages */}
+        {props.message.role === "assistant" && props.modelInfo && (
+          <div className="mb-2 text-xs text-muted-foreground">
+            <span className="inline-flex items-center gap-1 bg-muted px-2 py-1 rounded">
+              🤖 {props.modelInfo.modelUsed}
+              {props.modelInfo.feature && (
+                <span className="text-[10px] opacity-70">
+                  • {props.modelInfo.feature}
+                </span>
+              )}
+            </span>
+          </div>
+        )}
+
         <span>{props.message.content}</span>
+
+        {/* Model details and token info - only for AI messages */}
+        {props.message.role === "assistant" && props.modelInfo && (
+          <div className="mt-2 text-[10px] text-muted-foreground opacity-60">
+            {props.modelInfo.modelProvider && (
+              <span>Provider: {props.modelInfo.modelProvider}</span>
+            )}
+            {props.modelInfo.retrievalMethod && (
+              <span> • Method: {props.modelInfo.retrievalMethod}</span>
+            )}
+            {props.modelInfo.documentsFound && (
+              <span> • Docs: {props.modelInfo.documentsFound}</span>
+            )}
+          </div>
+        )}
 
         {props.sources && props.sources.length ? (
           <>
