@@ -3,8 +3,13 @@ import { Message as VercelChatMessage, StreamingTextResponse } from "ai";
 
 import { createReactAgent } from "@langchain/langgraph/prebuilt";
 import { ChatOpenAI } from "@langchain/openai";
+import { ChatDeepSeek } from "@langchain/deepseek";
+import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
+import { ChatAlibabaTongyi } from "@langchain/community/chat_models/alibaba_tongyi";
 import { SerpAPI } from "@langchain/community/tools/serpapi";
+import { TavilySearchResults } from "@langchain/community/tools/tavily_search";
 import { Calculator } from "@langchain/community/tools/calculator";
+import { Tool } from "@langchain/core/tools";
 import {
   AIMessage,
   BaseMessage,
@@ -12,8 +17,10 @@ import {
   HumanMessage,
   SystemMessage,
 } from "@langchain/core/messages";
+import { BaseChatModel, BaseChatModelCallOptions } from "@langchain/core/language_models/chat_models";
+import { AIMessageChunk } from "@langchain/core/messages";
 
-export const runtime = "edge";
+// export const runtime = "edge"; // Commented out to avoid edge runtime issues
 
 const convertVercelMessageToLangChainMessage = (message: VercelChatMessage) => {
   if (message.role === "user") {
@@ -39,6 +46,46 @@ const convertLangChainMessageToVercelMessage = (message: BaseMessage) => {
   }
 };
 
+// Helper function to create Alibaba Tongyi model
+function createAlibabaTongyiModel(config: {
+  temperature?: number;
+  model?: string;
+  apiKey?: string;
+}) {
+  return new ChatAlibabaTongyi({
+    temperature: config.temperature,
+    model: config.model,
+    alibabaApiKey: config.apiKey
+  });
+}
+
+// Helper function to get available model for agents
+function getAvailableAgentModel(): BaseChatModel<BaseChatModelCallOptions, AIMessageChunk> {
+  // Try models that support tool calling
+  if (process.env.OPENAI_API_KEY || process.env.NEKO_API_KEY) {
+    return new ChatOpenAI({
+      model: "gpt-4o-mini",
+      temperature: 0,
+      apiKey: process.env.NEKO_API_KEY || process.env.OPENAI_API_KEY,
+      configuration: { baseURL: process.env.NEKO_BASE_URL || process.env.OPENAI_BASE_URL },
+    });
+  } else if (process.env.GOOGLE_API_KEY) {
+    return new ChatGoogleGenerativeAI({
+      model: "gemini-2.5-flash-preview-05-20",
+      temperature: 0,
+      apiKey: process.env.GOOGLE_API_KEY,
+    });
+  } else if (process.env.DASHSCOPE_API_KEY) {
+    return createAlibabaTongyiModel({
+      model: "qwen-turbo-latest",
+      temperature: 0,
+      apiKey: process.env.DASHSCOPE_API_KEY,
+    });
+  } else {
+    throw new Error("No API keys configured for agent models. Please set up OpenAI, Google, or Alibaba Tongyi API keys.");
+  }
+}
+
 const AGENT_SYSTEM_TEMPLATE = `You are a talking parrot named Polly. All final responses must be how a talking parrot would respond. Squawk often!`;
 
 /**
@@ -62,13 +109,17 @@ export async function POST(req: NextRequest) {
       )
       .map(convertVercelMessageToLangChainMessage);
 
-    // Requires process.env.SERPAPI_API_KEY to be set: https://serpapi.com/
-    // You can remove this or use a different tool instead.
-    const tools = [new Calculator(), new SerpAPI()];
-    const chat = new ChatOpenAI({
-      model: "gpt-4o-mini",
-      temperature: 0,
-    });
+    // Setup tools - try different search providers
+    const tools: Tool[] = [new Calculator()];
+    
+    // Add search tool if available
+    if (process.env.SERPAPI_API_KEY) {
+      tools.push(new SerpAPI());
+    } else if (process.env.TAVILY_API_KEY) {
+      tools.push(new TavilySearchResults({ maxResults: 5, apiKey: process.env.TAVILY_API_KEY }));
+    }
+    
+    const chat = getAvailableAgentModel();
 
     /**
      * Use a prebuilt LangGraph agent.

@@ -3,9 +3,54 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
 import { ChatOpenAI } from "@langchain/openai";
+import { ChatDeepSeek } from "@langchain/deepseek";
+import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
+import { ChatAlibabaTongyi } from "@langchain/community/chat_models/alibaba_tongyi";
 import { PromptTemplate } from "@langchain/core/prompts";
+import { BaseChatModel, BaseChatModelCallOptions } from "@langchain/core/language_models/chat_models";
+import { AIMessageChunk } from "@langchain/core/messages";
 
-export const runtime = "edge";
+// export const runtime = "edge"; // Commented out to avoid edge runtime issues
+
+// Helper function to create Alibaba Tongyi model
+function createAlibabaTongyiModel(config: {
+  temperature?: number;
+  model?: string;
+  apiKey?: string;
+}) {
+  return new ChatAlibabaTongyi({
+    temperature: config.temperature,
+    model: config.model,
+    alibabaApiKey: config.apiKey
+  });
+}
+
+// Helper function to get available model for structured output
+function getAvailableStructuredOutputModel(): BaseChatModel<BaseChatModelCallOptions, AIMessageChunk> {
+  // Try models that support structured output/function calling
+  if (process.env.OPENAI_API_KEY || process.env.NEKO_API_KEY) {
+    return new ChatOpenAI({
+      temperature: 0.8,
+      model: "gpt-4o-mini",
+      apiKey: process.env.NEKO_API_KEY || process.env.OPENAI_API_KEY,
+      configuration: { baseURL: process.env.NEKO_BASE_URL || process.env.OPENAI_BASE_URL },
+    });
+  } else if (process.env.GOOGLE_API_KEY) {
+    return new ChatGoogleGenerativeAI({
+      temperature: 0.8,
+      model: "gemini-2.5-flash-lite-preview-06-17",
+      apiKey: process.env.GOOGLE_API_KEY,
+    });
+  } else if (process.env.DASHSCOPE_API_KEY) {
+    return createAlibabaTongyiModel({
+      temperature: 0.8,
+      model: "qwen-turbo-latest",
+      apiKey: process.env.DASHSCOPE_API_KEY,
+    });
+  } else {
+    throw new Error("No API keys configured for structured output models. Please set up OpenAI, Google, or Alibaba Tongyi API keys.");
+  }
+}
 
 const TEMPLATE = `Extract the requested fields from the input.
 
@@ -16,8 +61,8 @@ Input:
 {input}`;
 
 /**
- * This handler initializes and calls an OpenAI Functions powered
- * structured output chain. See the docs for more information:
+ * This handler initializes and calls a structured output chain with enhanced model support.
+ * See the docs for more information:
  *
  * https://js.langchain.com/v0.2/docs/how_to/structured_output
  */
@@ -28,13 +73,9 @@ export async function POST(req: NextRequest) {
     const currentMessageContent = messages[messages.length - 1].content;
 
     const prompt = PromptTemplate.fromTemplate(TEMPLATE);
-    /**
-     * Function calling is currently only supported with ChatOpenAI models
-     */
-    const model = new ChatOpenAI({
-      temperature: 0.8,
-      model: "gpt-4o-mini",
-    });
+    
+    // Get available model that supports structured output
+    const model = getAvailableStructuredOutputModel();
 
     /**
      * We use Zod (https://zod.dev) to define our schema for convenience,
