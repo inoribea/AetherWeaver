@@ -231,6 +231,17 @@ export function convertOpenAIToLangChain(request: OpenAICompletionRequest): {
   };
 }
 
+// 检测模型切换请求
+export function detectModelSwitchRequest(content: string): string | null {
+  const lowerContent = content.toLowerCase();
+  if (lowerContent.includes('切换到') || lowerContent.includes('使用') || lowerContent.includes('换成')) {
+    const modelRegex = /(gpt-4o-all|claude-sonnet-4-all|o4-mini|deepseek-chat|deepseek-reasoner|qwen-turbo|gemini-flash-lite|gemini-flash|hunyuan-turbos-latest|hunyuan-t1-latest)/g;
+    const match = modelRegex.exec(lowerContent);
+    return match ? match[0] : null;
+  }
+  return null;
+}
+
 // 生成 OpenAI 格式的响应
 export function createOpenAIResponse(
   content: string,

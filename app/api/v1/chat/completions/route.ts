@@ -11,7 +11,8 @@ import {
   createOpenAIResponse,
   formatStreamChunk,
   createStreamEnd,
-  detectIntentFromRequest
+  detectIntentFromRequest,
+  detectModelSwitchRequest // 导入模型切换检测函数
 } from '@/utils/openai-compat';
 
 // OpenAI兼容的聊天完成端点
@@ -66,6 +67,7 @@ export async function POST(req: NextRequest) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'X-OpenAI-Compat': 'true', // 添加标识，让内部API知道这是来自OpenAI兼容层的请求
         // 传递原始请求的一些头信息
         'X-Forwarded-For': req.headers.get('X-Forwarded-For') || '',
         'User-Agent': req.headers.get('User-Agent') || '',
@@ -94,8 +96,17 @@ export async function POST(req: NextRequest) {
     }
 
     // 获取模型信息
-    const modelUsed = internalResponse.headers.get('X-Model-Used') || body.model || 'auto';
-    const actualModel = modelUsed === 'auto' ? 'langchain-auto' : modelUsed;
+    let modelUsed = internalResponse.headers.get('X-Model-Used') || body.model || 'auto';
+    let actualModel = modelUsed === 'auto' ? 'langchain-auto' : modelUsed;
+
+    // 检测模型切换请求
+    const lastMessage = body.messages[body.messages.length - 1];
+    const messageContent = Array.isArray(lastMessage.content) ? lastMessage.content.map(c => typeof c === 'string' ? c : c.text).join('') : lastMessage.content;
+    const switchModel = detectModelSwitchRequest(messageContent);
+    if (switchModel) {
+      console.log(`Detected model switch request: ${switchModel}`);
+      actualModel = switchModel;
+    }
 
     // 处理流式响应
     if (body.stream !== false) {
@@ -113,10 +124,30 @@ export async function POST(req: NextRequest) {
           try {
             let buffer = '';
             
+            // 添加模型特定的处理逻辑
+            const isGeminiModel = actualModel.includes('gemini');
+            let modelInfoSent = false;
+            let contentBuffer = '';
+            
             while (true) {
               const { done, value } = await reader.read();
               
               if (done) {
+                // 处理剩余的buffer
+                if (buffer.trim()) {
+                  if (isGeminiModel && !modelInfoSent) {
+                    // 如果是 Gemini 模型且还没发送模型信息，一起发送
+                    const combinedContent = contentBuffer + buffer;
+                    if (combinedContent.trim()) {
+                      const openaiChunk = createOpenAIResponse(combinedContent, actualModel, false, true);
+                      controller.enqueue(encoder.encode(formatStreamChunk(openaiChunk)));
+                    }
+                  } else {
+                    const openaiChunk = createOpenAIResponse(buffer, actualModel, false, true);
+                    controller.enqueue(encoder.encode(formatStreamChunk(openaiChunk)));
+                  }
+                }
+                
                 // 发送最后的完成块
                 const finalChunk = createOpenAIResponse('', actualModel, true, true);
                 controller.enqueue(encoder.encode(formatStreamChunk(finalChunk)));
@@ -134,17 +165,33 @@ export async function POST(req: NextRequest) {
               
               for (const line of lines) {
                 if (line.trim()) {
-                  // 创建OpenAI格式的流式响应 - 不注入模型信息
-                  const openaiChunk = createOpenAIResponse(line + '\n', actualModel, false, true);
-                  controller.enqueue(encoder.encode(formatStreamChunk(openaiChunk)));
+                  // 对于 Gemini 模型，特殊处理模型信息
+                  if (isGeminiModel) {
+                    if (line.includes('🤖') || line.includes('---')) {
+                      // 缓存模型信息，不立即发送
+                      contentBuffer += line + '\n';
+                      continue;
+                    }
+                    
+                    // 当收到实际内容时，一起发送模型信息和内容
+                    if (!modelInfoSent && !line.includes('🤖') && !line.includes('---')) {
+                      const combinedContent = contentBuffer + line + '\n';
+                      const openaiChunk = createOpenAIResponse(combinedContent, actualModel, false, true);
+                      controller.enqueue(encoder.encode(formatStreamChunk(openaiChunk)));
+                      modelInfoSent = true;
+                      contentBuffer = '';
+                    } else if (modelInfoSent) {
+                      // 后续内容正常发送
+                      const openaiChunk = createOpenAIResponse(line + '\n', actualModel, false, true);
+                      controller.enqueue(encoder.encode(formatStreamChunk(openaiChunk)));
+                    }
+                  } else {
+                    // 非 Gemini 模型的正常处理
+                    const openaiChunk = createOpenAIResponse(line + '\n', actualModel, false, true);
+                    controller.enqueue(encoder.encode(formatStreamChunk(openaiChunk)));
+                  }
                 }
               }
-            }
-            
-            // 处理剩余的buffer
-            if (buffer.trim()) {
-              const openaiChunk = createOpenAIResponse(buffer, actualModel, false, true);
-              controller.enqueue(encoder.encode(formatStreamChunk(openaiChunk)));
             }
             
             controller.close();
