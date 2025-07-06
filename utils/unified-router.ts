@@ -545,13 +545,6 @@ export class SemanticRouter {
     return Math.min(complexity, 7); // 最大复杂度为7
   }
 
-  // 将数值复杂度转换为阈值级别
-  private getComplexityThreshold(complexity: number): 'low' | 'medium' | 'high' {
-    if (complexity >= 5) return 'high';
-    if (complexity >= 3) return 'medium';
-    return 'low';
-  }
-
   // 计算意图得分
   private calculateIntentScores(content: string): Array<{ intent: string; score: number }> {
     const scores: Array<{ intent: string; score: number }> = [];
@@ -988,12 +981,11 @@ export class IntelligentRouterUnified implements UnifiedRouter {
     return 'low';
   }
 
-  // 注册模型
+  // 实现 UnifiedRouter 接口的其他方法
   registerModel(model: ModelDefinition): void {
     this.modelRegistry.registerModel(model);
   }
 
-  // 获取可用模型
   getAvailableModels(): ModelInfo[] {
     return this.modelRegistry.getAllModels().map(model => ({
       id: model.id,
@@ -1007,13 +999,11 @@ export class IntelligentRouterUnified implements UnifiedRouter {
     }));
   }
 
-  // 分析模型能力
   analyzeCapabilities(modelId: string): ModelCapabilities {
     const model = this.modelRegistry.getModel(modelId);
     return model ? model.capabilities : {};
   }
 
-  // 重新加载配置
   async reloadConfiguration(): Promise<void> {
     await this.modelRegistry.reloadConfiguration();
   }

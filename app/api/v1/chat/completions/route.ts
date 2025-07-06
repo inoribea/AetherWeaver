@@ -64,8 +64,12 @@ export async function POST(req: NextRequest) {
       : userMessage.content;
     const detectedModel = detectModelSwitchRequest(userContent);
     
+    console.log(`🔍 检测到的模型切换意图: ${detectedModel}`);
+    console.log(`📝 用户消息: "${userContent}"`);
+    
     const routingRequest: RoutingRequest = {
       messages: body.messages,
+      // 优先使用检测到的模型，如果没有检测到且不是auto模型，则使用原始模型
       userIntent: detectedModel || (body.model !== 'auto' ? body.model : undefined),
       context: {
         taskType: 'chat',
@@ -75,6 +79,8 @@ export async function POST(req: NextRequest) {
       temperature: body.temperature,
       stream: body.stream
     };
+    
+    console.log(`📦 路由请求 userIntent: ${routingRequest.userIntent}`);
 
     // 调用统一路由器进行智能选择
     const routingDecision = await routeRequest(routingRequest);
