@@ -1017,6 +1017,25 @@ export async function routeRequest(request: RoutingRequest): Promise<RoutingDeci
   return intelligentRouter.route(request);
 }
 
+// 兼容性函数 - 为了向后兼容
+export async function routeToModel(
+  messages: OpenAIMessage[],
+  userIntent?: string,
+  options?: {
+    temperature?: number;
+    stream?: boolean;
+    tools?: any[];
+  }
+): Promise<RoutingDecision> {
+  return intelligentRouter.route({
+    messages,
+    userIntent,
+    temperature: options?.temperature,
+    stream: options?.stream,
+    tools: options?.tools
+  });
+}
+
 export function getAvailableModels(): ModelInfo[] {
   return intelligentRouter.getAvailableModels();
 }

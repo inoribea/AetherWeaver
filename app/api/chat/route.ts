@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server';
 import { Message as VercelChatMessage, StreamingTextResponse } from 'ai';
 import { z } from 'zod';
 import { selectBestModelForAuto, OpenAICompletionRequest, smartFormatModelInjection } from '@/utils/openai-compat';
-import { routeRequest, RoutingRequest, RoutingDecision, OpenAIMessage } from '@/utils/unified-router';
+import { routeToModel, OpenAIMessage, RoutingRequest, routeRequest } from '@/utils/unified-router';
 
 // Core LangChain imports
 import {
@@ -77,8 +77,8 @@ function extractTextContent(content: MessageContent | string): string {
   return '';
 }
 
-// Enhanced Router Output Schema with Model Switching Support
-const RouterOutputSchema = z.object({
+// 用户意图分析 Schema
+const UserIntentSchema = z.object({
   intent: z.enum([
     "vision_request",
     "web_search_request",
@@ -124,8 +124,8 @@ function createAlibabaTongyiModel(config: {
   });
 }
 
-// Model Providers Configuration
-const MODEL_PROVIDERS: Record<string, {
+// LangChain Model Providers Configuration
+const LANGCHAIN_MODEL_PROVIDERS: Record<string, {
   type: string;
   model: new (...args: any[]) => BaseChatModel<BaseChatModelCallOptions, AIMessageChunk>;
   config: {
@@ -422,7 +422,7 @@ const MODEL_PROVIDERS: Record<string, {
 
 // Helper function to get model instance with token counting
 function getModel(modelName: string): { llmInstance: BaseChatModel<BaseChatModelCallOptions, AIMessageChunk>, modelName: string } {
-  const providerEntry = MODEL_PROVIDERS[modelName];
+  const providerEntry = LANGCHAIN_MODEL_PROVIDERS[modelName];
   if (!providerEntry) {
     console.warn(`Model configuration for ${modelName} not found. Using fallback.`);
     return createFallbackModel();
@@ -651,7 +651,7 @@ function getModelByCapability(capability: string, fallback: string = 'gemini-fla
   
   // 返回第一个可用的模型
   for (const model of models) {
-    if (MODEL_PROVIDERS[model]) {
+    if (LANGCHAIN_MODEL_PROVIDERS[model]) {
       return model;
     }
   }
@@ -883,7 +883,7 @@ export async function POST(req: NextRequest) {
     let featureType = 'chat';
 
     // 处理明确指定的模型
-    if (requestedModel && requestedModel !== 'auto' && MODEL_PROVIDERS[requestedModel]) {
+    if (requestedModel && requestedModel !== 'auto' && LANGCHAIN_MODEL_PROVIDERS[requestedModel]) {
       console.log(`[Specific Model] Using requested model: ${requestedModel}`);
       const { llmInstance } = getModel(requestedModel);
       const prompt = ChatPromptTemplate.fromMessages(formattedMessages);
