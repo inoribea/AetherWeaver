@@ -1,0 +1,207 @@
+{
+  "models": {
+    "gpt-4o-all": {
+      "type": "openai_compatible",
+      "config": {
+        "apiKey": "NEKO_API_KEY",
+        "baseURL": "NEKO_BASE_URL",
+        "model": "gpt-4o-all",
+        "temperature": 0.7
+      },
+      "capabilities": {
+        "vision": true,
+        "reasoning": true,
+        "tool_calling": true,
+        "structured_output": true,
+        "agents": true,
+        "chinese": false,
+        "search": true,
+        "code_generation": true,
+        "creative_writing": true,
+        "mathematical_computation": true
+      },
+      "priority": {
+        "vision_processing": 1,
+        "complex_reasoning": 3,
+        "creative_writing": 2,
+        "code_generation": 2,
+        "mathematical_computation": 2,
+        "web_search": 2,
+        "structured_analysis": 1,
+        "agent_execution": 1
+      },
+      "cost_per_1k_tokens": 0.005,
+      "speed_rating": 8,
+      "quality_rating": 9
+    },
+    "claude-sonnet-4-all": {
+      "type": "openai_compatible",
+      "config": {
+        "apiKey": "NEKO_API_KEY",
+        "baseURL": "NEKO_BASE_URL",
+        "model": "claude-sonnet-4-all",
+        "temperature": 0.7
+      },
+      "capabilities": {
+        "vision": true,
+        "reasoning": true,
+        "structured_output": true,
+        "agents": true,
+        "chinese": false,
+        "search": false,
+        "code_generation": true,
+        "creative_writing": true,
+        "mathematical_computation": true
+      },
+      "priority": {
+        "vision_processing": 2,
+        "complex_reasoning": 1,
+        "creative_writing": 1,
+        "code_generation": 3,
+        "mathematical_computation": 3,
+        "document_retrieval": 1,
+        "structured_analysis": 2,
+        "agent_execution": 2
+      },
+      "cost_per_1k_tokens": 0.003,
+      "speed_rating": 7,
+      "quality_rating": 10
+    },
+    "deepseek-reasoner": {
+      "type": "deepseek",
+      "config": {
+        "apiKey": "DEEPSEEK_API_KEY",
+        "model": "deepseek-reasoner",
+        "temperature": 0.7
+      },
+      "capabilities": {
+        "reasoning": true,
+        "chinese": true,
+        "structured_output": true,
+        "mathematical_computation": true,
+        "code_generation": true
+      },
+      "priority": {
+        "complex_reasoning": 1,
+        "mathematical_computation": 1,
+        "code_generation": 1,
+        "chinese_conversation": 2
+      },
+      "cost_per_1k_tokens": 0.0014,
+      "speed_rating": 6,
+      "quality_rating": 9
+    },
+    "qwen-turbo": {
+      "type": "alibaba_tongyi",
+      "config": {
+        "apiKey": "DASHSCOPE_API_KEY",
+        "model": "qwen-turbo-latest",
+        "temperature": 0.7
+      },
+      "capabilities": {
+        "reasoning": true,
+        "tool_calling": true,
+        "chinese": true,
+        "structured_output": true,
+        "code_generation": true
+      },
+      "priority": {
+        "chinese_conversation": 1,
+        "simple_chat": 2,
+        "structured_analysis": 3,
+        "code_generation": 3
+      },
+      "cost_per_1k_tokens": 0.0008,
+      "speed_rating": 9,
+      "quality_rating": 7
+    },
+    "gemini-flash": {
+      "type": "google_gemini",
+      "config": {
+        "apiKey": "GOOGLE_API_KEY",
+        "model": "gemini-2.5-flash-preview-05-20",
+        "temperature": 0.7
+      },
+      "capabilities": {
+        "reasoning": true,
+        "tool_calling": true,
+        "search": true,
+        "structured_output": true,
+        "agents": true,
+        "web_search": true
+      },
+      "priority": {
+        "web_search": 1,
+        "document_retrieval": 2,
+        "agent_execution": 3,
+        "simple_chat": 1
+      },
+      "cost_per_1k_tokens": 0.0002,
+      "speed_rating": 10,
+      "quality_rating": 8
+    }
+  },
+  "routing_rules": {
+    "vision_processing": {
+      "triggers": ["image", "图片", "视觉", "看", "分析图", "photo", "picture"],
+      "required_capabilities": ["vision"],
+      "fallback_destination": "simple_chat"
+    },
+    "complex_reasoning": {
+      "triggers": ["推理", "逻辑", "分析", "reasoning", "logic", "analyze", "think", "解决", "problem"],
+      "required_capabilities": ["reasoning"],
+      "fallback_destination": "simple_chat"
+    },
+    "code_generation": {
+      "triggers": ["代码", "编程", "code", "program", "function", "class", "算法", "debug", "bug"],
+      "required_capabilities": ["code_generation"],
+      "fallback_destination": "simple_chat"
+    },
+    "chinese_conversation": {
+      "triggers": ["中文", "chinese", "汉语", "普通话"],
+      "required_capabilities": ["chinese"],
+      "fallback_destination": "simple_chat"
+    },
+    "web_search": {
+      "triggers": ["搜索", "search", "最新", "latest", "current", "news", "今天", "现在"],
+      "required_capabilities": ["search", "web_search"],
+      "fallback_destination": "simple_chat"
+    },
+    "mathematical_computation": {
+      "triggers": ["数学", "计算", "math", "calculate", "equation", "formula", "solve"],
+      "required_capabilities": ["mathematical_computation"],
+      "fallback_destination": "simple_chat"
+    },
+    "structured_analysis": {
+      "triggers": ["结构化", "格式", "extract", "parse", "json", "xml", "table"],
+      "required_capabilities": ["structured_output"],
+      "fallback_destination": "simple_chat"
+    },
+    "document_retrieval": {
+      "triggers": ["文档", "知识", "rag", "retrieval", "langchain", "vector"],
+      "required_capabilities": ["reasoning"],
+      "fallback_destination": "simple_chat"
+    },
+    "agent_execution": {
+      "triggers": ["任务", "步骤", "agent", "tool", "执行", "workflow"],
+      "required_capabilities": ["agents", "tool_calling"],
+      "fallback_destination": "simple_chat"
+    },
+    "creative_writing": {
+      "triggers": ["创作", "写作", "故事", "creative", "write", "story", "poem"],
+      "required_capabilities": ["creative_writing"],
+      "fallback_destination": "simple_chat"
+    },
+    "simple_chat": {
+      "triggers": ["聊天", "chat", "hello", "hi", "你好"],
+      "required_capabilities": [],
+      "fallback_destination": "simple_chat"
+    }
+  },
+  "selection_strategy": {
+    "primary": "capability_priority",
+    "secondary": "cost_efficiency",
+    "tertiary": "speed_rating",
+    "fallback": "quality_rating"
+  }
+}

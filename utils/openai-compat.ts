@@ -395,3 +395,156 @@ export function getSupportedModels() {
     }
   ];
 }
+
+// 格式化模型信息注入
+export function formatModelInjection(
+  content: string,
+  modelName: string,
+  options: {
+    useMarkdown?: boolean;
+    addSeparator?: boolean;
+    compact?: boolean;
+    detectStructured?: boolean;
+  } = {}
+): string {
+  const {
+    useMarkdown = true,
+    addSeparator = true,
+    compact = false,
+    detectStructured = true
+  } = options;
+
+  // 如果内容为空，直接返回
+  if (!content || !content.trim()) {
+    return content;
+  }
+
+  // 检测内容类型
+  const isStructuredContent = detectStructured && (
+    content.includes('```') ||
+    content.includes('```json') ||
+    content.includes('```javascript') ||
+    content.includes('```python') ||
+    content.includes('```sql') ||
+    content.includes('**') ||
+    content.includes('##') ||
+    content.includes('###') ||
+    content.includes('- ') ||
+    content.includes('1. ') ||
+    content.includes('| ') // 表格
+  );
+
+  // 检测是否为错误信息或技术内容
+  const isTechnicalContent =
+    content.includes('error') ||
+    content.includes('Error') ||
+    content.includes('undefined') ||
+    content.includes('Cannot read properties') ||
+    content.includes('API') ||
+    content.includes('配置') ||
+    content.includes('参数');
+
+  let modelInfo: string;
+  let separator: string;
+
+  if (compact) {
+    // 紧凑格式
+    modelInfo = `🤖 ${modelName}`;
+    separator = ' • ';
+  } else if (useMarkdown) {
+    // 标准Markdown格式
+    modelInfo = `🤖 **Model:** ${modelName}`;
+    separator = addSeparator ? '\n\n---\n\n' : '\n\n';
+  } else {
+    // 纯文本格式
+    modelInfo = `🤖 Model: ${modelName}`;
+    separator = addSeparator ? '\n---\n' : '\n';
+  }
+
+  // 对于结构化内容，使用代码块格式
+  if (isStructuredContent && useMarkdown && !compact) {
+    return `\`\`\`\n${modelInfo}\n${addSeparator ? '---' : ''}\n\`\`\`\n\n${content}`;
+  }
+
+  // 对于技术内容，使用引用格式
+  if (isTechnicalContent && useMarkdown && !compact) {
+    return `> ${modelInfo}\n\n${content}`;
+  }
+
+  // 标准格式
+  return `${modelInfo}${separator}${content}`;
+}
+
+// 检测内容是否需要特殊格式化
+export function detectContentType(content: string): {
+  isCode: boolean;
+  isStructured: boolean;
+  isTechnical: boolean;
+  isLongForm: boolean;
+} {
+  const isCode = content.includes('```') ||
+                 /^[\s]*[{}\[\]()=;]/.test(content) ||
+                 content.includes('function') ||
+                 content.includes('const ') ||
+                 content.includes('let ') ||
+                 content.includes('var ');
+
+  const isStructured = content.includes('**') ||
+                       content.includes('##') ||
+                       content.includes('###') ||
+                       content.includes('- ') ||
+                       content.includes('1. ') ||
+                       content.includes('| ') ||
+                       content.includes('```');
+
+  const isTechnical = content.includes('error') ||
+                      content.includes('Error') ||
+                      content.includes('API') ||
+                      content.includes('配置') ||
+                      content.includes('参数') ||
+                      content.includes('undefined') ||
+                      content.includes('Cannot read');
+
+  const isLongForm = content.length > 500;
+
+  return {
+    isCode,
+    isStructured,
+    isTechnical,
+    isLongForm
+  };
+}
+
+// 智能格式化函数 - 根据内容类型自动选择最佳格式
+export function smartFormatModelInjection(
+  content: string,
+  modelName: string
+): string {
+  const contentType = detectContentType(content);
+  
+  // 根据内容类型选择格式化选项
+  let options = {
+    useMarkdown: true,
+    addSeparator: true,
+    compact: false,
+    detectStructured: true
+  };
+
+  // 对于代码内容，使用紧凑格式
+  if (contentType.isCode) {
+    options.compact = true;
+    options.addSeparator = false;
+  }
+  
+  // 对于技术内容，使用引用格式
+  if (contentType.isTechnical) {
+    options.addSeparator = false;
+  }
+  
+  // 对于长内容，使用标准格式
+  if (contentType.isLongForm) {
+    options.addSeparator = true;
+  }
+
+  return formatModelInjection(content, modelName, options);
+}

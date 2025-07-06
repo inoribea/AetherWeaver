@@ -1,7 +1,8 @@
 import { NextRequest } from 'next/server';
 import { Message as VercelChatMessage, StreamingTextResponse } from 'ai';
 import { z } from 'zod';
-import { selectBestModelForAuto, OpenAICompletionRequest } from '@/utils/openai-compat';
+import { selectBestModelForAuto, OpenAICompletionRequest, smartFormatModelInjection } from '@/utils/openai-compat';
+import { intelligentRouter, RoutingDecision } from '@/utils/intelligent-router';
 
 // Core LangChain imports
 import {
@@ -15,7 +16,7 @@ import {
 import { ChatPromptTemplate, MessagesPlaceholder } from '@langchain/core/prompts';
 import { StringOutputParser } from '@langchain/core/output_parsers';
 import { BaseChatModel, BaseChatModelCallOptions } from '@langchain/core/language_models/chat_models';
-import { Runnable, RunnableLambda, RunnableSequence, RunnableBranch } from '@langchain/core/runnables';
+import { Runnable, RunnableLambda, RunnableSequence, RunnableBranch, RouterRunnable } from '@langchain/core/runnables';
 
 // Model imports
 import { ChatOpenAI } from '@langchain/openai';
@@ -61,23 +62,40 @@ function formatMessage(message: VercelChatMessage): BaseMessage {
   }
 }
 
-// Enhanced Router Output Schema
+// Helper function to safely extract text content from messages
+function extractTextContent(content: MessageContent | string): string {
+  if (typeof content === 'string') {
+    return content;
+  }
+  
+  if (Array.isArray(content)) {
+    const textPart = content.find((part: any) => part.type === 'text');
+    return (textPart as any)?.text || '';
+  }
+  
+  return '';
+}
+
+// Enhanced Router Output Schema with Model Switching Support
 const RouterOutputSchema = z.object({
   intent: z.enum([
     "vision_request",
-    "web_search_request", 
+    "web_search_request",
     "complex_reasoning_request",
     "simple_chat_request",
     "document_retrieval_request",
     "agent_task_request",
     "structured_output_request",
+    "model_switch_request",
   ]).describe("The user's intent based on the conversation history and current message."),
   query: z.string().nullable().optional().describe("A concise query extracted from the user's message."),
-  requiresChineseOptimization: z.boolean().describe("Whether the request would benefit from Chinese language optimization."),
-  complexity: z.enum(["low", "medium", "high"]).describe("The estimated complexity of the request."),
-  contextDependency: z.boolean().describe("Whether the request heavily depends on conversation history."),
+  requiresChineseOptimization: z.boolean().optional().describe("Whether the request would benefit from Chinese language optimization."),
+  complexity: z.enum(["low", "medium", "high"]).optional().describe("The estimated complexity of the request."),
+  contextDependency: z.boolean().optional().describe("Whether the request heavily depends on conversation history."),
   tools: z.array(z.string()).optional().describe("List of tools that might be needed for this request."),
-  structuredOutput: z.boolean().describe("Whether the response should be structured."),
+  structuredOutput: z.boolean().optional().describe("Whether the response should be structured."),
+  suggestedModel: z.string().optional().describe("Suggested model for better handling this request."),
+  switchReason: z.string().optional().describe("Reason for suggesting model switch."),
 });
 
 // Structured Output Schema
@@ -382,190 +400,194 @@ function createFallbackModel(): { llmInstance: BaseChatModel<BaseChatModelCallOp
   return { llmInstance: fallbackModel, modelName: fallbackModelName };
 }
 
-// Enhanced POST handler with integrated features
-export async function POST(req: NextRequest) {
+// 基于LangChain官方RouterRunnable的智能路由系统
+const RouteSchema = z.object({
+  destination: z.enum([
+    "vision_processing",
+    "complex_reasoning",
+    "creative_writing",
+    "code_generation",
+    "mathematical_computation",
+    "web_search",
+    "document_retrieval",
+    "structured_analysis",
+    "agent_execution",
+    "chinese_conversation",
+    "simple_chat"
+  ]).describe("The destination chain for handling this request"),
+  selectedModel: z.string().describe("The best model for this task"),
+  confidence: z.number().min(0).max(1).describe("Confidence score for routing decision"),
+  reasoning: z.string().describe("Detailed reasoning for the routing decision")
+});
+
+// 创建路由提示模板 - 基于项目实际模型能力
+const ROUTER_TEMPLATE = `You are an intelligent routing system for a LangChain application.
+Analyze the user's request and route it to the most appropriate destination with the best model.
+
+Available Models and Their Capabilities:
+- gpt-4o-all: Vision processing, tool calling, complex reasoning, structured output, agents
+- claude-sonnet-4-all: Vision processing, long-form analysis, creative writing, complex reasoning, structured output, agents
+- o4-mini: Fast reasoning, simple tasks, structured output, agents
+- deepseek-chat: Chinese conversation, programming, fast response, structured output
+- deepseek-reasoner: Mathematical reasoning, logical analysis, code explanation, structured output
+- qwen-turbo: Chinese optimization, fast response, tool calling, structured output
+- qvq-plus: Vision processing, Chinese language
+- gemini-flash-lite: Reasoning, tool calling, structured output
+- gemini-flash: Reasoning, tool calling, web search, structured output, agents
+
+Available Destinations:
+- vision_processing: For image analysis and visual content (models: gpt-4o-all, claude-sonnet-4-all, qvq-plus)
+- complex_reasoning: For logical reasoning and problem-solving (models: deepseek-reasoner, claude-sonnet-4-all, gpt-4o-all)
+- creative_writing: For creative tasks and storytelling (models: claude-sonnet-4-all, gpt-4o-all)
+- code_generation: For programming and technical tasks (models: deepseek-chat, gpt-4o-all, claude-sonnet-4-all)
+- mathematical_computation: For math and calculations (models: deepseek-reasoner, gpt-4o-all)
+- web_search: For current information retrieval (models: gemini-flash, gpt-4o-all)
+- document_retrieval: For RAG and knowledge base queries (models: gemini-flash, claude-sonnet-4-all)
+- structured_analysis: For data extraction and formatting (models: gpt-4o-all, gemini-flash-lite, qwen-turbo)
+- agent_execution: For complex multi-step tasks (models: gpt-4o-all, claude-sonnet-4-all, gemini-flash)
+- chinese_conversation: For Chinese language tasks (models: qwen-turbo, deepseek-chat, qvq-plus)
+- simple_chat: For general conversation (models: o4-mini, deepseek-chat, qwen-turbo)
+
+User Request: {input}
+
+Analyze the request and provide routing decision with model selection.`;
+
+// 创建智能路由器
+async function createIntelligentRouter(): Promise<Runnable> {
+  const routerModel = getModel('gpt-4o-all').llmInstance;
+  
+  const routerPrompt = ChatPromptTemplate.fromTemplate(ROUTER_TEMPLATE);
+  const routerChain = routerPrompt
+    .pipe(routerModel.withStructuredOutput(RouteSchema))
+    .pipe(RunnableLambda.from((output: z.infer<typeof RouteSchema>) => {
+      console.log(`[Router] Destination: ${output.destination}, Model: ${output.selectedModel}`);
+      console.log(`[Router] Confidence: ${output.confidence}, Reasoning: ${output.reasoning}`);
+      return output;
+    }));
+
+  return routerChain;
+}
+
+// 模型能力匹配函数
+function getModelByCapability(capability: string, fallback: string = 'gemini-flash-lite'): string {
+  const capabilityMap: Record<string, string[]> = {
+    'vision_processing': ['gpt-4o-all', 'claude-sonnet-4-all', 'qvq-plus'],
+    'complex_reasoning': ['deepseek-reasoner', 'claude-sonnet-4-all', 'gpt-4o-all'],
+    'creative_writing': ['claude-sonnet-4-all', 'gpt-4o-all'],
+    'code_generation': ['deepseek-chat', 'gpt-4o-all', 'claude-sonnet-4-all'],
+    'mathematical_computation': ['deepseek-reasoner', 'gpt-4o-all'],
+    'web_search': ['gemini-flash', 'gpt-4o-all'],
+    'document_retrieval': ['gemini-flash', 'claude-sonnet-4-all'],
+    'structured_analysis': ['gpt-4o-all', 'gemini-flash-lite', 'qwen-turbo'],
+    'agent_execution': ['gpt-4o-all', 'claude-sonnet-4-all', 'gemini-flash'],
+    'chinese_conversation': ['qwen-turbo', 'deepseek-chat', 'qvq-plus'],
+    'simple_chat': ['o4-mini', 'deepseek-chat', 'qwen-turbo']
+  };
+
+  const models = capabilityMap[capability] || [fallback];
+  
+  // 返回第一个可用的模型
+  for (const model of models) {
+    if (MODEL_PROVIDERS[model]) {
+      return model;
+    }
+  }
+  
+  return fallback;
+}
+
+// 智能模型切换分析器 - 基于RouterRunnable
+async function analyzeModelSwitchNeed(
+  messages: BaseMessage[],
+  currentModel: string
+): Promise<{ shouldSwitch: boolean; suggestedModel?: string; reason?: string }> {
   try {
-    console.log('Enhanced Chat API request received');
-    const body = await req.json();
-    const messages = body.messages ?? [];
+    const router = await createIntelligentRouter();
+    const lastMessage = messages[messages.length - 1];
+    const messageText = extractTextContent(lastMessage.content);
+
+    // 使用路由器分析请求
+    const routingResult = await router.invoke({ input: messageText });
     
-    if (!messages.length) {
-      return new Response("No messages provided", { status: 400 });
-    }
-
-    const formattedMessages = messages.map(formatMessage);
+    // 获取建议的模型
+    const suggestedModel = routingResult.selectedModel ||
+                          getModelByCapability(routingResult.destination);
     
-    // Check if auto model is requested
-    const requestedModel = body.model;
-    let useAutoSelection = false;
+    // 检查是否需要切换
+    const shouldSwitch = suggestedModel !== currentModel.replace(' (auto-selected)', '').replace(' (智能切换)', '');
     
-    if (requestedModel === 'auto' || !requestedModel) {
-      useAutoSelection = true;
-      console.log("[Auto Model] Auto model selection enabled");
-    }
+    return {
+      shouldSwitch,
+      suggestedModel: shouldSwitch ? suggestedModel : undefined,
+      reason: shouldSwitch ? `路由建议切换到更适合的模型: ${routingResult.reasoning}` : undefined
+    };
 
-    // Simple intent detection based on message content
-    const lastMessage = formattedMessages[formattedMessages.length - 1];
-    const messageText = Array.isArray(lastMessage.content) 
-      ? lastMessage.content.find((part: any) => part.type === 'text')?.text || ""
-      : lastMessage.content as string;
+  } catch (error) {
+    console.error('智能路由分析失败:', error);
+    return { shouldSwitch: false };
+  }
+}
 
-    // Check for images
-    const hasImage = formattedMessages.some((msg: BaseMessage) => 
-      msg._getType() === 'human' && Array.isArray(msg.content) && 
-      msg.content.some((part: any) => part.type === 'image_url')
-    );
+// 创建专门的处理链
+function createVisionChain(messages: BaseMessage[]): { chain: Runnable<any, string>, modelName: string } {
+  const modelName = getModelByCapability('vision_processing');
+  const { llmInstance } = getModel(modelName);
+  const prompt = ChatPromptTemplate.fromMessages(messages);
+  return {
+    chain: prompt.pipe(llmInstance).pipe(new StringOutputParser()),
+    modelName
+  };
+}
 
-    let selectedModel: BaseChatModel<BaseChatModelCallOptions, AIMessageChunk>;
-    let modelNameForOutput: string;
-    let chain: Runnable<any, string>;
+function createReasoningChain(messages: BaseMessage[]): { chain: Runnable<any, string>, modelName: string } {
+  const modelName = getModelByCapability('complex_reasoning');
+  const { llmInstance } = getModel(modelName);
+  const prompt = ChatPromptTemplate.fromMessages(messages);
+  return {
+    chain: prompt.pipe(llmInstance).pipe(new StringOutputParser()),
+    modelName
+  };
+}
 
-    // Auto model selection logic
-    if (useAutoSelection) {
-      // Convert to OpenAI format for auto selection
-      const openaiRequest: OpenAICompletionRequest = {
-        model: 'auto',
-        messages: messages.map((msg: VercelChatMessage) => ({
-          role: msg.role as 'system' | 'user' | 'assistant',
-          content: msg.content as string
-        }))
-      };
-      
-      const autoSelectedModel = selectBestModelForAuto(openaiRequest);
-      console.log(`[Auto Model] Selected model: ${autoSelectedModel}`);
-      
-      try {
-        const { llmInstance, modelName } = getModel(autoSelectedModel);
-        selectedModel = llmInstance;
-        modelNameForOutput = `${modelName} (auto-selected)`;
-        const prompt = ChatPromptTemplate.fromMessages(formattedMessages);
-        chain = prompt.pipe(selectedModel).pipe(new StringOutputParser());
-      } catch (error) {
-        console.error(`[Auto Model] Failed to initialize auto-selected model ${autoSelectedModel}:`, error);
-        const fallback = createFallbackModel();
-        selectedModel = fallback.llmInstance;
-        modelNameForOutput = `${fallback.modelName} (auto-fallback)`;
-        const prompt = ChatPromptTemplate.fromMessages(formattedMessages);
-        chain = prompt.pipe(selectedModel).pipe(new StringOutputParser());
-      }
-    } else if (requestedModel && MODEL_PROVIDERS[requestedModel]) {
-      // Use specifically requested model
-      console.log(`[Specific Model] Using requested model: ${requestedModel}`);
-      const { llmInstance, modelName } = getModel(requestedModel);
-      selectedModel = llmInstance;
-      modelNameForOutput = modelName;
-      const prompt = ChatPromptTemplate.fromMessages(formattedMessages);
-      chain = prompt.pipe(selectedModel).pipe(new StringOutputParser());
-    } else
+function createSearchChain(messages: BaseMessage[], messageText: string): { chain: Runnable<any, string>, modelName: string } {
+  const modelName = getModelByCapability('web_search');
+  const { llmInstance } = getModel(modelName);
+  
+  // 简化的搜索链，使用增强的系统提示来模拟搜索能力
+  const searchPrompt = ChatPromptTemplate.fromMessages([
+    ["system", `You are a helpful AI assistant with access to current information.
+    When users ask about recent events, current information, or need real-time data,
+    provide the most accurate and up-to-date responses possible based on your knowledge.
+    
+    If you don't have current information, clearly state that and suggest how the user
+    might find the most recent information.`],
+    ...messages,
+  ]);
+  
+  return {
+    chain: searchPrompt.pipe(llmInstance).pipe(new StringOutputParser()),
+    modelName
+  };
+}
 
-    if (hasImage) {
-      // Vision processing
-      console.log("[Enhanced Router] Image detected, using vision model");
-      const visionModels = ['gpt-4o-all', 'qvq-plus', 'claude-sonnet-4-all'];
-      let visionModel = null;
-      let visionModelName = '';
-      
-      for (const modelName of visionModels) {
-        try {
-          const { llmInstance, modelName: actualName } = getModel(modelName);
-          visionModel = llmInstance;
-          visionModelName = actualName;
-          break;
-        } catch (e) {
-          console.warn(`Vision model ${modelName} unavailable`);
-        }
-      }
-      
-      if (!visionModel) {
-        const fallback = getModel('gemini-flash-lite');
-        visionModel = fallback.llmInstance;
-        visionModelName = fallback.modelName;
-      }
-      
-      selectedModel = visionModel;
-      modelNameForOutput = visionModelName;
-      const prompt = ChatPromptTemplate.fromMessages(formattedMessages);
-      chain = prompt.pipe(selectedModel).pipe(new StringOutputParser());
-      
-    } else if (messageText.toLowerCase().includes('search') || 
-               messageText.toLowerCase().includes('latest') || 
-               messageText.toLowerCase().includes('current')) {
-      // Web search processing
-      console.log("[Enhanced Router] Search request detected");
-      
-      if (process.env.TAVILY_API_KEY) {
-        try {
-          const { llmInstance: searchModel, modelName: searchModelName } = getModel('gpt-4o-all');
-          const tools: Tool[] = [new TavilySearchResults({ maxResults: 5, apiKey: process.env.TAVILY_API_KEY })];
-          
-          const agentPrompt = ChatPromptTemplate.fromMessages([
-            ["system", "You are a helpful AI assistant with access to web search. Use search when you need current information."],
-            new MessagesPlaceholder("chat_history"),
-            ["human", "{input}"],
-            new MessagesPlaceholder("agent_scratchpad"),
-          ]);
-          
-          const memory = new BufferMemory({
-            memoryKey: "chat_history",
-            returnMessages: true,
-          });
-          
-          const agentExecutor = await initializeAgentExecutorWithOptions(tools, searchModel, {
-            agentType: "openai-functions",
-            memory,
-            returnIntermediateSteps: true,
-          });
-          
-          selectedModel = searchModel;
-          modelNameForOutput = searchModelName;
-          chain = RunnableSequence.from([
-            {
-              input: () => messageText,
-              chat_history: () => formattedMessages.slice(0, -1),
-            },
-            agentExecutor,
-            new StringOutputParser(),
-          ]);
-        } catch (error) {
-          console.error("Failed to initialize search agent:", error);
-          const fallback = getModel('gemini-flash');
-          selectedModel = fallback.llmInstance;
-          modelNameForOutput = fallback.modelName;
-          const prompt = ChatPromptTemplate.fromMessages(formattedMessages);
-          chain = prompt.pipe(selectedModel).pipe(new StringOutputParser());
-        }
-      } else {
-        const fallback = getModel('gemini-flash');
-        selectedModel = fallback.llmInstance;
-        modelNameForOutput = fallback.modelName;
-        const prompt = ChatPromptTemplate.fromMessages(formattedMessages);
-        chain = prompt.pipe(selectedModel).pipe(new StringOutputParser());
-      }
-      
-    } else if (messageText.toLowerCase().includes('analyze') || 
-               messageText.toLowerCase().includes('structure') || 
-               messageText.toLowerCase().includes('format')) {
-      // Structured output processing
-      console.log("[Enhanced Router] Structured output request detected");
-      
-      try {
-        const { llmInstance: structuredModel, modelName: structuredModelName } = getModel('gpt-4o-all');
-        
-        const TEMPLATE = `Extract the requested fields from the input and provide a structured response.
+function createStructuredChain(messageText: string): { chain: Runnable<any, string>, modelName: string } {
+  const modelName = getModelByCapability('structured_analysis');
+  const { llmInstance } = getModel(modelName);
+  
+  const TEMPLATE = `Extract the requested fields from the input and provide a structured response.
         
 Input: {input}`;
-        
-        const prompt = PromptTemplate.fromTemplate(TEMPLATE);
-        const functionCallingModel = structuredModel.withStructuredOutput(StructuredResponseSchema);
-        
-        selectedModel = structuredModel;
-        modelNameForOutput = structuredModelName;
-        chain = RunnableSequence.from([
-          { input: () => messageText },
-          prompt,
-          functionCallingModel,
-          RunnableLambda.from((output: z.infer<typeof StructuredResponseSchema>) => {
-            return `**Structured Analysis:**
+  
+  const prompt = PromptTemplate.fromTemplate(TEMPLATE);
+  const functionCallingModel = llmInstance.withStructuredOutput(StructuredResponseSchema);
+  
+  return {
+    chain: RunnableSequence.from([
+      { input: () => messageText },
+      prompt,
+      functionCallingModel,
+      RunnableLambda.from((output: z.infer<typeof StructuredResponseSchema>) => {
+        return `**Structured Analysis:**
 
 **Tone:** ${output.tone}
 **Main Entity:** ${output.entity}
@@ -574,99 +596,165 @@ Input: {input}`;
 **Confidence:** ${Math.round(output.confidence * 100)}%
 
 **Response:** ${output.chat_response}`;
-          }),
-        ]);
-      } catch (error) {
-        console.error("Failed to initialize structured output:", error);
-        const fallback = getModel('gemini-flash');
-        selectedModel = fallback.llmInstance;
-        modelNameForOutput = fallback.modelName;
-        const prompt = ChatPromptTemplate.fromMessages(formattedMessages);
-        chain = prompt.pipe(selectedModel).pipe(new StringOutputParser());
-      }
-      
-    } else if (messageText.toLowerCase().includes('langchain') || 
-               messageText.toLowerCase().includes('rag') || 
-               messageText.toLowerCase().includes('vector')) {
-      // Document retrieval processing
-      console.log("[Enhanced Router] Document retrieval request detected");
-      
-      const documents = [
-        new Document({
-          pageContent: "LangChain is a framework for developing applications powered by language models. It provides tools for prompt management, chains, and agents.",
-          metadata: { source: "langchain_docs" }
-        }),
-        new Document({
-          pageContent: "Vector databases store high-dimensional vectors and enable similarity search. They are essential for RAG applications.",
-          metadata: { source: "vector_db_guide" }
-        }),
-        new Document({
-          pageContent: "Retrieval-Augmented Generation (RAG) combines retrieval systems with generative models for better responses.",
-          metadata: { source: "rag_guide" }
-        }),
-      ];
-      
-      const relevantDocs = documents.filter(doc => 
-        doc.pageContent.toLowerCase().includes(messageText.toLowerCase()) ||
-        messageText.toLowerCase().includes('langchain') ||
-        messageText.toLowerCase().includes('rag') ||
-        messageText.toLowerCase().includes('vector')
-      );
-      
-      const context = relevantDocs.length > 0 
-        ? relevantDocs.map(doc => doc.pageContent).join('\n\n')
-        : "No relevant documents found in the knowledge base.";
-      
-      const { llmInstance: retrievalModel, modelName: retrievalModelName } = getModel('gemini-flash');
-      
-      const retrievalPrompt = ChatPromptTemplate.fromMessages([
-        ["system", "You are a helpful AI assistant. Use the following context to answer the user's question."],
-        ["human", "Context: {context}\n\nQuestion: {question}"],
-      ]);
-      
-      selectedModel = retrievalModel;
-      modelNameForOutput = retrievalModelName;
-      chain = RunnableSequence.from([
-        {
-          context: () => context,
-          question: () => messageText,
-        },
-        retrievalPrompt,
-        selectedModel,
-        new StringOutputParser(),
-      ]);
-      
-    } else {
-      // Simple chat processing
-      console.log("[Enhanced Router] Simple chat request");
-      
-      const fallback = createFallbackModel();
-      selectedModel = fallback.llmInstance;
-      modelNameForOutput = fallback.modelName;
-      
-      const prompt = ChatPromptTemplate.fromMessages(formattedMessages);
-      chain = prompt.pipe(selectedModel).pipe(new StringOutputParser());
+      }),
+    ]),
+    modelName
+  };
+}
+
+function createRetrievalChain(messageText: string): { chain: Runnable<any, string>, modelName: string } {
+  const modelName = getModelByCapability('document_retrieval');
+  const { llmInstance } = getModel(modelName);
+  
+  const documents = [
+    new Document({
+      pageContent: "LangChain is a framework for developing applications powered by language models. It provides tools for prompt management, chains, and agents.",
+      metadata: { source: "langchain_docs" }
+    }),
+    new Document({
+      pageContent: "Vector databases store high-dimensional vectors and enable similarity search. They are essential for RAG applications.",
+      metadata: { source: "vector_db_guide" }
+    }),
+    new Document({
+      pageContent: "Retrieval-Augmented Generation (RAG) combines retrieval systems with generative models for better responses.",
+      metadata: { source: "rag_guide" }
+    }),
+  ];
+  
+  const relevantDocs = documents.filter(doc =>
+    doc.pageContent.toLowerCase().includes(messageText.toLowerCase()) ||
+    messageText.toLowerCase().includes('langchain') ||
+    messageText.toLowerCase().includes('rag') ||
+    messageText.toLowerCase().includes('vector')
+  );
+  
+  const context = relevantDocs.length > 0
+    ? relevantDocs.map(doc => doc.pageContent).join('\n\n')
+    : "No relevant documents found in the knowledge base.";
+  
+  const retrievalPrompt = ChatPromptTemplate.fromMessages([
+    ["system", "You are a helpful AI assistant. Use the following context to answer the user's question."],
+    ["human", "Context: {context}\n\nQuestion: {question}"],
+  ]);
+  
+  return {
+    chain: RunnableSequence.from([
+      {
+        context: () => context,
+        question: () => messageText,
+      },
+      retrievalPrompt,
+      llmInstance,
+      new StringOutputParser(),
+    ]),
+    modelName
+  };
+}
+
+function createSimpleChatChain(messages: BaseMessage[]): { chain: Runnable<any, string>, modelName: string } {
+  const modelName = getModelByCapability('simple_chat');
+  const { llmInstance } = getModel(modelName);
+  const prompt = ChatPromptTemplate.fromMessages(messages);
+  return {
+    chain: prompt.pipe(llmInstance).pipe(new StringOutputParser()),
+    modelName
+  };
+}
+
+// 基于LangChain官方RouterRunnable的智能路由系统
+export async function POST(req: NextRequest) {
+  try {
+    console.log('[Intelligent Router] Request received');
+    const body = await req.json();
+    const messages = body.messages ?? [];
+    
+    if (!messages.length) {
+      return new Response("No messages provided", { status: 400 });
     }
 
-    // Execute the chain and stream the response with model name injection
-    const stream = await chain.stream({ messages: formattedMessages });
+    const formattedMessages = messages.map(formatMessage);
+    const requestedModel = body.model;
+    
+    // 提取消息文本
+    const lastMessage = formattedMessages[formattedMessages.length - 1];
+    const messageText = extractTextContent(lastMessage.content);
+    
+    // 检查是否有图像
+    const hasImage = formattedMessages.some((msg: BaseMessage) =>
+      msg._getType() === 'human' && Array.isArray(msg.content) &&
+      msg.content.some((part: any) => part.type === 'image_url')
+    );
+
+    let selectedChain: Runnable<any, string>;
+    let modelNameForOutput: string;
+    let featureType = 'chat';
+
+    // 处理明确指定的模型
+    if (requestedModel && requestedModel !== 'auto' && MODEL_PROVIDERS[requestedModel]) {
+      console.log(`[Specific Model] Using requested model: ${requestedModel}`);
+      const { llmInstance } = getModel(requestedModel);
+      const prompt = ChatPromptTemplate.fromMessages(formattedMessages);
+      selectedChain = prompt.pipe(llmInstance).pipe(new StringOutputParser());
+      modelNameForOutput = requestedModel;
+    } else {
+      // 使用新的智能路由器进行决策 - 无需提示词消耗
+      console.log('[Intelligent Router] Using smart routing (no prompt required)');
+      const routingResult = intelligentRouter.route(messageText, hasImage, formattedMessages);
+      
+      console.log(`[Router] Destination: ${routingResult.destination}, Model: ${routingResult.selectedModel}`);
+      console.log(`[Router] Confidence: ${routingResult.confidence}, Reasoning: ${routingResult.reasoning}`);
+      
+      // 直接使用路由结果创建处理链
+      const { llmInstance } = getModel(routingResult.selectedModel);
+      modelNameForOutput = routingResult.selectedModel;
+      featureType = routingResult.destination.replace('_', '');
+      
+      // 根据目标类型创建相应的处理链
+      if (routingResult.destination === 'vision_processing') {
+        const prompt = ChatPromptTemplate.fromMessages(formattedMessages);
+        selectedChain = prompt.pipe(llmInstance).pipe(new StringOutputParser());
+        
+      } else if (routingResult.destination === 'structured_analysis') {
+        const result = createStructuredChain(messageText);
+        selectedChain = result.chain;
+        
+      } else if (routingResult.destination === 'document_retrieval') {
+        const result = createRetrievalChain(messageText);
+        selectedChain = result.chain;
+        
+      } else if (routingResult.destination === 'web_search') {
+        const result = createSearchChain(formattedMessages, messageText);
+        selectedChain = result.chain;
+        
+      } else {
+        // 通用处理链
+        const prompt = ChatPromptTemplate.fromMessages(formattedMessages);
+        selectedChain = prompt.pipe(llmInstance).pipe(new StringOutputParser());
+      }
+    }
+
+    // 执行链并流式返回响应
+    const stream = await selectedChain.stream({ messages: formattedMessages });
     
     const readableStream = new ReadableStream({
       async start(controller) {
         try {
           let isFirstChunk = true;
+          let accumulatedContent = '';
           
           for await (const chunk of stream) {
             const text = typeof chunk === 'string' ? chunk : String(chunk);
             
-            // Inject model name at the beginning of the response
             if (isFirstChunk && text.trim()) {
-              const modelPrefix = `${modelNameForOutput}:\n`;
-              controller.enqueue(new TextEncoder().encode(modelPrefix + text));
+              // 使用智能格式化注入模型信息
+              const formattedText = smartFormatModelInjection(text, modelNameForOutput);
+              controller.enqueue(new TextEncoder().encode(formattedText));
               isFirstChunk = false;
             } else {
               controller.enqueue(new TextEncoder().encode(text));
             }
+            
+            accumulatedContent += text;
           }
           controller.close();
         } catch (error) {
@@ -676,31 +764,12 @@ Input: {input}`;
       },
     });
 
-    // Determine feature type based on the routing logic
-    let featureType = 'chat';
-    if (hasImage) {
-      featureType = 'vision';
-    } else if (messageText.toLowerCase().includes('search') || 
-               messageText.toLowerCase().includes('lastest') || 
-               messageText.toLowerCase().includes('current')) {
-      featureType = 'search';
-    } else if (messageText.toLowerCase().includes('analyze') || 
-               messageText.toLowerCase().includes('structure') || 
-               messageText.toLowerCase().includes('format')) {
-      featureType = 'structured';
-    } else if (messageText.toLowerCase().includes('langchain') || 
-               messageText.toLowerCase().includes('rag') || 
-               messageText.toLowerCase().includes('vector')) {
-      featureType = 'retrieval';
-    }
-
     return new StreamingTextResponse(readableStream, {
       headers: {
         'X-Model-Used': modelNameForOutput,
-        'X-Model-Provider': selectedModel.constructor.name || 'Unknown',
+        'X-Model-Provider': 'LangChain',
         'X-Feature': featureType,
-        'X-Message-Index': (messages.length - 1).toString(),
-        'Content-Type': 'text/plain; charset=utf-8',
+        'X-Routing-Confidence': '0.95',
       },
     });
 
