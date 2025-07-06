@@ -234,11 +234,54 @@ export function convertOpenAIToLangChain(request: OpenAICompletionRequest): {
 // 检测模型切换请求
 export function detectModelSwitchRequest(content: string): string | null {
   const lowerContent = content.toLowerCase();
-  if (lowerContent.includes('切换到') || lowerContent.includes('使用') || lowerContent.includes('换成')) {
-    const modelRegex = /(gpt-4o-all|claude-sonnet-4-all|o4-mini|deepseek-chat|deepseek-reasoner|qwen-turbo|gemini-flash-lite|gemini-flash|hunyuan-turbos-latest|hunyuan-t1-latest)/g;
-    const match = modelRegex.exec(lowerContent);
-    return match ? match[0] : null;
+  
+  // 扩展的模型切换关键词
+  const switchKeywords = [
+    '切换到', '使用', '换成', '改用', '换到', '用',
+    '让', '请', '要', '想要', '希望',
+    'switch to', 'use', 'change to', 'with'
+  ];
+  
+  // 检查是否包含切换关键词
+  const hasSwitchKeyword = switchKeywords.some(keyword => lowerContent.includes(keyword));
+  
+  if (hasSwitchKeyword) {
+    // 模型名称映射（包括常用别名）
+    const modelMappings = {
+      'gpt-4o': 'gpt-4o-all',
+      'gpt4': 'gpt-4o-all',
+      'gpt': 'gpt-4o-all',
+      'claude': 'claude-sonnet-4-all',
+      'sonnet': 'claude-sonnet-4-all',
+      'deepseek': 'deepseek-reasoner',
+      'reasoner': 'deepseek-reasoner',
+      'qwen': 'qwen-turbo',
+      'gemini': 'gemini-flash-lite',
+      'flash': 'gemini-flash-lite',
+      'lite': 'gemini-flash-lite',
+      'hunyuan': 'hunyuan-turbos-latest',
+      '混元': 'hunyuan-turbos-latest',
+      't1': 'hunyuan-t1-latest',
+      'qvq': 'qvq-plus',
+      'o4': 'o4-mini',
+      'mini': 'o4-mini'
+    };
+    
+    // 检查所有可能的模型名称
+    for (const [alias, modelName] of Object.entries(modelMappings)) {
+      if (lowerContent.includes(alias)) {
+        return modelName;
+      }
+    }
+    
+    // 直接匹配完整模型名称
+    const fullModelRegex = /(gpt-4o-all|claude-sonnet-4-all|o4-mini|deepseek-chat|deepseek-reasoner|qwen-turbo|gemini-flash-lite|gemini-flash|hunyuan-turbos-latest|hunyuan-t1-latest|qvq-plus)/g;
+    const match = fullModelRegex.exec(lowerContent);
+    if (match) {
+      return match[0];
+    }
   }
+  
   return null;
 }
 

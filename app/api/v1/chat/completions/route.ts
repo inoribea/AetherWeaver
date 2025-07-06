@@ -57,9 +57,16 @@ export async function POST(req: NextRequest) {
     console.log(`OpenAI API - Model: ${body.model}, Messages: ${body.messages.length}, Stream: ${body.stream}`);
 
     // 🚀 使用统一智能路由器进行模型选择
+    // 首先检测用户消息中的模型切换意图
+    const userMessage = body.messages[body.messages.length - 1];
+    const userContent = Array.isArray(userMessage.content)
+      ? userMessage.content.map(c => typeof c === 'string' ? c : c.text).join('')
+      : userMessage.content;
+    const detectedModel = detectModelSwitchRequest(userContent);
+    
     const routingRequest: RoutingRequest = {
       messages: body.messages,
-      userIntent: body.model !== 'auto' ? body.model : undefined,
+      userIntent: detectedModel || (body.model !== 'auto' ? body.model : undefined),
       context: {
         taskType: 'chat',
         language: 'auto'
