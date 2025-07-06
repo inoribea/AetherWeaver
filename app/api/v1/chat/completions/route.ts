@@ -135,7 +135,7 @@ export async function POST(req: NextRequest) {
               for (const line of lines) {
                 if (line.trim()) {
                   // 创建OpenAI格式的流式响应 - 不注入模型信息
-                  const openaiChunk = createOpenAIResponse(line, actualModel, false, true);
+                  const openaiChunk = createOpenAIResponse(line + '\n', actualModel, false, true);
                   controller.enqueue(encoder.encode(formatStreamChunk(openaiChunk)));
                 }
               }
