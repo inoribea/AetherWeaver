@@ -454,9 +454,19 @@ export class SemanticRouter {
   // 标准化模型名称
   private normalizeModelName(name: string): string {
     const nameMap: Record<string, string> = {
-      'qvq': 'qvq-plus',
+      // GPT 4.1 系列 - 重要：确保 gpt4.1 映射到自己
+      'gpt4.1': 'gpt4.1',
+      'gpt-4.1': 'gpt4.1',
+      '4.1': 'gpt4.1',
+      
+      // GPT 4o 系列
+      'gpt4o': 'gpt-4o-all',
       'gpt4': 'gpt-4o-all',
       'gpt': 'gpt-4o-all',
+      '4o': 'gpt-4o-all',
+      
+      // 其他模型
+      'qvq': 'qvq-plus',
       'claude': 'claude-sonnet-4-all',
       'sonnet': 'claude-sonnet-4-all',
       'deepseek': 'deepseek-reasoner',
@@ -676,12 +686,40 @@ export class IntelligentRouterUnified implements UnifiedRouter {
   // 主路由方法
   async route(request: RoutingRequest): Promise<RoutingDecision> {
     console.log('🚀 开始智能路由分析...');
+    console.log(`📝 接收到 userIntent: ${request.userIntent}`);
 
     try {
-      // 1. 分析用户意图
+      // 1. 优先检查直接指定的 userIntent
+      if (request.userIntent) {
+        console.log(`🎯 直接使用 userIntent 指定的模型: ${request.userIntent}`);
+        
+        // 验证模型是否存在
+        const model = this.modelRegistry.getModel(request.userIntent);
+        if (model) {
+          const fallbackChain = this.fallbackChain.generateFallbackChain(request.userIntent, []);
+          
+          return {
+            selectedModel: request.userIntent,
+            confidence: 0.95,
+            reasoning: `用户通过 userIntent 明确指定模型: ${request.userIntent}`,
+            fallbackChain,
+            metadata: {
+              routingStrategy: 'explicit',
+              userIntentDetected: true,
+              capabilityMatch: 1.0,
+              costEstimate: this.estimateCost(request.userIntent),
+              speedRating: this.getSpeedRating(request.userIntent)
+            }
+          };
+        } else {
+          console.log(`⚠️ userIntent 指定的模型 ${request.userIntent} 不存在，继续语义分析`);
+        }
+      }
+
+      // 2. 分析用户意图
       const intentAnalysis = await this.semanticRouter.analyzeIntent(request.messages);
       
-      // 2. 确定目标模型
+      // 3. 确定目标模型
       let selectedModel: string;
       let routingStrategy: RoutingDecision['metadata']['routingStrategy'];
       let confidence = intentAnalysis.confidence;
@@ -690,7 +728,7 @@ export class IntelligentRouterUnified implements UnifiedRouter {
         // 明确指定模型
         selectedModel = intentAnalysis.targetModel;
         routingStrategy = 'explicit';
-        console.log(`🎯 用户明确指定模型: ${selectedModel}`);
+        console.log(`🎯 语义分析检测到明确指定模型: ${selectedModel}`);
       } else if (intentAnalysis.detectedCapabilities && intentAnalysis.detectedCapabilities.length > 0) {
         // 基于能力选择
         selectedModel = this.selectModelByCapabilities(intentAnalysis.detectedCapabilities, intentAnalysis.complexity);

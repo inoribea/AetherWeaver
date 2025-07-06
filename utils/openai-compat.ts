@@ -295,6 +295,9 @@ export function detectModelSwitchRequest(content: string): string | null {
     // 检查"高级模型"等形容词请求
     const qualityKeywords = [
       '高级', '更好', '强', '厉害', '顶级', '最好',
+      '高级的', '更好的', '强的', '厉害的', '顶级的', '最好的',
+      '高级点', '更好点', '强点', '厉害点', '顶级点',
+      '高级点的', '更好点的', '强点的', '厉害点的', '顶级点的',
       'better', 'advanced', 'premium', 'top', 'best'
     ];
     
