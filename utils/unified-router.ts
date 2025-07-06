@@ -447,7 +447,9 @@ export class SemanticRouter {
       'sonnet': 'claude-sonnet-4-all',
       'deepseek': 'deepseek-reasoner',
       'reasoner': 'deepseek-reasoner',
-      'gemini': 'gemini-flash',
+      'gemini': 'gemini-flash-lite',
+      'flash': 'gemini-flash-lite',
+      'lite': 'gemini-flash-lite',
       'qwen': 'qwen-turbo',
       'hunyuan': 'hunyuan-turbos-latest',
       '混元': 'hunyuan-turbos-latest',
@@ -640,7 +642,7 @@ export class FallbackChain {
 
   // 获取默认降级链
   private getDefaultFallbackChain(capabilities: string[]): string[] {
-    const defaultChain = ['gpt-4o-all', 'claude-sonnet-4-all', 'gemini-flash', 'qwen-turbo'];
+    const defaultChain = ['gemini-flash-lite', 'gpt-4o-all', 'claude-sonnet-4-all', 'gemini-flash', 'qwen-turbo'];
     return defaultChain.filter(modelId => this.modelRegistry.isModelAvailable(modelId));
   }
 }
@@ -888,7 +890,7 @@ export class IntelligentRouterUnified implements UnifiedRouter {
     }
 
     // 如果没找到合适的，返回第一个可用模型
-    return availableModels[0] || 'gpt-4o-all';
+    return availableModels[0] || 'gemini-flash-lite';
   }
 
   // 从环境变量获取复杂度模型列表
@@ -899,18 +901,18 @@ export class IntelligentRouterUnified implements UnifiedRouter {
     switch (complexityThreshold) {
       case 'high':
         envVar = process.env.COMPLEXITY_HIGH_MODELS || '';
-        defaultModels = ['claude-sonnet-4-all', 'gpt-4o-all', 'deepseek-reasoner', 'hunyuan-t1-latest'];
+        defaultModels = ['gemini-flash-lite', 'claude-sonnet-4-all', 'gpt-4o-all', 'deepseek-reasoner', 'hunyuan-t1-latest'];
         break;
       case 'medium':
         envVar = process.env.COMPLEXITY_MEDIUM_MODELS || '';
-        defaultModels = ['gpt-4o-all', 'gemini-flash', 'qwen-turbo', 'hunyuan-turbos-latest', 'claude-sonnet-4-all'];
+        defaultModels = ['gemini-flash-lite', 'gpt-4o-all', 'gemini-flash', 'qwen-turbo', 'hunyuan-turbos-latest'];
         break;
       case 'low':
         envVar = process.env.COMPLEXITY_LOW_MODELS || '';
-        defaultModels = ['gemini-flash', 'qwen-turbo', 'hunyuan-turbos-latest', 'gpt-4o-all'];
+        defaultModels = ['gemini-flash-lite', 'gemini-flash', 'qwen-turbo', 'hunyuan-turbos-latest', 'gpt-4o-all'];
         break;
       default:
-        return ['gpt-4o-all'];
+        return ['gemini-flash-lite'];
     }
 
     // 如果环境变量存在且不为空，解析逗号分隔的模型列表

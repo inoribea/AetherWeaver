@@ -143,6 +143,10 @@ const MODEL_PROVIDERS: Record<string, {
     chinese?: boolean;
     structured_output?: boolean;
     agents?: boolean;
+    code_generation?: boolean;
+    creative_writing?: boolean;
+    mathematical_computation?: boolean;
+    web_search?: boolean;
   };
 }> = {
   // OpenAI Compatible Models
@@ -155,12 +159,16 @@ const MODEL_PROVIDERS: Record<string, {
       model: 'gpt-4o-all',
       temperature: 0.7
     },
-    capabilities: { 
-      vision: true, 
-      reasoning: true, 
-      tool_calling: true, 
+    capabilities: {
+      vision: true,
+      reasoning: true,
+      tool_calling: true,
       structured_output: true,
-      agents: true
+      agents: true,
+      code_generation: true,
+      creative_writing: true,
+      mathematical_computation: true,
+      web_search: true
     },
   },
   'claude-sonnet-4-all': {
@@ -172,11 +180,14 @@ const MODEL_PROVIDERS: Record<string, {
       model: 'claude-sonnet-4-all',
       temperature: 0.7
     },
-    capabilities: { 
-      vision: true, 
-      reasoning: true, 
+    capabilities: {
+      vision: true,
+      reasoning: true,
       structured_output: true,
-      agents: true
+      agents: true,
+      code_generation: true,
+      creative_writing: true,
+      mathematical_computation: true
     },
   },
   'o4-mini': {
@@ -188,10 +199,12 @@ const MODEL_PROVIDERS: Record<string, {
       model: 'o4-mini',
       temperature: 0.7
     },
-    capabilities: { 
+    capabilities: {
       reasoning: true,
       structured_output: true,
-      agents: true
+      agents: true,
+      code_generation: true,
+      mathematical_computation: true
     },
   },
   // DeepSeek Models
@@ -217,10 +230,12 @@ const MODEL_PROVIDERS: Record<string, {
       model: 'deepseek-reasoner',
       temperature: 0.7
     },
-    capabilities: { 
-      reasoning: true, 
+    capabilities: {
+      reasoning: true,
       chinese: true,
-      structured_output: true
+      structured_output: true,
+      code_generation: true,
+      mathematical_computation: true
     }
   },
   // Aliyun Models
@@ -232,11 +247,14 @@ const MODEL_PROVIDERS: Record<string, {
       model: 'qwen-turbo-latest',
       temperature: 0.7
     },
-    capabilities: { 
-      reasoning: true, 
-      tool_calling: true, 
+    capabilities: {
+      reasoning: true,
+      tool_calling: true,
       chinese: true,
-      structured_output: true
+      structured_output: true,
+      code_generation: true,
+      creative_writing: true,
+      mathematical_computation: true
     }
   },
   'qvq-plus': {
@@ -247,9 +265,12 @@ const MODEL_PROVIDERS: Record<string, {
       model: 'qvq-plus',
       temperature: 0.7
     },
-    capabilities: { 
-      vision: true, 
-      chinese: true 
+    capabilities: {
+      vision: true,
+      chinese: true,
+      reasoning: true,
+      code_generation: true,
+      mathematical_computation: true
     }
   },
   // Google Gemini Models
@@ -261,10 +282,13 @@ const MODEL_PROVIDERS: Record<string, {
       model: 'models/gemini-2.5-flash-lite-preview-06-17',
       temperature: 0.7
     },
-    capabilities: { 
-      reasoning: true, 
+    capabilities: {
+      reasoning: true,
       tool_calling: true,
-      structured_output: true
+      structured_output: true,
+      code_generation: true,
+      creative_writing: true,
+      mathematical_computation: true
     }
   },
   'gemini-flash': {
@@ -275,13 +299,80 @@ const MODEL_PROVIDERS: Record<string, {
       model: 'gemini-2.5-flash-preview-05-20',
       temperature: 0.7
     },
-    capabilities: { 
-      reasoning: true, 
-      tool_calling: true, 
+    capabilities: {
+      reasoning: true,
+      tool_calling: true,
       search: true,
       structured_output: true,
-      agents: true
+      agents: true,
+      code_generation: true,
+      creative_writing: true,
+      mathematical_computation: true,
+      web_search: true
     }
+  },
+  // Neko Provider Models (gpt4.1) - 与官方GPT-4功能一致，web search首选
+  'gpt4.1': {
+    type: 'openai_compatible',
+    model: ChatOpenAI,
+    config: {
+      apiKey: process.env.NEKO_API_KEY,
+      configuration: { baseURL: process.env.NEKO_BASE_URL },
+      model: 'gpt4.1',
+      temperature: 0.7
+    },
+    capabilities: {
+      vision: true,
+      reasoning: true,
+      tool_calling: true,
+      structured_output: true,
+      agents: true,
+      code_generation: true,
+      creative_writing: true,
+      mathematical_computation: true,
+      search: true,
+      web_search: true,
+      chinese: false
+    },
+  },
+  // O3 Provider Models
+  'Qwen/Qwen3-235B-A22B-search': {
+    type: 'openai_compatible',
+    model: ChatOpenAI,
+    config: {
+      apiKey: process.env.O3_API_KEY,
+      configuration: { baseURL: process.env.O3_BASE_URL },
+      model: 'Qwen/Qwen3-235B-A22B-search',
+      temperature: 0.7
+    },
+    capabilities: {
+      reasoning: true,
+      tool_calling: true,
+      structured_output: true,
+      agents: true,
+      chinese: true,
+      search: true,
+      code_generation: true
+    },
+  },
+  'deepseek-ai/DeepSeek-V3-search': {
+    type: 'openai_compatible',
+    model: ChatOpenAI,
+    config: {
+      apiKey: process.env.O3_API_KEY,
+      configuration: { baseURL: process.env.O3_BASE_URL },
+      model: 'deepseek-ai/DeepSeek-V3-search',
+      temperature: 0.7
+    },
+    capabilities: {
+      reasoning: true,
+      tool_calling: true,
+      structured_output: true,
+      agents: true,
+      chinese: true,
+      search: true,
+      code_generation: true
+    },
   },
   // Tencent Hunyuan Models
   'hunyuan-turbos-latest': {
@@ -321,7 +412,10 @@ const MODEL_PROVIDERS: Record<string, {
       tool_calling: true,
       chinese: true,
       structured_output: true,
-      agents: true
+      agents: true,
+      code_generation: true,
+      creative_writing: true,
+      mathematical_computation: true
     }
   }
 };
@@ -401,6 +495,16 @@ function getModel(modelName: string): { llmInstance: BaseChatModel<BaseChatModel
         model: providerEntry.config.model || modelName,
         callbacks: tokenCountingCallbacks,
       });
+    } else if (providerEntry.type === 'o3_provider') {
+      // O3 provider uses OpenAI compatible interface
+      modelInstance = new ChatOpenAI({
+        temperature: providerEntry.config.temperature || 0.7,
+        streaming: true,
+        apiKey: providerEntry.config.apiKey!,
+        configuration: providerEntry.config.configuration,
+        model: providerEntry.config.model || modelName,
+        callbacks: tokenCountingCallbacks,
+      });
     } else {
       throw new Error(`Unsupported model type: ${providerEntry.type}`);
     }
@@ -417,23 +521,15 @@ function createFallbackModel(): { llmInstance: BaseChatModel<BaseChatModelCallOp
   let fallbackModel: BaseChatModel<BaseChatModelCallOptions, AIMessageChunk>;
   let fallbackModelName: string;
   
+  // 优先使用 gemini-flash-lite 作为回退模型（速度最快）
   if (process.env.GOOGLE_API_KEY) {
-    console.log("使用 Google Gemini 作为回退模型");
+    console.log("使用 Google Gemini Flash Lite 作为回退模型（速度优先）");
     fallbackModelName = 'gemini-flash-lite';
     fallbackModel = new ChatGoogleGenerativeAI({
       temperature: 0.7,
       streaming: true,
       apiKey: process.env.GOOGLE_API_KEY,
       model: 'models/gemini-2.5-flash-lite-preview-06-17',
-    });
-  } else if (process.env.OPENAI_API_KEY) {
-    console.log("使用 OpenAI 作为回退模型");
-    fallbackModelName = 'gpt-4o-mini';
-    fallbackModel = new ChatOpenAI({
-      temperature: 0.7,
-      streaming: true,
-      apiKey: process.env.OPENAI_API_KEY,
-      model: 'gpt-4o-mini',
     });
   } else if (process.env.DEEPSEEK_API_KEY) {
     console.log("使用 DeepSeek 作为回退模型");
@@ -443,6 +539,15 @@ function createFallbackModel(): { llmInstance: BaseChatModel<BaseChatModelCallOp
       streaming: true,
       apiKey: process.env.DEEPSEEK_API_KEY,
       model: 'deepseek-chat',
+    });
+  } else if (process.env.OPENAI_API_KEY) {
+    console.log("使用 OpenAI 作为回退模型");
+    fallbackModelName = 'gpt-4o-mini';
+    fallbackModel = new ChatOpenAI({
+      temperature: 0.7,
+      streaming: true,
+      apiKey: process.env.OPENAI_API_KEY,
+      model: 'gpt-4o-mini',
     });
   } else {
     throw new Error("未找到可用的 API 密钥，请在 .env.local 文件中配置 GOOGLE_API_KEY、OPENAI_API_KEY 或 DEEPSEEK_API_KEY");
@@ -476,30 +581,35 @@ const ROUTER_TEMPLATE = `You are an intelligent routing system for a LangChain a
 Analyze the user's request and route it to the most appropriate destination with the best model.
 
 Available Models and Their Capabilities:
-- gpt-4o-all: Vision processing, tool calling, complex reasoning, structured output, agents
+- gemini-flash-lite: **FASTEST MODEL** - Ultra-fast response, reasoning, tool calling, structured output, code generation, creative writing (速度优先首选)
+- gpt4.1: Vision processing, tool calling, complex reasoning, structured output, agents, web search
+- gpt-4o-all: Vision processing, tool calling, complex reasoning, structured output, agents, web search
 - claude-sonnet-4-all: Vision processing, long-form analysis, creative writing, complex reasoning, structured output, agents
 - o4-mini: Fast reasoning, simple tasks, structured output, agents
 - deepseek-chat: Chinese conversation, programming, fast response, structured output
 - deepseek-reasoner: Mathematical reasoning, logical analysis, code explanation, structured output
 - qwen-turbo: Chinese optimization, fast response, tool calling, structured output
 - qvq-plus: Vision processing, Chinese language
-- gemini-flash-lite: Reasoning, tool calling, structured output
 - gemini-flash: Reasoning, tool calling, web search, structured output, agents
 - hunyuan-turbos-latest: Chinese conversation, fast response, tool calling, structured output, agents
 - hunyuan-t1-latest: Advanced reasoning, Chinese conversation, complex tasks, structured output, agents
+- Qwen/Qwen3-235B-A22B-search: Chinese conversation, web search, code generation, structured output
+- deepseek-ai/DeepSeek-V3-search: Chinese conversation, web search, code generation, mathematical computation
 
 Available Destinations:
-- vision_processing: For image analysis and visual content (models: gpt-4o-all, claude-sonnet-4-all, qvq-plus)
-- complex_reasoning: For logical reasoning and problem-solving (models: hunyuan-t1-latest, deepseek-reasoner, claude-sonnet-4-all, gpt-4o-all)
-- creative_writing: For creative tasks and storytelling (models: hunyuan-t1-latest, claude-sonnet-4-all, gpt-4o-all)
-- code_generation: For programming and technical tasks (models: hunyuan-t1-latest, deepseek-chat, gpt-4o-all, claude-sonnet-4-all)
-- mathematical_computation: For math and calculations (models: hunyuan-t1-latest, deepseek-reasoner, gpt-4o-all)
-- web_search: For current information retrieval (models: gemini-flash, gpt-4o-all)
-- document_retrieval: For RAG and knowledge base queries (models: gemini-flash, claude-sonnet-4-all)
-- structured_analysis: For data extraction and formatting (models: hunyuan-turbos-latest, gpt-4o-all, gemini-flash-lite, qwen-turbo)
-- agent_execution: For complex multi-step tasks (models: hunyuan-t1-latest, gpt-4o-all, claude-sonnet-4-all, gemini-flash)
-- chinese_conversation: For Chinese language tasks (models: hunyuan-turbos-latest, hunyuan-t1-latest, qwen-turbo, deepseek-chat, qvq-plus)
-- simple_chat: For general conversation (models: hunyuan-turbos-latest, o4-mini, deepseek-chat, qwen-turbo)
+- vision_processing: For image analysis and visual content (models: gpt-4o-all, qvq-plus, claude-sonnet-4-all, gemini-flash-lite)
+- complex_reasoning: For logical reasoning and problem-solving (models: gemini-flash-lite, deepseek-reasoner, claude-sonnet-4-all, hunyuan-t1-latest)
+- creative_writing: For creative tasks and storytelling (models: gemini-flash-lite, claude-sonnet-4-all, hunyuan-t1-latest, gpt-4o-all)
+- code_generation: For programming and technical tasks (models: gemini-flash-lite, deepseek-chat, gpt4.1, claude-sonnet-4-all)
+- mathematical_computation: For math and calculations (models: gemini-flash-lite, deepseek-reasoner, hunyuan-t1-latest, gpt-4o-all)
+- web_search: For current information retrieval (models: gemini-flash-lite, gpt4.1, Qwen/Qwen3-235B-A22B-search, deepseek-ai/DeepSeek-V3-search)
+- document_retrieval: For RAG and knowledge base queries (models: gemini-flash-lite, gemini-flash, claude-sonnet-4-all)
+- structured_analysis: For data extraction and formatting (models: gemini-flash-lite, hunyuan-turbos-latest, gpt-4o-all, qwen-turbo)
+- agent_execution: For complex multi-step tasks (models: gemini-flash-lite, hunyuan-t1-latest, gpt-4o-all, claude-sonnet-4-all)
+- chinese_conversation: For Chinese language tasks (models: gemini-flash-lite, hunyuan-turbos-latest, hunyuan-t1-latest, qwen-turbo)
+- simple_chat: For general conversation (models: gemini-flash-lite, hunyuan-turbos-latest, o4-mini, deepseek-chat)
+
+**PRIORITY: Always prefer gemini-flash-lite for fastest response unless specific capabilities are absolutely required.**
 
 User Request: {input}
 
@@ -507,7 +617,7 @@ Analyze the request and provide routing decision with model selection.`;
 
 // 创建智能路由器
 async function createIntelligentRouter(): Promise<Runnable> {
-  const routerModel = getModel('gpt-4o-all').llmInstance;
+  const routerModel = getModel('gemini-flash-lite').llmInstance;
   
   const routerPrompt = ChatPromptTemplate.fromTemplate(ROUTER_TEMPLATE);
   const routerChain = routerPrompt
@@ -524,17 +634,17 @@ async function createIntelligentRouter(): Promise<Runnable> {
 // 模型能力匹配函数
 function getModelByCapability(capability: string, fallback: string = 'gemini-flash-lite'): string {
   const capabilityMap: Record<string, string[]> = {
-    'vision_processing': ['gpt-4o-all', 'claude-sonnet-4-all', 'qvq-plus'],
-    'complex_reasoning': ['hunyuan-t1-latest', 'deepseek-reasoner', 'claude-sonnet-4-all', 'gpt-4o-all'],
-    'creative_writing': ['hunyuan-t1-latest', 'claude-sonnet-4-all', 'gpt-4o-all'],
-    'code_generation': ['hunyuan-t1-latest', 'deepseek-chat', 'gpt-4o-all', 'claude-sonnet-4-all'],
-    'mathematical_computation': ['hunyuan-t1-latest', 'deepseek-reasoner', 'gpt-4o-all'],
-    'web_search': ['gemini-flash', 'gpt-4o-all'],
-    'document_retrieval': ['gemini-flash', 'claude-sonnet-4-all'],
-    'structured_analysis': ['hunyuan-turbos-latest', 'gpt-4o-all', 'gemini-flash-lite', 'qwen-turbo'],
-    'agent_execution': ['hunyuan-t1-latest', 'gpt-4o-all', 'claude-sonnet-4-all', 'gemini-flash'],
-    'chinese_conversation': ['hunyuan-turbos-latest', 'hunyuan-t1-latest', 'qwen-turbo', 'deepseek-chat', 'qvq-plus'],
-    'simple_chat': ['hunyuan-turbos-latest', 'o4-mini', 'deepseek-chat', 'qwen-turbo']
+    'vision_processing': ['gpt-4o-all', 'qvq-plus', 'claude-sonnet-4-all', 'gemini-flash-lite'],
+    'complex_reasoning': ['gemini-flash-lite', 'deepseek-reasoner', 'claude-sonnet-4-all', 'hunyuan-t1-latest'],
+    'creative_writing': ['gemini-flash-lite', 'claude-sonnet-4-all', 'hunyuan-t1-latest', 'gpt-4o-all'],
+    'code_generation': ['gemini-flash-lite', 'deepseek-chat', 'gpt4.1', 'claude-sonnet-4-all'],
+    'mathematical_computation': ['gemini-flash-lite', 'deepseek-reasoner', 'hunyuan-t1-latest', 'gpt-4o-all'],
+    'web_search': ['gemini-flash-lite', 'gpt4.1', 'Qwen/Qwen3-235B-A22B-search', 'deepseek-ai/DeepSeek-V3-search'],
+    'document_retrieval': ['gemini-flash-lite', 'gemini-flash', 'claude-sonnet-4-all'],
+    'structured_analysis': ['gemini-flash-lite', 'hunyuan-turbos-latest', 'gpt-4o-all', 'qwen-turbo'],
+    'agent_execution': ['gemini-flash-lite', 'hunyuan-t1-latest', 'gpt-4o-all', 'claude-sonnet-4-all'],
+    'chinese_conversation': ['gemini-flash-lite', 'hunyuan-turbos-latest', 'hunyuan-t1-latest', 'qwen-turbo'],
+    'simple_chat': ['gemini-flash-lite', 'hunyuan-turbos-latest', 'o4-mini', 'deepseek-chat']
   };
 
   const models = capabilityMap[capability] || [fallback];
@@ -606,19 +716,49 @@ function createSearchChain(messages: BaseMessage[], messageText: string): { chai
   const modelName = getModelByCapability('web_search');
   const { llmInstance } = getModel(modelName);
   
-  // 简化的搜索链，使用增强的系统提示来模拟搜索能力
+  // 创建Tavily搜索工具
+  const searchTool = new TavilySearchResults({
+    maxResults: 5,
+    apiKey: process.env.TAVILY_API_KEY,
+  });
+  
+  // 增强的搜索链，集成Tavily实时搜索
   const searchPrompt = ChatPromptTemplate.fromMessages([
-    ["system", `You are a helpful AI assistant with access to current information.
+    ["system", `You are a helpful AI assistant with access to real-time web search through Tavily.
     When users ask about recent events, current information, or need real-time data,
-    provide the most accurate and up-to-date responses possible based on your knowledge.
+    use the search results to provide accurate and up-to-date responses.
     
-    If you don't have current information, clearly state that and suggest how the user
-    might find the most recent information.`],
-    ...messages,
+    Always cite your sources when using search results.`],
+    ["human", "Search Query: {query}\n\nSearch Results: {searchResults}\n\nUser Question: {question}"],
   ]);
   
   return {
-    chain: searchPrompt.pipe(llmInstance).pipe(new StringOutputParser()),
+    chain: RunnableSequence.from([
+      {
+        query: () => messageText,
+        question: () => messageText,
+        searchResults: RunnableLambda.from(async () => {
+          try {
+            if (process.env.TAVILY_API_KEY) {
+              const searchResults = await searchTool.invoke(messageText);
+              return Array.isArray(searchResults)
+                ? searchResults.map((result: any) =>
+                    `**${result.title}**\n${result.content}\nSource: ${result.url}`
+                  ).join('\n\n')
+                : 'No search results found.';
+            } else {
+              return 'Search functionality is not available. Please configure TAVILY_API_KEY.';
+            }
+          } catch (error) {
+            console.error('Tavily search error:', error);
+            return 'Search temporarily unavailable. Please try again later.';
+          }
+        }),
+      },
+      searchPrompt,
+      llmInstance,
+      new StringOutputParser(),
+    ]),
     modelName
   };
 }

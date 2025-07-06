@@ -22,14 +22,14 @@
         "mathematical_computation": true
       },
       "priority": {
-        "vision_processing": 1,
-        "complex_reasoning": 3,
-        "creative_writing": 2,
-        "code_generation": 2,
-        "mathematical_computation": 2,
+        "vision_processing": 4,
+        "complex_reasoning": 4,
+        "creative_writing": 3,
+        "code_generation": 4,
+        "mathematical_computation": 4,
         "web_search": 2,
-        "structured_analysis": 1,
-        "agent_execution": 1
+        "structured_analysis": 3,
+        "agent_execution": 3
       },
       "cost_per_1k_tokens": 0.005,
       "speed_rating": 8,
@@ -57,13 +57,13 @@
         "mathematical_computation": true
       },
       "priority": {
-        "vision_processing": 5,
+        "vision_processing": 3,
         "complex_reasoning": 1,
         "creative_writing": 1,
         "code_generation": 3,
         "mathematical_computation": 3,
-        "structured_analysis": 3,
-        "agent_execution": 3
+        "structured_analysis": 2,
+        "agent_execution": 2
       },
       "cost_per_1k_tokens": 0.015,
       "speed_rating": 6,
@@ -93,7 +93,7 @@
       },
       "priority": {
         "complex_reasoning": 1,
-        "code_generation": 3,
+        "code_generation": 2,
         "mathematical_computation": 1
       },
       "cost_per_1k_tokens": 0.001,
@@ -181,10 +181,10 @@
         "mathematical_computation": true
       },
       "priority": {
-        "chinese": 1,
-        "code_generation": 4,
-        "creative_writing": 4,
-        "mathematical_computation": 4
+        "chinese": 2,
+        "code_generation": 1,
+        "creative_writing": 3,
+        "mathematical_computation": 2
       },
       "cost_per_1k_tokens": 0.0005,
       "speed_rating": 8,
@@ -212,9 +212,9 @@
       },
       "priority": {
         "vision_processing": 1,
-        "complex_reasoning": 2,
-        "chinese": 2,
-        "mathematical_computation": 2
+        "complex_reasoning": 3,
+        "chinese": 1,
+        "mathematical_computation": 3
       },
       "cost_per_1k_tokens": 0.002,
       "speed_rating": 7,
@@ -283,52 +283,198 @@
       "cost_per_1k_tokens": 0.003,
       "speed_rating": 6,
       "quality_rating": 9
+    },
+    "gpt-4o-search": {
+      "type": "openai_compatible",
+      "config": {
+        "apiKey": "NEKO_API_KEY",
+        "baseURL": "NEKO_BASE_URL",
+        "model": "gpt-4o-search",
+        "temperature": 0.7
+      },
+      "capabilities": {
+        "vision": true,
+        "reasoning": true,
+        "tool_calling": true,
+        "structured_output": true,
+        "agents": true,
+        "chinese": false,
+        "search": true,
+        "web_search": true,
+        "code_generation": true,
+        "creative_writing": true,
+        "mathematical_computation": true
+      },
+      "priority": {
+        "web_search": 1,
+        "search": 1,
+        "vision_processing": 3,
+        "complex_reasoning": 3,
+        "creative_writing": 3,
+        "code_generation": 3,
+        "mathematical_computation": 3,
+        "structured_analysis": 2,
+        "agent_execution": 2
+      },
+      "cost_per_1k_tokens": 0.006,
+      "speed_rating": 8,
+      "quality_rating": 9
+    },
+    "gpt4.1": {
+      "type": "openai_compatible",
+      "config": {
+        "apiKey": "NEKO_API_KEY",
+        "baseURL": "NEKO_BASE_URL",
+        "model": "gpt4.1",
+        "temperature": 0.7
+      },
+      "capabilities": {
+        "vision": true,
+        "reasoning": true,
+        "tool_calling": true,
+        "structured_output": true,
+        "agents": true,
+        "chinese": false,
+        "search": true,
+        "web_search": true,
+        "code_generation": true,
+        "creative_writing": true,
+        "mathematical_computation": true
+      },
+      "priority": {
+        "web_search": 1,
+        "search": 1,
+        "code_generation": 1,
+        "complex_reasoning": 2,
+        "mathematical_computation": 2,
+        "creative_writing": 2,
+        "structured_analysis": 1,
+        "agent_execution": 1,
+        "vision_processing": 3
+      },
+      "cost_per_1k_tokens": 0.008,
+      "speed_rating": 7,
+      "quality_rating": 10,
+      "description": "Neko提供商的顶级模型，与官方GPT-4功能一致，web search首选"
+    },
+    "Qwen/Qwen3-235B-A22B-search": {
+      "type": "o3_provider",
+      "config": {
+        "apiKey": "O3_API_KEY",
+        "baseURL": "O3_BASE_URL",
+        "model": "Qwen/Qwen3-235B-A22B-search",
+        "temperature": 0.7
+      },
+      "capabilities": {
+        "vision": false,
+        "reasoning": true,
+        "tool_calling": true,
+        "structured_output": true,
+        "agents": true,
+        "chinese": true,
+        "search": true,
+        "web_search": true,
+        "code_generation": true,
+        "creative_writing": true,
+        "mathematical_computation": true
+      },
+      "priority": {
+        "web_search": 1,
+        "search": 1,
+        "chinese": 1,
+        "code_generation": 1,
+        "complex_reasoning": 2,
+        "mathematical_computation": 2,
+        "creative_writing": 2,
+        "structured_analysis": 1,
+        "agent_execution": 1
+      },
+      "cost_per_1k_tokens": 0.001,
+      "speed_rating": 8,
+      "quality_rating": 9,
+      "description": "本地部署的Qwen联网版模型"
+    },
+    "deepseek-ai/DeepSeek-V3-search": {
+      "type": "o3_provider",
+      "config": {
+        "apiKey": "O3_API_KEY",
+        "baseURL": "O3_BASE_URL",
+        "model": "deepseek-ai/DeepSeek-V3-search",
+        "temperature": 0.7
+      },
+      "capabilities": {
+        "vision": false,
+        "reasoning": true,
+        "tool_calling": true,
+        "structured_output": true,
+        "agents": true,
+        "chinese": true,
+        "search": true,
+        "web_search": true,
+        "code_generation": true,
+        "creative_writing": false,
+        "mathematical_computation": true
+      },
+      "priority": {
+        "web_search": 1,
+        "search": 1,
+        "code_generation": 1,
+        "complex_reasoning": 1,
+        "mathematical_computation": 1,
+        "chinese": 2,
+        "structured_analysis": 1,
+        "agent_execution": 1
+      },
+      "cost_per_1k_tokens": 0.001,
+      "speed_rating": 8,
+      "quality_rating": 9,
+      "description": "本地部署的DeepSeek联网版模型"
     }
   },
   "routing_rules": {
     "vision_tasks": {
       "conditions": ["has_image", "vision_keywords"],
-      "preferred_models": ["qvq-plus", "gpt-4o-all", "claude-sonnet-4-all", "gemini-flash"],
-      "fallback_models": ["gpt-4o-all"]
+      "preferred_models": ["gpt-4o-all", "qvq-plus", "claude-sonnet-4-all"],
+      "fallback_models": ["gemini-flash-lite"]
     },
     "reasoning_tasks": {
       "conditions": ["reasoning_keywords", "complex_analysis"],
-      "preferred_models": ["deepseek-reasoner", "claude-sonnet-4-all", "hunyuan-t1-latest"],
-      "fallback_models": ["gpt-4o-all"]
+      "preferred_models": ["gemini-flash-lite", "deepseek-reasoner", "claude-sonnet-4-all", "hunyuan-t1-latest"],
+      "fallback_models": ["gemini-flash-lite"]
     },
     "chinese_tasks": {
       "conditions": ["chinese_content", "chinese_keywords"],
-      "preferred_models": ["hunyuan-t1-latest", "hunyuan-turbos-latest", "qwen-turbo", "qvq-plus"],
-      "fallback_models": ["gpt-4o-all"]
+      "preferred_models": ["gemini-flash-lite", "hunyuan-t1-latest", "hunyuan-turbos-latest", "qwen-turbo"],
+      "fallback_models": ["gemini-flash-lite"]
     },
     "search_tasks": {
       "conditions": ["search_keywords", "current_info"],
-      "preferred_models": ["gemini-flash", "gpt-4o-all"],
-      "fallback_models": ["gpt-4o-all"]
+      "preferred_models": ["gemini-flash-lite", "gpt4.1", "Qwen/Qwen3-235B-A22B-search", "deepseek-ai/DeepSeek-V3-search"],
+      "fallback_models": ["gemini-flash-lite"]
     },
     "code_tasks": {
       "conditions": ["code_keywords", "programming"],
-      "preferred_models": ["claude-sonnet-4-all", "deepseek-reasoner", "gpt-4o-all"],
-      "fallback_models": ["gpt-4o-all"]
+      "preferred_models": ["gemini-flash-lite", "gpt4.1", "qwen-turbo", "deepseek-reasoner"],
+      "fallback_models": ["gemini-flash-lite"]
     },
     "creative_tasks": {
       "conditions": ["creative_keywords", "writing"],
-      "preferred_models": ["claude-sonnet-4-all", "hunyuan-t1-latest", "gpt-4o-all"],
+      "preferred_models": ["gemini-flash-lite", "claude-sonnet-4-all", "hunyuan-t1-latest", "gpt-4o-all"],
       "fallback_models": ["gemini-flash-lite"]
     },
     "structured_output": {
       "conditions": ["json_keywords", "structured_format"],
-      "preferred_models": ["gpt-4o-all", "claude-sonnet-4-all", "hunyuan-turbos-latest"],
-      "fallback_models": ["qwen-turbo"]
+      "preferred_models": ["gemini-flash-lite", "gpt-4o-all", "claude-sonnet-4-all", "hunyuan-turbos-latest"],
+      "fallback_models": ["gemini-flash-lite"]
     }
   },
   "selection_strategy": {
-    "default_model": "gpt-4o-all",
-    "fallback_chain": ["gpt-4o-all", "claude-sonnet-4-all", "gemini-flash", "qwen-turbo"],
+    "default_model": "gemini-flash-lite",
+    "fallback_chain": ["gemini-flash-lite", "gpt4.1", "qwen-turbo", "deepseek-reasoner", "claude-sonnet-4-all"],
     "load_balancing": false,
     "cost_optimization": false,
-    "speed_optimization": false,
-    "quality_optimization": true
+    "speed_optimization": true,
+    "quality_optimization": false
   },
   "keywords": {
     "vision": ["图片", "图像", "照片", "视觉", "看", "分析图", "photo", "picture", "image", "visual"],

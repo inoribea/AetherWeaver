@@ -56,19 +56,37 @@ export async function POST(req: NextRequest) {
 
     console.log(`OpenAI API - Model: ${body.model}, Messages: ${body.messages.length}, Stream: ${body.stream}`);
 
+    // 🚀 使用统一智能路由器进行模型选择
+    const routingRequest: RoutingRequest = {
+      messages: body.messages,
+      userIntent: body.model !== 'auto' ? body.model : undefined,
+      context: {
+        taskType: 'chat',
+        language: 'auto'
+      },
+      tools: body.tools,
+      temperature: body.temperature,
+      stream: body.stream
+    };
+
+    // 调用统一路由器进行智能选择
+    const routingDecision = await routeRequest(routingRequest);
+    
+    console.log(`🎯 统一路由器决策:`);
+    console.log(`  - 选择模型: ${routingDecision.selectedModel}`);
+    console.log(`  - 置信度: ${routingDecision.confidence}`);
+    console.log(`  - 策略: ${routingDecision.metadata.routingStrategy}`);
+    console.log(`  - 推理: ${routingDecision.reasoning}`);
+    
+    // 更新请求中的模型
+    body.model = routingDecision.selectedModel;
+    
     // 转换为LangChain格式
     const langchainRequest = convertOpenAIToLangChain(body);
     
     // 智能路由 - 根据请求内容选择合适的端点
     const targetEndpoint = await detectIntentFromRequest(body);
     console.log(`Routing to endpoint: ${targetEndpoint}`);
-    
-    // 如果是auto模型，使用统一路由器进行智能选择
-    if (body.model === 'auto') {
-      const selectedModel = await selectBestModelForAuto(body);
-      body.model = selectedModel;
-      console.log(`🎯 Auto模型智能选择: ${selectedModel}`);
-    }
 
     // 构建内部请求
     const internalUrl = new URL(targetEndpoint, req.url);
