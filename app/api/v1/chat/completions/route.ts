@@ -129,18 +129,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 获取模型信息
-    let modelUsed = internalResponse.headers.get('X-Model-Used') || body.model || 'auto';
-    let actualModel = modelUsed === 'auto' ? 'langchain-auto' : modelUsed;
-
-    // 检测模型切换请求
-    const lastMessage = body.messages[body.messages.length - 1];
-    const messageContent = Array.isArray(lastMessage.content) ? lastMessage.content.map(c => typeof c === 'string' ? c : c.text).join('') : lastMessage.content;
-    const switchModel = detectModelSwitchRequest(messageContent);
-    if (switchModel) {
-      console.log(`Detected model switch request: ${switchModel}`);
-      actualModel = switchModel;
-    }
+    // 获取模型信息 - 使用统一路由器选择的模型
+    const actualModel = routingDecision.selectedModel;
+    console.log(`🎯 Final model used: ${actualModel}`);
 
     // 处理流式响应
     if (body.stream !== false) {
@@ -158,28 +149,14 @@ export async function POST(req: NextRequest) {
           try {
             let buffer = '';
             
-            // 添加模型特定的处理逻辑
-            const isGeminiModel = actualModel.includes('gemini');
-            let modelInfoSent = false;
-            let contentBuffer = '';
-            
             while (true) {
               const { done, value } = await reader.read();
               
               if (done) {
                 // 处理剩余的buffer
                 if (buffer.trim()) {
-                  if (isGeminiModel && !modelInfoSent) {
-                    // 如果是 Gemini 模型且还没发送模型信息，一起发送
-                    const combinedContent = contentBuffer + buffer;
-                    if (combinedContent.trim()) {
-                      const openaiChunk = createOpenAIResponse(combinedContent, actualModel, false, true);
-                      controller.enqueue(encoder.encode(formatStreamChunk(openaiChunk)));
-                    }
-                  } else {
-                    const openaiChunk = createOpenAIResponse(buffer, actualModel, false, true);
-                    controller.enqueue(encoder.encode(formatStreamChunk(openaiChunk)));
-                  }
+                  const openaiChunk = createOpenAIResponse(buffer, actualModel, false, true);
+                  controller.enqueue(encoder.encode(formatStreamChunk(openaiChunk)));
                 }
                 
                 // 发送最后的完成块
@@ -199,31 +176,9 @@ export async function POST(req: NextRequest) {
               
               for (const line of lines) {
                 if (line.trim()) {
-                  // 对于 Gemini 模型，特殊处理模型信息
-                  if (isGeminiModel) {
-                    if (line.includes('🤖') || line.includes('---')) {
-                      // 缓存模型信息，不立即发送
-                      contentBuffer += line + '\n';
-                      continue;
-                    }
-                    
-                    // 当收到实际内容时，一起发送模型信息和内容
-                    if (!modelInfoSent && !line.includes('🤖') && !line.includes('---')) {
-                      const combinedContent = contentBuffer + line + '\n';
-                      const openaiChunk = createOpenAIResponse(combinedContent, actualModel, false, true);
-                      controller.enqueue(encoder.encode(formatStreamChunk(openaiChunk)));
-                      modelInfoSent = true;
-                      contentBuffer = '';
-                    } else if (modelInfoSent) {
-                      // 后续内容正常发送
-                      const openaiChunk = createOpenAIResponse(line + '\n', actualModel, false, true);
-                      controller.enqueue(encoder.encode(formatStreamChunk(openaiChunk)));
-                    }
-                  } else {
-                    // 非 Gemini 模型的正常处理
-                    const openaiChunk = createOpenAIResponse(line + '\n', actualModel, false, true);
-                    controller.enqueue(encoder.encode(formatStreamChunk(openaiChunk)));
-                  }
+                  // 统一处理所有模型的流式响应
+                  const openaiChunk = createOpenAIResponse(line + '\n', actualModel, false, true);
+                  controller.enqueue(encoder.encode(formatStreamChunk(openaiChunk)));
                 }
               }
             }

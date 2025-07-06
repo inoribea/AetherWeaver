@@ -81,6 +81,10 @@ export const MODEL_MAPPING: Record<string, string> = {
   'gpt-4o-mini': 'o4-mini',
   'gpt-3.5-turbo': 'gemini-flash-lite',
   
+  // GPT 4.1 模型映射 - 重要：gpt4.1 映射到自己
+  'gpt4.1': 'gpt4.1',
+  'gpt-4.1': 'gpt4.1',
+  
   // Claude 模型映射
   'claude-3-5-sonnet': 'claude-sonnet-4-all',
   'claude-3-sonnet': 'claude-sonnet-4-all',
@@ -239,6 +243,7 @@ export function detectModelSwitchRequest(content: string): string | null {
   const switchKeywords = [
     '切换到', '使用', '换成', '改用', '换到', '用',
     '让', '请', '要', '想要', '希望',
+    '换个', '来个', '要个', '用个',
     'switch to', 'use', 'change to', 'with'
   ];
   
@@ -248,24 +253,67 @@ export function detectModelSwitchRequest(content: string): string | null {
   if (hasSwitchKeyword) {
     // 模型名称映射（包括常用别名）
     const modelMappings = {
+      // GPT 4.1 系列 - 修正：gpt4.1 应该映射到自己
+      'gpt4.1': 'gpt4.1',
+      'gpt-4.1': 'gpt4.1',
+      '4.1': 'gpt4.1',
+      
+      // GPT 4o 系列
       'gpt-4o': 'gpt-4o-all',
+      'gpt4o': 'gpt-4o-all',
       'gpt4': 'gpt-4o-all',
       'gpt': 'gpt-4o-all',
+      '4o': 'gpt-4o-all',
+      
+      // Claude 系列
       'claude': 'claude-sonnet-4-all',
       'sonnet': 'claude-sonnet-4-all',
+      
+      // DeepSeek 系列
       'deepseek': 'deepseek-reasoner',
       'reasoner': 'deepseek-reasoner',
+      
+      // Qwen 系列
       'qwen': 'qwen-turbo',
+      'qvq': 'qvq-plus',
+      
+      // Gemini 系列
       'gemini': 'gemini-flash-lite',
       'flash': 'gemini-flash-lite',
       'lite': 'gemini-flash-lite',
+      
+      // 混元系列
       'hunyuan': 'hunyuan-turbos-latest',
       '混元': 'hunyuan-turbos-latest',
       't1': 'hunyuan-t1-latest',
-      'qvq': 'qvq-plus',
+      
+      // 其他模型
       'o4': 'o4-mini',
       'mini': 'o4-mini'
     };
+    
+    // 检查"高级模型"等形容词请求
+    const qualityKeywords = [
+      '高级', '更好', '强', '厉害', '顶级', '最好',
+      'better', 'advanced', 'premium', 'top', 'best'
+    ];
+    
+    const hasQualityKeyword = qualityKeywords.some(keyword => lowerContent.includes(keyword));
+    
+    if (hasQualityKeyword) {
+      // 智能选择高质量模型
+      // 根据models-config.json中的quality_rating选择
+      const highQualityModels = [
+        'claude-sonnet-4-all',  // quality_rating: 10
+        'gpt4.1',               // quality_rating: 10
+        'gpt-4o-all',           // quality_rating: 9
+        'hunyuan-t1-latest',    // quality_rating: 9
+        'deepseek-reasoner'     // quality_rating: 9
+      ];
+      
+      // 返回最高质量的模型
+      return highQualityModels[0]; // claude-sonnet-4-all
+    }
     
     // 检查所有可能的模型名称
     for (const [alias, modelName] of Object.entries(modelMappings)) {
@@ -275,7 +323,7 @@ export function detectModelSwitchRequest(content: string): string | null {
     }
     
     // 直接匹配完整模型名称
-    const fullModelRegex = /(gpt-4o-all|claude-sonnet-4-all|o4-mini|deepseek-chat|deepseek-reasoner|qwen-turbo|gemini-flash-lite|gemini-flash|hunyuan-turbos-latest|hunyuan-t1-latest|qvq-plus)/g;
+    const fullModelRegex = /(gpt4\.1|gpt-4o-all|claude-sonnet-4-all|o4-mini|deepseek-chat|deepseek-reasoner|qwen-turbo|gemini-flash-lite|gemini-flash|hunyuan-turbos-latest|hunyuan-t1-latest|qvq-plus)/g;
     const match = fullModelRegex.exec(lowerContent);
     if (match) {
       return match[0];
