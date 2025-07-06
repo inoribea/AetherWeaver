@@ -139,6 +139,74 @@
       "cost_per_1k_tokens": 0.0002,
       "speed_rating": 10,
       "quality_rating": 8
+    },
+    "hunyuan-turbos-latest": {
+      "type": "tencent_hunyuan",
+      "config": {
+        "secretId": "TENCENT_HUNYUAN_SECRET_ID",
+        "secretKey": "TENCENT_HUNYUAN_SECRET_KEY",
+        "model": "hunyuan-turbos-latest",
+        "temperature": 0.7
+      },
+      "capabilities": {
+        "reasoning": true,
+        "tool_calling": true,
+        "chinese": true,
+        "structured_output": true,
+        "code_generation": true,
+        "creative_writing": true,
+        "mathematical_computation": true,
+        "search": false,
+        "vision": false,
+        "agents": true
+      },
+      "priority": {
+        "chinese_conversation": 1,
+        "code_generation": 2,
+        "creative_writing": 2,
+        "complex_reasoning": 2,
+        "mathematical_computation": 2,
+        "structured_analysis": 2,
+        "agent_execution": 2,
+        "simple_chat": 1
+      },
+      "cost_per_1k_tokens": 0.0012,
+      "speed_rating": 9,
+      "quality_rating": 8
+    },
+    "hunyuan-t1-latest": {
+      "type": "tencent_hunyuan",
+      "config": {
+        "secretId": "TENCENT_HUNYUAN_SECRET_ID",
+        "secretKey": "TENCENT_HUNYUAN_SECRET_KEY",
+        "model": "hunyuan-t1-latest",
+        "temperature": 0.7
+      },
+      "capabilities": {
+        "reasoning": true,
+        "tool_calling": true,
+        "chinese": true,
+        "structured_output": true,
+        "code_generation": true,
+        "creative_writing": true,
+        "mathematical_computation": true,
+        "search": false,
+        "vision": false,
+        "agents": true
+      },
+      "priority": {
+        "chinese_conversation": 1,
+        "complex_reasoning": 1,
+        "code_generation": 1,
+        "creative_writing": 1,
+        "mathematical_computation": 1,
+        "structured_analysis": 1,
+        "agent_execution": 1,
+        "simple_chat": 2
+      },
+      "cost_per_1k_tokens": 0.002,
+      "speed_rating": 7,
+      "quality_rating": 9
     }
   },
   "routing_rules": {

@@ -23,6 +23,7 @@ import { ChatOpenAI } from '@langchain/openai';
 import { ChatDeepSeek } from "@langchain/deepseek";
 import { ChatAlibabaTongyi } from '@langchain/community/chat_models/alibaba_tongyi';
 import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
+import { ChatTencentHunyuan } from '@langchain/community/chat_models/tencent_hunyuan';
 
 // Tools and Agents imports
 import { Tool } from "@langchain/core/tools";
@@ -281,6 +282,47 @@ const MODEL_PROVIDERS: Record<string, {
       structured_output: true,
       agents: true
     }
+  },
+  // Tencent Hunyuan Models
+  'hunyuan-turbos-latest': {
+    type: 'tencent_hunyuan',
+    model: ChatTencentHunyuan,
+    config: {
+      apiKey: process.env.TENCENT_HUNYUAN_SECRET_ID,
+      configuration: {
+        tencentSecretId: process.env.TENCENT_HUNYUAN_SECRET_ID,
+        tencentSecretKey: process.env.TENCENT_HUNYUAN_SECRET_KEY
+      },
+      model: 'hunyuan-turbos-latest',
+      temperature: 0.7
+    },
+    capabilities: {
+      reasoning: true,
+      tool_calling: true,
+      chinese: true,
+      structured_output: true,
+      agents: true
+    }
+  },
+  'hunyuan-t1-latest': {
+    type: 'tencent_hunyuan',
+    model: ChatTencentHunyuan,
+    config: {
+      apiKey: process.env.TENCENT_HUNYUAN_SECRET_ID,
+      configuration: {
+        tencentSecretId: process.env.TENCENT_HUNYUAN_SECRET_ID,
+        tencentSecretKey: process.env.TENCENT_HUNYUAN_SECRET_KEY
+      },
+      model: 'hunyuan-t1-latest',
+      temperature: 0.7
+    },
+    capabilities: {
+      reasoning: true,
+      tool_calling: true,
+      chinese: true,
+      structured_output: true,
+      agents: true
+    }
   }
 };
 
@@ -347,6 +389,15 @@ function getModel(modelName: string): { llmInstance: BaseChatModel<BaseChatModel
         temperature: providerEntry.config.temperature || 0.7,
         streaming: true,
         apiKey: providerEntry.config.apiKey!,
+        model: providerEntry.config.model || modelName,
+        callbacks: tokenCountingCallbacks,
+      });
+    } else if (providerEntry.type === 'tencent_hunyuan') {
+      modelInstance = new ChatTencentHunyuan({
+        temperature: providerEntry.config.temperature || 0.7,
+        streaming: true,
+        tencentSecretId: providerEntry.config.configuration?.tencentSecretId || process.env.TENCENT_HUNYUAN_SECRET_ID!,
+        tencentSecretKey: providerEntry.config.configuration?.tencentSecretKey || process.env.TENCENT_HUNYUAN_SECRET_KEY!,
         model: providerEntry.config.model || modelName,
         callbacks: tokenCountingCallbacks,
       });
@@ -434,19 +485,21 @@ Available Models and Their Capabilities:
 - qvq-plus: Vision processing, Chinese language
 - gemini-flash-lite: Reasoning, tool calling, structured output
 - gemini-flash: Reasoning, tool calling, web search, structured output, agents
+- hunyuan-turbos-latest: Chinese conversation, fast response, tool calling, structured output, agents
+- hunyuan-t1-latest: Advanced reasoning, Chinese conversation, complex tasks, structured output, agents
 
 Available Destinations:
 - vision_processing: For image analysis and visual content (models: gpt-4o-all, claude-sonnet-4-all, qvq-plus)
-- complex_reasoning: For logical reasoning and problem-solving (models: deepseek-reasoner, claude-sonnet-4-all, gpt-4o-all)
-- creative_writing: For creative tasks and storytelling (models: claude-sonnet-4-all, gpt-4o-all)
-- code_generation: For programming and technical tasks (models: deepseek-chat, gpt-4o-all, claude-sonnet-4-all)
-- mathematical_computation: For math and calculations (models: deepseek-reasoner, gpt-4o-all)
+- complex_reasoning: For logical reasoning and problem-solving (models: hunyuan-t1-latest, deepseek-reasoner, claude-sonnet-4-all, gpt-4o-all)
+- creative_writing: For creative tasks and storytelling (models: hunyuan-t1-latest, claude-sonnet-4-all, gpt-4o-all)
+- code_generation: For programming and technical tasks (models: hunyuan-t1-latest, deepseek-chat, gpt-4o-all, claude-sonnet-4-all)
+- mathematical_computation: For math and calculations (models: hunyuan-t1-latest, deepseek-reasoner, gpt-4o-all)
 - web_search: For current information retrieval (models: gemini-flash, gpt-4o-all)
 - document_retrieval: For RAG and knowledge base queries (models: gemini-flash, claude-sonnet-4-all)
-- structured_analysis: For data extraction and formatting (models: gpt-4o-all, gemini-flash-lite, qwen-turbo)
-- agent_execution: For complex multi-step tasks (models: gpt-4o-all, claude-sonnet-4-all, gemini-flash)
-- chinese_conversation: For Chinese language tasks (models: qwen-turbo, deepseek-chat, qvq-plus)
-- simple_chat: For general conversation (models: o4-mini, deepseek-chat, qwen-turbo)
+- structured_analysis: For data extraction and formatting (models: hunyuan-turbos-latest, gpt-4o-all, gemini-flash-lite, qwen-turbo)
+- agent_execution: For complex multi-step tasks (models: hunyuan-t1-latest, gpt-4o-all, claude-sonnet-4-all, gemini-flash)
+- chinese_conversation: For Chinese language tasks (models: hunyuan-turbos-latest, hunyuan-t1-latest, qwen-turbo, deepseek-chat, qvq-plus)
+- simple_chat: For general conversation (models: hunyuan-turbos-latest, o4-mini, deepseek-chat, qwen-turbo)
 
 User Request: {input}
 
@@ -472,16 +525,16 @@ async function createIntelligentRouter(): Promise<Runnable> {
 function getModelByCapability(capability: string, fallback: string = 'gemini-flash-lite'): string {
   const capabilityMap: Record<string, string[]> = {
     'vision_processing': ['gpt-4o-all', 'claude-sonnet-4-all', 'qvq-plus'],
-    'complex_reasoning': ['deepseek-reasoner', 'claude-sonnet-4-all', 'gpt-4o-all'],
-    'creative_writing': ['claude-sonnet-4-all', 'gpt-4o-all'],
-    'code_generation': ['deepseek-chat', 'gpt-4o-all', 'claude-sonnet-4-all'],
-    'mathematical_computation': ['deepseek-reasoner', 'gpt-4o-all'],
+    'complex_reasoning': ['hunyuan-t1-latest', 'deepseek-reasoner', 'claude-sonnet-4-all', 'gpt-4o-all'],
+    'creative_writing': ['hunyuan-t1-latest', 'claude-sonnet-4-all', 'gpt-4o-all'],
+    'code_generation': ['hunyuan-t1-latest', 'deepseek-chat', 'gpt-4o-all', 'claude-sonnet-4-all'],
+    'mathematical_computation': ['hunyuan-t1-latest', 'deepseek-reasoner', 'gpt-4o-all'],
     'web_search': ['gemini-flash', 'gpt-4o-all'],
     'document_retrieval': ['gemini-flash', 'claude-sonnet-4-all'],
-    'structured_analysis': ['gpt-4o-all', 'gemini-flash-lite', 'qwen-turbo'],
-    'agent_execution': ['gpt-4o-all', 'claude-sonnet-4-all', 'gemini-flash'],
-    'chinese_conversation': ['qwen-turbo', 'deepseek-chat', 'qvq-plus'],
-    'simple_chat': ['o4-mini', 'deepseek-chat', 'qwen-turbo']
+    'structured_analysis': ['hunyuan-turbos-latest', 'gpt-4o-all', 'gemini-flash-lite', 'qwen-turbo'],
+    'agent_execution': ['hunyuan-t1-latest', 'gpt-4o-all', 'claude-sonnet-4-all', 'gemini-flash'],
+    'chinese_conversation': ['hunyuan-turbos-latest', 'hunyuan-t1-latest', 'qwen-turbo', 'deepseek-chat', 'qvq-plus'],
+    'simple_chat': ['hunyuan-turbos-latest', 'o4-mini', 'deepseek-chat', 'qwen-turbo']
   };
 
   const models = capabilityMap[capability] || [fallback];

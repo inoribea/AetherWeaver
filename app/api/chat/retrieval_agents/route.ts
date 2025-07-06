@@ -12,6 +12,7 @@ import { ChatOpenAI } from "@langchain/openai";
 import { ChatDeepSeek } from "@langchain/deepseek";
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
 import { ChatAlibabaTongyi } from "@langchain/community/chat_models/alibaba_tongyi";
+import { ChatTencentHunyuan } from "@langchain/community/chat_models/tencent_hunyuan";
 import { createRetrieverTool } from "langchain/tools/retriever";
 import { createReactAgent } from "@langchain/langgraph/prebuilt";
 import { Document } from "@langchain/core/documents";
@@ -70,6 +71,13 @@ function getAvailableRetrievalAgentModel(): BaseChatModel<BaseChatModelCallOptio
       apiKey: process.env.NEKO_API_KEY || process.env.OPENAI_API_KEY,
       configuration: { baseURL: process.env.NEKO_BASE_URL || process.env.OPENAI_BASE_URL },
     });
+  } else if (process.env.TENCENT_HUNYUAN_SECRET_ID && process.env.TENCENT_HUNYUAN_SECRET_KEY) {
+    return new ChatTencentHunyuan({
+      model: "hunyuan-t1-latest",
+      temperature: 0.2,
+      tencentSecretId: process.env.TENCENT_HUNYUAN_SECRET_ID,
+      tencentSecretKey: process.env.TENCENT_HUNYUAN_SECRET_KEY,
+    });
   } else if (process.env.GOOGLE_API_KEY) {
     return new ChatGoogleGenerativeAI({
       model: "gemini-2.5-flash-preview-05-20",
@@ -83,7 +91,7 @@ function getAvailableRetrievalAgentModel(): BaseChatModel<BaseChatModelCallOptio
       apiKey: process.env.DASHSCOPE_API_KEY,
     });
   } else {
-    throw new Error("No API keys configured for retrieval agent models. Please set up OpenAI, Google, or Alibaba Tongyi API keys.");
+    throw new Error("No API keys configured for retrieval agent models. Please set up OpenAI, Tencent Hunyuan, Google, or Alibaba Tongyi API keys.");
   }
 }
 

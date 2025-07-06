@@ -107,6 +107,13 @@ export const MODEL_MAPPING: Record<string, string> = {
   'qwen-turbo': 'qwen-turbo',
   'qwen-plus': 'qwen-turbo',
   'qwen-max': 'qwen-turbo',
+  
+  // 腾讯混元模型映射
+  'hunyuan-turbo': 'hunyuan-turbos-latest',
+  'hunyuan-turbos': 'hunyuan-turbos-latest',
+  'hunyuan-turbos-latest': 'hunyuan-turbos-latest',
+  'hunyuan-t1': 'hunyuan-t1-latest',
+  'hunyuan-t1-latest': 'hunyuan-t1-latest',
 };
 
 // Auto模型智能选择逻辑
@@ -174,7 +181,11 @@ export function selectBestModelForAuto(request: OpenAICompletionRequest): string
   const isChineseContent = totalChars > 0 && (chineseChars / totalChars) > 0.3;
 
   if (isChineseContent) {
-    return 'deepseek-chat'; // 中文优化模型
+    // 根据复杂度选择中文模型
+    if (content.length > 300 || lowerContent.includes('复杂') || lowerContent.includes('详细')) {
+      return 'hunyuan-t1-latest'; // 复杂中文任务
+    }
+    return 'hunyuan-turbos-latest'; // 一般中文任务
   }
 
   // 默认使用快速通用模型
@@ -374,6 +385,18 @@ export function getSupportedModels() {
       object: 'model',
       created: Math.floor(Date.now() / 1000),
       owned_by: 'deepseek'
+    },
+    {
+      id: 'hunyuan-turbos-latest',
+      object: 'model',
+      created: Math.floor(Date.now() / 1000),
+      owned_by: 'tencent'
+    },
+    {
+      id: 'hunyuan-t1-latest',
+      object: 'model',
+      created: Math.floor(Date.now() / 1000),
+      owned_by: 'tencent'
     },
     {
       id: 'langchain-chat',

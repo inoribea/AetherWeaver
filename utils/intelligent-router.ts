@@ -6,7 +6,9 @@ import { BaseMessage } from '@langchain/core/messages';
 interface ModelConfig {
   type: string;
   config: {
-    apiKey: string;
+    apiKey?: string;
+    secretId?: string;
+    secretKey?: string;
     baseURL?: string;
     model: string;
     temperature: number;
@@ -205,9 +207,19 @@ export class IntelligentRouter {
     
     for (const [modelName, modelConfig] of Object.entries(this.config.models)) {
       // 检查API密钥是否可用
-      const apiKey = process.env[modelConfig.config.apiKey];
-      if (!apiKey) {
-        console.log(`[EligibleModels] Skipping ${modelName}: API key not available`);
+      let hasValidCredentials = false;
+      
+      if (modelConfig.config.apiKey) {
+        const apiKey = process.env[modelConfig.config.apiKey];
+        hasValidCredentials = !!apiKey;
+      } else if (modelConfig.config.secretId && modelConfig.config.secretKey) {
+        const secretId = process.env[modelConfig.config.secretId];
+        const secretKey = process.env[modelConfig.config.secretKey];
+        hasValidCredentials = !!(secretId && secretKey);
+      }
+      
+      if (!hasValidCredentials) {
+        console.log(`[EligibleModels] Skipping ${modelName}: API credentials not available`);
         continue;
       }
       
@@ -400,8 +412,18 @@ export class IntelligentRouter {
   public getAvailableModels(): string[] {
     return Object.keys(this.config.models).filter(modelName => {
       const modelConfig = this.config.models[modelName];
-      const apiKey = process.env[modelConfig.config.apiKey];
-      return !!apiKey;
+      
+      // 检查不同类型的凭据
+      if (modelConfig.config.apiKey) {
+        const apiKey = process.env[modelConfig.config.apiKey];
+        return !!apiKey;
+      } else if (modelConfig.config.secretId && modelConfig.config.secretKey) {
+        const secretId = process.env[modelConfig.config.secretId];
+        const secretKey = process.env[modelConfig.config.secretKey];
+        return !!(secretId && secretKey);
+      }
+      
+      return false;
     });
   }
 
