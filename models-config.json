@@ -16,6 +16,7 @@
         "agents": true,
         "chinese": false,
         "search": true,
+        "web_search": true,
         "code_generation": true,
         "creative_writing": true,
         "mathematical_computation": true
@@ -37,35 +38,38 @@
     "claude-sonnet-4-all": {
       "type": "openai_compatible",
       "config": {
-        "apiKey": "NEKO_API_KEY",
-        "baseURL": "NEKO_BASE_URL",
+        "apiKey": "CLAUDE_API_KEY",
+        "baseURL": "CLAUDE_BASE_URL",
         "model": "claude-sonnet-4-all",
         "temperature": 0.7
       },
       "capabilities": {
         "vision": true,
         "reasoning": true,
+        "tool_calling": true,
         "structured_output": true,
         "agents": true,
         "chinese": false,
         "search": false,
+        "web_search": false,
         "code_generation": true,
         "creative_writing": true,
         "mathematical_computation": true
       },
       "priority": {
-        "vision_processing": 2,
+        "vision_processing": 5,
         "complex_reasoning": 1,
         "creative_writing": 1,
         "code_generation": 3,
         "mathematical_computation": 3,
-        "document_retrieval": 1,
-        "structured_analysis": 2,
-        "agent_execution": 2
+        "structured_analysis": 3,
+        "agent_execution": 3
       },
-      "cost_per_1k_tokens": 0.003,
-      "speed_rating": 7,
-      "quality_rating": 10
+      "cost_per_1k_tokens": 0.015,
+      "speed_rating": 6,
+      "quality_rating": 10,
+      "description": "顶尖AI模型，专门处理最复杂的推理和创作任务",
+      "complexity_threshold": "high"
     },
     "deepseek-reasoner": {
       "type": "deepseek",
@@ -75,21 +79,86 @@
         "temperature": 0.7
       },
       "capabilities": {
+        "vision": false,
         "reasoning": true,
+        "tool_calling": false,
+        "structured_output": false,
+        "agents": false,
         "chinese": true,
-        "structured_output": true,
-        "mathematical_computation": true,
-        "code_generation": true
+        "search": false,
+        "web_search": false,
+        "code_generation": true,
+        "creative_writing": false,
+        "mathematical_computation": true
       },
       "priority": {
         "complex_reasoning": 1,
-        "mathematical_computation": 1,
-        "code_generation": 1,
-        "chinese_conversation": 2
+        "code_generation": 3,
+        "mathematical_computation": 1
       },
-      "cost_per_1k_tokens": 0.0014,
+      "cost_per_1k_tokens": 0.001,
       "speed_rating": 6,
       "quality_rating": 9
+    },
+    "gemini-flash": {
+      "type": "google_gemini",
+      "config": {
+        "apiKey": "GOOGLE_API_KEY",
+        "model": "gemini-2.5-flash-lite-preview-06-17",
+        "temperature": 0.7
+      },
+      "capabilities": {
+        "vision": true,
+        "reasoning": true,
+        "tool_calling": true,
+        "structured_output": true,
+        "agents": true,
+        "chinese": false,
+        "search": true,
+        "web_search": true,
+        "code_generation": true,
+        "creative_writing": true,
+        "mathematical_computation": true
+      },
+      "priority": {
+        "vision_processing": 3,
+        "web_search": 1,
+        "search": 1,
+        "code_generation": 4,
+        "creative_writing": 3,
+        "mathematical_computation": 3
+      },
+      "cost_per_1k_tokens": 0.0001,
+      "speed_rating": 9,
+      "quality_rating": 7
+    },
+    "gemini-flash-lite": {
+      "type": "google_gemini",
+      "config": {
+        "apiKey": "GOOGLE_API_KEY",
+        "model": "gemini-2.5-flash-lite-preview-06-17",
+        "temperature": 0.7
+      },
+      "capabilities": {
+        "vision": false,
+        "reasoning": true,
+        "tool_calling": false,
+        "structured_output": false,
+        "agents": false,
+        "chinese": false,
+        "search": false,
+        "web_search": false,
+        "code_generation": true,
+        "creative_writing": true,
+        "mathematical_computation": false
+      },
+      "priority": {
+        "creative_writing": 4,
+        "code_generation": 5
+      },
+      "cost_per_1k_tokens": 0.00005,
+      "speed_rating": 10,
+      "quality_rating": 6
     },
     "qwen-turbo": {
       "type": "alibaba_tongyi",
@@ -99,68 +168,57 @@
         "temperature": 0.7
       },
       "capabilities": {
+        "vision": false,
         "reasoning": true,
         "tool_calling": true,
+        "structured_output": true,
+        "agents": false,
         "chinese": true,
-        "structured_output": true,
-        "code_generation": true
+        "search": false,
+        "web_search": false,
+        "code_generation": true,
+        "creative_writing": true,
+        "mathematical_computation": true
       },
       "priority": {
-        "chinese_conversation": 1,
-        "simple_chat": 2,
-        "structured_analysis": 3,
-        "code_generation": 3
+        "chinese": 1,
+        "code_generation": 4,
+        "creative_writing": 4,
+        "mathematical_computation": 4
       },
-      "cost_per_1k_tokens": 0.0008,
-      "speed_rating": 9,
+      "cost_per_1k_tokens": 0.0005,
+      "speed_rating": 8,
       "quality_rating": 7
     },
-    "gemini-flash": {
-      "type": "google_gemini",
+    "qvq-plus": {
+      "type": "alibaba_tongyi",
       "config": {
-        "apiKey": "GOOGLE_API_KEY",
-        "model": "gemini-2.5-flash-preview-05-20",
+        "apiKey": "DASHSCOPE_API_KEY",
+        "model": "qvq-plus",
         "temperature": 0.7
       },
       "capabilities": {
+        "vision": true,
         "reasoning": true,
-        "tool_calling": true,
-        "search": true,
-        "structured_output": true,
-        "agents": true,
-        "web_search": true
+        "tool_calling": false,
+        "structured_output": false,
+        "agents": false,
+        "chinese": true,
+        "search": false,
+        "web_search": false,
+        "code_generation": true,
+        "creative_writing": false,
+        "mathematical_computation": true
       },
       "priority": {
-        "web_search": 1,
-        "document_retrieval": 2,
-        "agent_execution": 3,
-        "simple_chat": 3
+        "vision_processing": 1,
+        "complex_reasoning": 2,
+        "chinese": 2,
+        "mathematical_computation": 2
       },
-      "cost_per_1k_tokens": 0.0002,
-      "speed_rating": 10,
+      "cost_per_1k_tokens": 0.002,
+      "speed_rating": 7,
       "quality_rating": 8
-    },
-    "gemini-flash-lite": {
-      "type": "google_gemini",
-      "config": {
-        "apiKey": "GOOGLE_API_KEY",
-        "model": "models/gemini-2.5-flash-lite-preview-06-17",
-        "temperature": 0.7
-      },
-      "capabilities": {
-        "reasoning": true,
-        "tool_calling": true,
-        "structured_output": true
-      },
-      "priority": {
-        "simple_chat": 1,
-        "web_search": 4,
-        "document_retrieval": 4,
-        "agent_execution": 4
-      },
-      "cost_per_1k_tokens": 0.000125,
-      "speed_rating": 10,
-      "quality_rating": 7
     },
     "hunyuan-turbos-latest": {
       "type": "tencent_hunyuan",
@@ -171,30 +229,28 @@
         "temperature": 0.7
       },
       "capabilities": {
+        "vision": false,
         "reasoning": true,
         "tool_calling": true,
-        "chinese": true,
         "structured_output": true,
+        "agents": true,
+        "chinese": true,
+        "search": false,
+        "web_search": false,
         "code_generation": true,
         "creative_writing": true,
-        "mathematical_computation": true,
-        "search": false,
-        "vision": false,
-        "agents": true
+        "mathematical_computation": true
       },
       "priority": {
-        "chinese_conversation": 1,
-        "code_generation": 2,
+        "chinese": 1,
+        "code_generation": 3,
         "creative_writing": 2,
-        "complex_reasoning": 2,
-        "mathematical_computation": 2,
-        "structured_analysis": 2,
-        "agent_execution": 2,
-        "simple_chat": 1
+        "mathematical_computation": 3,
+        "structured_analysis": 3
       },
-      "cost_per_1k_tokens": 0.0012,
-      "speed_rating": 9,
-      "quality_rating": 8
+      "cost_per_1k_tokens": 0.0008,
+      "speed_rating": 8,
+      "quality_rating": 7
     },
     "hunyuan-t1-latest": {
       "type": "tencent_hunyuan",
@@ -205,93 +261,83 @@
         "temperature": 0.7
       },
       "capabilities": {
+        "vision": false,
         "reasoning": true,
-        "tool_calling": true,
+        "tool_calling": false,
+        "structured_output": false,
+        "agents": false,
         "chinese": true,
-        "structured_output": true,
+        "search": false,
+        "web_search": false,
         "code_generation": true,
         "creative_writing": true,
-        "mathematical_computation": true,
-        "search": false,
-        "vision": false,
-        "agents": true
+        "mathematical_computation": true
       },
       "priority": {
-        "chinese_conversation": 1,
+        "chinese": 1,
         "complex_reasoning": 1,
-        "code_generation": 1,
+        "code_generation": 2,
         "creative_writing": 1,
-        "mathematical_computation": 1,
-        "structured_analysis": 1,
-        "agent_execution": 1,
-        "simple_chat": 2
+        "mathematical_computation": 1
       },
-      "cost_per_1k_tokens": 0.002,
-      "speed_rating": 7,
+      "cost_per_1k_tokens": 0.003,
+      "speed_rating": 6,
       "quality_rating": 9
     }
   },
   "routing_rules": {
-    "vision_processing": {
-      "triggers": ["image", "图片", "视觉", "看", "分析图", "photo", "picture"],
-      "required_capabilities": ["vision"],
-      "fallback_destination": "simple_chat"
+    "vision_tasks": {
+      "conditions": ["has_image", "vision_keywords"],
+      "preferred_models": ["qvq-plus", "gpt-4o-all", "claude-sonnet-4-all", "gemini-flash"],
+      "fallback_models": ["gpt-4o-all"]
     },
-    "complex_reasoning": {
-      "triggers": ["推理", "逻辑", "分析", "reasoning", "logic", "analyze", "think", "解决", "problem"],
-      "required_capabilities": ["reasoning"],
-      "fallback_destination": "simple_chat"
+    "reasoning_tasks": {
+      "conditions": ["reasoning_keywords", "complex_analysis"],
+      "preferred_models": ["deepseek-reasoner", "claude-sonnet-4-all", "hunyuan-t1-latest"],
+      "fallback_models": ["gpt-4o-all"]
     },
-    "code_generation": {
-      "triggers": ["代码", "编程", "code", "program", "function", "class", "算法", "debug", "bug"],
-      "required_capabilities": ["code_generation"],
-      "fallback_destination": "simple_chat"
+    "chinese_tasks": {
+      "conditions": ["chinese_content", "chinese_keywords"],
+      "preferred_models": ["hunyuan-t1-latest", "hunyuan-turbos-latest", "qwen-turbo", "qvq-plus"],
+      "fallback_models": ["gpt-4o-all"]
     },
-    "chinese_conversation": {
-      "triggers": ["中文", "chinese", "汉语", "普通话"],
-      "required_capabilities": ["chinese"],
-      "fallback_destination": "simple_chat"
+    "search_tasks": {
+      "conditions": ["search_keywords", "current_info"],
+      "preferred_models": ["gemini-flash", "gpt-4o-all"],
+      "fallback_models": ["gpt-4o-all"]
     },
-    "web_search": {
-      "triggers": ["搜索", "search", "最新", "latest", "current", "news", "今天", "现在"],
-      "required_capabilities": ["search", "web_search"],
-      "fallback_destination": "simple_chat"
+    "code_tasks": {
+      "conditions": ["code_keywords", "programming"],
+      "preferred_models": ["claude-sonnet-4-all", "deepseek-reasoner", "gpt-4o-all"],
+      "fallback_models": ["gpt-4o-all"]
     },
-    "mathematical_computation": {
-      "triggers": ["数学", "计算", "math", "calculate", "equation", "formula", "solve"],
-      "required_capabilities": ["mathematical_computation"],
-      "fallback_destination": "simple_chat"
+    "creative_tasks": {
+      "conditions": ["creative_keywords", "writing"],
+      "preferred_models": ["claude-sonnet-4-all", "hunyuan-t1-latest", "gpt-4o-all"],
+      "fallback_models": ["gemini-flash-lite"]
     },
-    "structured_analysis": {
-      "triggers": ["结构化", "格式", "extract", "parse", "json", "xml", "table"],
-      "required_capabilities": ["structured_output"],
-      "fallback_destination": "simple_chat"
-    },
-    "document_retrieval": {
-      "triggers": ["文档", "知识", "rag", "retrieval", "langchain", "vector"],
-      "required_capabilities": ["reasoning"],
-      "fallback_destination": "simple_chat"
-    },
-    "agent_execution": {
-      "triggers": ["任务", "步骤", "agent", "tool", "执行", "workflow"],
-      "required_capabilities": ["agents", "tool_calling"],
-      "fallback_destination": "simple_chat"
-    },
-    "creative_writing": {
-      "triggers": ["创作", "写作", "故事", "creative", "write", "story", "poem"],
-      "required_capabilities": ["creative_writing"],
-      "fallback_destination": "simple_chat"
-    },
-    "simple_chat": {
-      "triggers": ["聊天", "chat", "hello", "hi", "你好"],
-      "required_capabilities": [],
-      "fallback_destination": "simple_chat"
+    "structured_output": {
+      "conditions": ["json_keywords", "structured_format"],
+      "preferred_models": ["gpt-4o-all", "claude-sonnet-4-all", "hunyuan-turbos-latest"],
+      "fallback_models": ["qwen-turbo"]
     }
   },
   "selection_strategy": {
-    "primary": "capability_priority",
-    "secondary": "cost_efficiency",
-    "tertiary": "speed_rating",
-    "fallback": "quality_rating"
+    "default_model": "gpt-4o-all",
+    "fallback_chain": ["gpt-4o-all", "claude-sonnet-4-all", "gemini-flash", "qwen-turbo"],
+    "load_balancing": false,
+    "cost_optimization": false,
+    "speed_optimization": false,
+    "quality_optimization": true
+  },
+  "keywords": {
+    "vision": ["图片", "图像", "照片", "视觉", "看", "分析图", "photo", "picture", "image", "visual"],
+    "reasoning": ["推理", "逻辑", "分析", "reasoning", "logic", "analyze", "思考", "解决", "problem", "为什么", "怎么", "如何"],
+    "chinese": ["中文", "汉语", "中国", "Chinese", "汉字"],
+    "search": ["搜索", "search", "最新", "latest", "current", "news", "今天", "现在", "查询", "找"],
+    "code": ["代码", "编程", "code", "program", "function", "class", "算法", "debug", "bug"],
+    "creative": ["创作", "写作", "故事", "creative", "write", "story", "poem", "小说", "诗歌"],
+    "structured": ["结构化", "格式", "extract", "parse", "json", "xml", "table", "列表", "表格"],
+    "math": ["数学", "计算", "math", "calculate", "equation", "formula", "solve", "算", "计算题"]
   }
 }

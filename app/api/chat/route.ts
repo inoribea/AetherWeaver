@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server';
 import { Message as VercelChatMessage, StreamingTextResponse } from 'ai';
 import { z } from 'zod';
 import { selectBestModelForAuto, OpenAICompletionRequest, smartFormatModelInjection } from '@/utils/openai-compat';
-import { intelligentRouter, RoutingDecision } from '@/utils/intelligent-router';
+import { routeRequest, RoutingRequest, RoutingDecision, OpenAIMessage } from '@/utils/unified-router';
 
 // Core LangChain imports
 import {
@@ -750,34 +750,54 @@ export async function POST(req: NextRequest) {
       selectedChain = prompt.pipe(llmInstance).pipe(new StringOutputParser());
       modelNameForOutput = requestedModel;
     } else {
-      // 使用新的智能路由器进行决策 - 无需提示词消耗
-      console.log('[Intelligent Router] Using smart routing (no prompt required)');
-      const routingResult = intelligentRouter.route(messageText, hasImage, formattedMessages);
+      // 使用新的统一路由器进行决策
+      console.log('[Unified Router] Using smart routing');
       
-      console.log(`[Router] Destination: ${routingResult.destination}, Model: ${routingResult.selectedModel}`);
+      // 转换消息格式为统一路由器格式
+      const routingMessages: OpenAIMessage[] = formattedMessages.map((msg: BaseMessage) => ({
+        role: msg._getType() === 'human' ? 'user' as const :
+              msg._getType() === 'ai' ? 'assistant' as const : 'system' as const,
+        content: extractTextContent(msg.content)
+      }));
+      
+      const routingRequest: RoutingRequest = {
+        messages: routingMessages
+      };
+      
+      const routingResult = await routeRequest(routingRequest);
+      
+      console.log(`[Router] Model: ${routingResult.selectedModel}`);
       console.log(`[Router] Confidence: ${routingResult.confidence}, Reasoning: ${routingResult.reasoning}`);
       
       // 直接使用路由结果创建处理链
       const { llmInstance } = getModel(routingResult.selectedModel);
       modelNameForOutput = routingResult.selectedModel;
-      featureType = routingResult.destination.replace('_', '');
+      featureType = 'chat'; // 简化为通用聊天
       
-      // 根据目标类型创建相应的处理链
-      if (routingResult.destination === 'vision_processing') {
+      // 检测特殊处理需求
+      if (hasImage) {
+        // 视觉处理
         const prompt = ChatPromptTemplate.fromMessages(formattedMessages);
         selectedChain = prompt.pipe(llmInstance).pipe(new StringOutputParser());
+        featureType = 'vision';
         
-      } else if (routingResult.destination === 'structured_analysis') {
+      } else if (messageText.toLowerCase().includes('json') || messageText.toLowerCase().includes('structure')) {
+        // 结构化输出
         const result = createStructuredChain(messageText);
         selectedChain = result.chain;
+        featureType = 'structured';
         
-      } else if (routingResult.destination === 'document_retrieval') {
-        const result = createRetrievalChain(messageText);
-        selectedChain = result.chain;
-        
-      } else if (routingResult.destination === 'web_search') {
+      } else if (messageText.toLowerCase().includes('search') || messageText.toLowerCase().includes('latest')) {
+        // 搜索
         const result = createSearchChain(formattedMessages, messageText);
         selectedChain = result.chain;
+        featureType = 'search';
+        
+      } else if (messageText.toLowerCase().includes('document') || messageText.toLowerCase().includes('rag')) {
+        // 文档检索
+        const result = createRetrievalChain(messageText);
+        selectedChain = result.chain;
+        featureType = 'retrieval';
         
       } else {
         // 通用处理链

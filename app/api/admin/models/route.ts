@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { intelligentRouter } from '@/utils/intelligent-router';
+import {
+  intelligentRouter as unifiedRouter,
+  getAvailableModels,
+  analyzeModelCapabilities,
+  reloadModelConfiguration
+} from '@/utils/unified-router';
 import fs from 'fs';
 import path from 'path';
 
@@ -10,17 +15,28 @@ export async function GET() {
     const configData = fs.readFileSync(configPath, 'utf-8');
     const config = JSON.parse(configData);
     
-    // 添加模型状态信息
-    const availableModels = intelligentRouter.getAvailableModels();
+    // 使用统一路由器添加模型状态信息
+    const availableModels = getAvailableModels();
     const configWithStatus = {
       ...config,
       modelStatus: Object.keys(config.models).reduce((acc, modelName) => {
+        const modelInfo = availableModels.find(m => m.id === modelName);
         acc[modelName] = {
-          available: availableModels.includes(modelName),
-          capabilities: intelligentRouter.getModelCapabilities(modelName)
+          available: modelInfo?.available || false,
+          capabilities: analyzeModelCapabilities(modelName),
+          cost_per_1k_tokens: modelInfo?.cost_per_1k_tokens || 0,
+          speed_rating: modelInfo?.speed_rating || 0,
+          quality_rating: modelInfo?.quality_rating || 0
         };
         return acc;
-      }, {} as Record<string, any>)
+      }, {} as Record<string, any>),
+      routerInfo: {
+        type: 'unified-router',
+        version: '1.0.0',
+        features: ['semantic-routing', 'capability-matching', 'fallback-chains', 'dynamic-registration'],
+        totalModels: availableModels.length,
+        availableModels: availableModels.filter(m => m.available).length
+      }
     };
     
     return NextResponse.json(configWithStatus);
@@ -44,8 +60,8 @@ export async function POST(request: NextRequest) {
     // 保存配置文件
     fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
     
-    // 重新加载路由器配置
-    intelligentRouter.reloadConfig();
+    // 重新加载统一路由器配置
+    await reloadModelConfiguration();
     
     return NextResponse.json({ success: true, message: 'Configuration saved successfully' });
   } catch (error) {
@@ -63,8 +79,11 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Model name and config are required' }, { status: 400 });
     }
     
-    // 运行时添加模型
-    intelligentRouter.addModel(modelName, modelConfig);
+    // 运行时添加模型到统一路由器
+    unifiedRouter.registerModel({
+      id: modelName,
+      ...modelConfig
+    });
     
     // 保存到配置文件
     const configPath = path.join(process.cwd(), 'models-config.json');
@@ -102,8 +121,8 @@ export async function DELETE(request: NextRequest) {
     delete config.models[modelName];
     fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
     
-    // 重新加载配置
-    intelligentRouter.reloadConfig();
+    // 重新加载统一路由器配置
+    await reloadModelConfiguration();
     
     return NextResponse.json({ success: true, message: `Model ${modelName} deleted successfully` });
   } catch (error) {

@@ -10,6 +10,7 @@ import { ChatTencentHunyuan } from "@langchain/community/chat_models/tencent_hun
 import { PromptTemplate } from "@langchain/core/prompts";
 import { BaseChatModel, BaseChatModelCallOptions } from "@langchain/core/language_models/chat_models";
 import { AIMessageChunk } from "@langchain/core/messages";
+import { routeRequest, RoutingRequest } from '@/utils/unified-router';
 
 // export const runtime = "edge"; // Commented out to avoid edge runtime issues
 
@@ -26,37 +27,94 @@ function createAlibabaTongyiModel(config: {
   });
 }
 
-// Helper function to get available model for structured output
-function getAvailableStructuredOutputModel(): BaseChatModel<BaseChatModelCallOptions, AIMessageChunk> {
-  // Try models that support structured output/function calling
-  if (process.env.OPENAI_API_KEY || process.env.NEKO_API_KEY) {
-    return new ChatOpenAI({
-      temperature: 0.8,
-      model: "gpt-4o-mini",
-      apiKey: process.env.NEKO_API_KEY || process.env.OPENAI_API_KEY,
-      configuration: { baseURL: process.env.NEKO_BASE_URL || process.env.OPENAI_BASE_URL },
-    });
-  } else if (process.env.TENCENT_HUNYUAN_SECRET_ID && process.env.TENCENT_HUNYUAN_SECRET_KEY) {
-    return new ChatTencentHunyuan({
-      temperature: 0.8,
-      model: "hunyuan-turbos-latest",
-      tencentSecretId: process.env.TENCENT_HUNYUAN_SECRET_ID,
-      tencentSecretKey: process.env.TENCENT_HUNYUAN_SECRET_KEY,
-    });
-  } else if (process.env.GOOGLE_API_KEY) {
-    return new ChatGoogleGenerativeAI({
-      temperature: 0.8,
-      model: "gemini-2.5-flash-lite-preview-06-17",
-      apiKey: process.env.GOOGLE_API_KEY,
-    });
-  } else if (process.env.DASHSCOPE_API_KEY) {
-    return createAlibabaTongyiModel({
-      temperature: 0.8,
-      model: "qwen-turbo-latest",
-      apiKey: process.env.DASHSCOPE_API_KEY,
-    });
-  } else {
-    throw new Error("No API keys configured for structured output models. Please set up OpenAI, Tencent Hunyuan, Google, or Alibaba Tongyi API keys.");
+// Helper function to get available model for structured output using unified router
+async function getAvailableStructuredOutputModel(messages: any[]): Promise<{
+  model: BaseChatModel<BaseChatModelCallOptions, AIMessageChunk>;
+  modelName: string;
+}> {
+  try {
+    // Use unified router to select the best model for structured output
+    const routingRequest: RoutingRequest = {
+      messages: messages.map(msg => ({
+        role: msg.role as 'user' | 'assistant' | 'system',
+        content: msg.content
+      })),
+      capabilities: {
+        structured_output: true,
+        tool_calling: true
+      }
+    };
+    
+    const decision = await routeRequest(routingRequest);
+    const selectedModelId = decision.selectedModel;
+    
+    console.log(`🎯 Unified router selected model for structured output: ${selectedModelId}`);
+    console.log(`📝 Reasoning: ${decision.reasoning}`);
+    
+    // Create the appropriate model instance based on the selected model
+    let model: BaseChatModel<BaseChatModelCallOptions, AIMessageChunk>;
+    
+    if (selectedModelId.includes('gpt') || selectedModelId.includes('openai')) {
+      model = new ChatOpenAI({
+        temperature: 0.8,
+        model: selectedModelId,
+        apiKey: process.env.NEKO_API_KEY || process.env.OPENAI_API_KEY,
+        configuration: { baseURL: process.env.NEKO_BASE_URL || process.env.OPENAI_BASE_URL },
+      });
+    } else if (selectedModelId.includes('hunyuan')) {
+      model = new ChatTencentHunyuan({
+        temperature: 0.8,
+        model: selectedModelId,
+        tencentSecretId: process.env.TENCENT_HUNYUAN_SECRET_ID,
+        tencentSecretKey: process.env.TENCENT_HUNYUAN_SECRET_KEY,
+      });
+    } else if (selectedModelId.includes('gemini')) {
+      model = new ChatGoogleGenerativeAI({
+        temperature: 0.8,
+        model: selectedModelId,
+        apiKey: process.env.GOOGLE_API_KEY,
+      });
+    } else if (selectedModelId.includes('qwen')) {
+      model = createAlibabaTongyiModel({
+        temperature: 0.8,
+        model: selectedModelId,
+        apiKey: process.env.DASHSCOPE_API_KEY,
+      });
+    } else if (selectedModelId.includes('deepseek')) {
+      model = new ChatDeepSeek({
+        temperature: 0.8,
+        model: selectedModelId,
+        apiKey: process.env.DEEPSEEK_API_KEY,
+      });
+    } else {
+      // Fallback to OpenAI if model type is unknown
+      model = new ChatOpenAI({
+        temperature: 0.8,
+        model: "gpt-4o-mini",
+        apiKey: process.env.NEKO_API_KEY || process.env.OPENAI_API_KEY,
+        configuration: { baseURL: process.env.NEKO_BASE_URL || process.env.OPENAI_BASE_URL },
+      });
+    }
+    
+    return { model, modelName: selectedModelId };
+    
+  } catch (error) {
+    console.error('❌ Unified router failed, using fallback model:', error);
+    
+    // Fallback to original logic if unified router fails
+    if (process.env.OPENAI_API_KEY || process.env.NEKO_API_KEY) {
+      return {
+        model: new ChatOpenAI({
+          temperature: 0.8,
+          model: "gpt-4o-mini",
+          apiKey: process.env.NEKO_API_KEY || process.env.OPENAI_API_KEY,
+          configuration: { baseURL: process.env.NEKO_BASE_URL || process.env.OPENAI_BASE_URL },
+        }),
+        modelName: "gpt-4o-mini"
+      };
+    } else {
+      throw new Error("No API keys configured for structured output models. Please set up OpenAI, Tencent Hunyuan, Google, or Alibaba Tongyi API keys.");
+    }
   }
 }
 
@@ -82,8 +140,8 @@ export async function POST(req: NextRequest) {
 
     const prompt = PromptTemplate.fromTemplate(TEMPLATE);
     
-    // Get available model that supports structured output
-    const model = getAvailableStructuredOutputModel();
+    // Get available model that supports structured output using unified router
+    const { model, modelName } = await getAvailableStructuredOutputModel(messages);
 
     /**
      * We use Zod (https://zod.dev) to define our schema for convenience,
@@ -122,13 +180,13 @@ export async function POST(req: NextRequest) {
       input: currentMessageContent,
     });
 
-    const modelName = "gpt-4o-mini"; // 默认模型名，可以根据实际情况修改
     return NextResponse.json(result, {
       status: 200,
       headers: {
         "X-Model-Used": modelName,
-        "X-Model-Provider": "LangChain",
+        "X-Model-Provider": "LangChain + Unified Router",
         "X-Feature": "Structured Output",
+        "X-Router-Decision": "Intelligent model selection based on structured output capabilities",
       },
     });
   } catch (e: any) {

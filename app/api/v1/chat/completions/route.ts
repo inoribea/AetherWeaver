@@ -12,8 +12,10 @@ import {
   formatStreamChunk,
   createStreamEnd,
   detectIntentFromRequest,
-  detectModelSwitchRequest // 导入模型切换检测函数
+  detectModelSwitchRequest,
+  selectBestModelForAuto
 } from '@/utils/openai-compat';
+import { routeRequest, RoutingRequest } from '@/utils/unified-router';
 
 // OpenAI兼容的聊天完成端点
 export async function POST(req: NextRequest) {
@@ -58,8 +60,15 @@ export async function POST(req: NextRequest) {
     const langchainRequest = convertOpenAIToLangChain(body);
     
     // 智能路由 - 根据请求内容选择合适的端点
-    const targetEndpoint = detectIntentFromRequest(body);
+    const targetEndpoint = await detectIntentFromRequest(body);
     console.log(`Routing to endpoint: ${targetEndpoint}`);
+    
+    // 如果是auto模型，使用统一路由器进行智能选择
+    if (body.model === 'auto') {
+      const selectedModel = await selectBestModelForAuto(body);
+      body.model = selectedModel;
+      console.log(`🎯 Auto模型智能选择: ${selectedModel}`);
+    }
 
     // 构建内部请求
     const internalUrl = new URL(targetEndpoint, req.url);

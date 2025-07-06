@@ -25,8 +25,11 @@ export async function GET(req: NextRequest) {
       console.log(`Valid API key used for models endpoint: ${keyInfo.isAdmin ? 'Admin' : 'User'} key`);
     }
 
-    // 获取支持的模型列表
+    // 获取支持的模型列表 - 使用统一路由器
     const models = getSupportedModels();
+    
+    console.log(`Found ${models.length} supported models`);
+    console.log('Available models:', models.map(m => m.id).join(', '));
     
     const response = {
       object: 'list',
