@@ -798,12 +798,16 @@ export async function POST(req: NextRequest) {
           for await (const chunk of stream) {
             const text = typeof chunk === 'string' ? chunk : String(chunk);
             
-            if (text.trim()) {
-              // 直接输出内容，不添加模型信息注入
-              controller.enqueue(new TextEncoder().encode(text));
-              accumulatedContent += text;
+            if (isFirstChunk && text.trim()) {
+              // 使用智能格式化注入模型信息
+              const formattedText = smartFormatModelInjection(text, modelNameForOutput);
+              controller.enqueue(new TextEncoder().encode(formattedText));
               isFirstChunk = false;
+            } else {
+              controller.enqueue(new TextEncoder().encode(text));
             }
+            
+            accumulatedContent += text;
           }
           controller.close();
         } catch (error) {

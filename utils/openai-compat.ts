@@ -242,6 +242,8 @@ export function createOpenAIResponse(
   const id = `chatcmpl-${Math.random().toString(36).substring(2, 15)}`;
 
   if (isStream) {
+  if (isComplete) {
+    // 完成块
     return {
       id,
       object: 'chat.completion.chunk',
@@ -249,11 +251,28 @@ export function createOpenAIResponse(
       model,
       choices: [{
         index: 0,
-        delta: isComplete ? {} : { content },
-        finish_reason: isComplete ? 'stop' : null
+        delta: {},
+        finish_reason: 'stop'
       }]
     };
   } else {
+    // 内容块
+    return {
+      id,
+      object: 'chat.completion.chunk',
+      created: timestamp,
+      model,
+      choices: [{
+        index: 0,
+        delta: {
+          role: 'assistant',
+          content: content
+        },
+        finish_reason: null
+      }]
+    };
+  }
+} else {
     return {
       id,
       object: 'chat.completion',

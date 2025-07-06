@@ -122,7 +122,15 @@ export async function POST(req: NextRequest) {
       input: currentMessageContent,
     });
 
-    return NextResponse.json(result, { status: 200 });
+    const modelName = "gpt-4o-mini"; // 默认模型名，可以根据实际情况修改
+    return NextResponse.json(result, {
+      status: 200,
+      headers: {
+        "X-Model-Used": modelName,
+        "X-Model-Provider": "LangChain",
+        "X-Feature": "Structured Output",
+      },
+    });
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: e.status ?? 500 });
   }
