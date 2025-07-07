@@ -179,10 +179,10 @@ export function convertOpenAIToLangChain(request: OpenAICompletionRequest): {
   const messages: VercelChatMessage[] = request.messages.map(msg => {
     if (msg.role === 'tool') {
       return {
-        id: Math.random().toString(36),
-        role: 'system' as const,
-        content: `Tool result: ${msg.content}`
-      };
+      id: Math.random().toString(36),
+      role: 'tool' as const,
+      content: JSON.stringify(msg.content)
+    };
     }
     return {
       id: Math.random().toString(36),
