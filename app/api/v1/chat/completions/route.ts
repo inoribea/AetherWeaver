@@ -101,7 +101,8 @@ export async function POST(req: NextRequest) {
     
     // 智能路由 - 根据请求内容选择合适的端点
     const targetEndpoint = await detectIntentFromRequest(body);
-    console.log(`Routing to endpoint: ${targetEndpoint}`);
+    console.log(`[Smart Router] Routing to endpoint: ${targetEndpoint}`);
+    console.log(`[Smart Router] Selected Model: ${body.model}`);
 
     // 构建内部请求
     const baseUrl = new URL(req.url).origin;
