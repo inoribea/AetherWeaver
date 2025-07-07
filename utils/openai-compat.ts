@@ -472,7 +472,22 @@ export function getSupportedModels() {
       id: 'auto',
       object: 'model',
       created: Math.floor(Date.now() / 1000),
-      owned_by: 'langchain'
+      owned_by: 'langchain',
+      // 补充能力描述，确保 openai format 客户端能识别
+      capabilities: {
+        vision: true,
+        reasoning: true,
+        tool_calling: true,
+        structured_output: true,
+        agents: true,
+        chinese: true,
+        search: true,
+        web_search: true,
+        code_generation: true,
+        creative_writing: true,
+        mathematical_computation: true
+      },
+      description: '自动智能路由模型，支持所有功能，自动选择最佳底层模型'
     },
     {
       id: 'gpt-4',
