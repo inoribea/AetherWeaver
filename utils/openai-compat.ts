@@ -180,8 +180,8 @@ export function convertOpenAIToLangChain(request: OpenAICompletionRequest): {
     if (msg.role === 'tool') {
       return {
       id: Math.random().toString(36),
-      role: 'tool' as const,
-      content: JSON.stringify(msg.content)
+      role: 'system' as const,
+      content: `Tool result: ${msg.content}`
     };
     }
     return {

@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
     console.log('OpenAI Compatible API request received');
 
     // API密钥验证
-    if (isAuthEnabled()) {
+    if (isAuthEnabled() && process.env.ENABLE_API_AUTH !== 'false') {
       const apiKey = extractApiKey(req);
       const keyInfo = validateApiKey(apiKey);
       
@@ -33,6 +33,8 @@ export async function POST(req: NextRequest) {
       }
       
       console.log(`Valid API key used: ${keyInfo.isAdmin ? 'Admin' : 'User'} key`);
+    } else {
+      console.log('API Authentication is disabled.');
     }
 
     // 解析请求体
@@ -120,18 +122,19 @@ export async function POST(req: NextRequest) {
     const internalResponse = await fetch(internalRequest);
     
     if (!internalResponse.ok) {
-      console.error(`Internal API error: ${internalResponse.status}`);
+      const errorText = await internalResponse.text();
+      console.error(`Internal API error: ${internalResponse.status}, Response: ${errorText}`);
       return new Response(
         JSON.stringify({
           error: {
-            message: 'Internal server error',
+            message: `Internal server error: ${internalResponse.status} - ${errorText}`,
             type: 'server_error',
             code: 'internal_error'
           }
         }),
-        { 
-          status: 500, 
-          headers: { 'Content-Type': 'application/json' } 
+        {
+          status: 500,
+          headers: { 'Content-Type': 'application/json' }
         }
       );
     }
