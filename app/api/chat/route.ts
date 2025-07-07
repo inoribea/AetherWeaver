@@ -854,6 +854,102 @@ function createSimpleChatChain(messages: BaseMessage[]): { chain: Runnable<any, 
   };
 }
 
+function createAgentChain(messages: BaseMessage[], messageText: string): { chain: Runnable<any, string>, modelName: string } {
+  const modelName = getModelByCapability('agent_execution');
+  const { llmInstance } = getModel(modelName);
+  
+  const agentPrompt = ChatPromptTemplate.fromMessages([
+    ["system", `You are a helpful AI assistant that can break down complex tasks into steps.
+    Analyze the user's request and provide a structured approach to solving it.`],
+    ["human", "Task: {task}\n\nPlease provide a step-by-step approach to accomplish this task."],
+  ]);
+  
+  return {
+    chain: RunnableSequence.from([
+      {
+        task: () => messageText,
+      },
+      agentPrompt,
+      llmInstance,
+      new StringOutputParser(),
+    ]),
+    modelName
+  };
+}
+
+// 创建智能路由分支
+async function createIntelligentRoutingChain(messages: BaseMessage[]): Promise<Runnable> {
+  const router = await createIntelligentRouter();
+  const lastMessage = messages[messages.length - 1];
+  const messageText = extractTextContent(lastMessage.content);
+  
+  // 创建路由分支
+  const routingBranch = RunnableBranch.from([
+    [
+      // 视觉处理分支
+      (input: any) => input.destination === "vision_processing",
+      RunnableLambda.from(() => {
+        const { chain } = createVisionChain(messages);
+        return chain;
+      })
+    ],
+    [
+      // 复杂推理分支
+      (input: any) => input.destination === "complex_reasoning",
+      RunnableLambda.from(() => {
+        const { chain } = createReasoningChain(messages);
+        return chain;
+      })
+    ],
+    [
+      // 网络搜索分支
+      (input: any) => input.destination === "web_search",
+      RunnableLambda.from(() => {
+        const { chain } = createSearchChain(messages, messageText);
+        return chain;
+      })
+    ],
+    [
+      // 结构化分析分支
+      (input: any) => input.destination === "structured_analysis",
+      RunnableLambda.from(() => {
+        const { chain } = createStructuredChain(messageText);
+        return chain;
+      })
+    ],
+    [
+      // 文档检索分支
+      (input: any) => input.destination === "document_retrieval",
+      RunnableLambda.from(() => {
+        const { chain } = createRetrievalChain(messageText);
+        return chain;
+      })
+    ],
+    [
+      // 代理执行分支
+      (input: any) => input.destination === "agent_execution",
+      RunnableLambda.from(() => {
+        const { chain } = createAgentChain(messages, messageText);
+        return chain;
+      })
+    ],
+    // 默认分支 - 简单聊天
+    RunnableLambda.from(() => {
+      const { chain } = createSimpleChatChain(messages);
+      return chain;
+    })
+  ]);
+  
+  // 组合路由器和分支
+  return RunnableSequence.from([
+    {
+      input: () => messageText,
+    },
+    router,
+    routingBranch,
+  ]);
+}
+
 // 基于LangChain官方RouterRunnable的智能路由系统
 export async function POST(req: NextRequest) {
   try {
