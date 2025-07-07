@@ -102,7 +102,8 @@ export async function POST(req: NextRequest) {
     console.log(`Routing to endpoint: ${targetEndpoint}`);
 
     // 构建内部请求
-    const internalUrl = new URL(targetEndpoint, req.url);
+    const baseUrl = new URL(req.url).origin;
+    const internalUrl = new URL(targetEndpoint, baseUrl);
     const internalRequest = new Request(internalUrl.toString(), {
       method: 'POST',
       headers: {

@@ -247,7 +247,7 @@ export function getSupportedModels() {
         mathematical_computation: true
       },
       display_name: MODEL_DISPLAY_NAME['Qwen/Qwen3-235B-A22B-search'],
-      description: '本地部署的Qwen联网版模型'
+      description: 'Qwen联网版模型'
     },
     {
       id: 'deepseek-ai/DeepSeek-V3-search',
@@ -268,7 +268,7 @@ export function getSupportedModels() {
         mathematical_computation: true
       },
       display_name: MODEL_DISPLAY_NAME['deepseek-ai/DeepSeek-V3-search'],
-      description: '本地部署的DeepSeek联网版模型'
+      description: 'DeepSeek联网版模型'
     },
     {
       id: 'gpt-4o-all',
@@ -289,7 +289,7 @@ export function getSupportedModels() {
         mathematical_computation: true
       },
       display_name: MODEL_DISPLAY_NAME['gpt-4o-all'],
-      description: 'OpenAI GPT-4o 全能旗舰模型，支持多模态输入，强于复杂推理、代码、创意写作，适合通用对话和企业级应用。'
+      description: 'OpenAI GPT-4o 支持多模态输入，强于复杂推理、代码、创意写作，适合通用对话和企业级应用。'
     },
     {
       id: 'claude-sonnet-4-all',
@@ -310,7 +310,7 @@ export function getSupportedModels() {
         mathematical_computation: true
       },
       display_name: MODEL_DISPLAY_NAME['claude-sonnet-4-all'],
-      description: '顶尖AI模型，专门处理最复杂的推理和创作任务'
+      description: '专门处理最复杂的推理和创作任务'
     },
     {
       id: 'deepseek-reasoner',
@@ -394,7 +394,7 @@ export function getSupportedModels() {
         mathematical_computation: true
       },
       display_name: MODEL_DISPLAY_NAME['qwen-turbo'],
-      description: '阿里云 Qwen Turbo，中文优化大模型，支持工具调用、结构化输出和创意写作，适合中文场景和企业知识问答。'
+      description: '中文优化大模型，支持工具调用、结构化输出和创意写作，适合中文场景和企业知识问答。'
     },
     {
       id: 'qvq-plus',
@@ -415,7 +415,7 @@ export function getSupportedModels() {
         mathematical_computation: true
       },
       display_name: MODEL_DISPLAY_NAME['qvq-plus'],
-      description: '阿里云 Qwen Vision Plus，支持图像理解和中文多模态任务，适合图片分析、视觉问答等场景。'
+      description: '支持图像理解和中文多模态任务，适合图片分析、视觉问答等场景。'
     },
     {
       id: 'hunyuan-turbos-latest',
@@ -436,7 +436,7 @@ export function getSupportedModels() {
         mathematical_computation: true
       },
       display_name: MODEL_DISPLAY_NAME['hunyuan-turbos-latest'],
-      description: '腾讯混元 Turbo，主打中文对话、推理和工具调用，适合中文助手、企业知识库和多轮复杂任务。'
+      description: '主打中文对话、推理和工具调用，适合中文助手、企业知识库和多轮复杂任务。'
     },
     {
       id: 'hunyuan-t1-latest',
@@ -457,7 +457,7 @@ export function getSupportedModels() {
         mathematical_computation: true
       },
       display_name: MODEL_DISPLAY_NAME['hunyuan-t1-latest'],
-      description: '腾讯混元 T1，面向高复杂度推理、长文本分析和多任务场景，支持中文创作、代码和数学计算。'
+      description: '面向高复杂度推理、长文本分析和多任务场景，支持中文创作、代码和数学计算。'
     },
     {
       id: 'gpt-4o-search',
@@ -478,7 +478,7 @@ export function getSupportedModels() {
         mathematical_computation: true
       },
       display_name: MODEL_DISPLAY_NAME['gpt-4o-search'],
-      description: 'OpenAI GPT-4o Search，集成联网搜索能力，适合需要实时信息检索和知识增强的高级对话场景。'
+      description: '集成联网搜索能力，适合需要实时信息检索和知识增强的高级对话场景。'
     },
     {
       id: 'gpt4.1',
@@ -499,7 +499,7 @@ export function getSupportedModels() {
         mathematical_computation: true
       },
       display_name: MODEL_DISPLAY_NAME['gpt4.1'],
-      description: 'Neko提供商的顶级模型，与官方GPT-4功能一致，web search首选'
+      description: '与官方GPT-4功能一致，web search首选'
     }
   ];
 }
