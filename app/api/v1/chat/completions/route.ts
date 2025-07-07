@@ -147,7 +147,20 @@ export async function POST(req: NextRequest) {
       const reader = internalResponse.body?.getReader();
       
       if (!reader) {
-        throw new Error('Failed to get response reader');
+        console.error('Failed to get response reader');
+        return new Response(
+          JSON.stringify({
+            error: {
+              message: 'Failed to get response reader',
+              type: 'server_error',
+              code: 'internal_error'
+            }
+          }),
+          {
+            status: 500,
+            headers: { 'Content-Type': 'application/json' }
+          }
+        );
       }
 
       const readableStream = new ReadableStream({
@@ -225,19 +238,25 @@ export async function POST(req: NextRequest) {
     }
 
   } catch (error) {
+    let errorMessage = 'Unknown error occurred';
+    if (error instanceof Error) {
+      errorMessage = error.message;
+    } else if (typeof error === 'string') {
+      errorMessage = error;
+    }
     console.error('OpenAI Compatible API error:', error);
-    
+
     return new Response(
       JSON.stringify({
         error: {
-          message: error instanceof Error ? error.message : 'Unknown error occurred',
+          message: errorMessage,
           type: 'server_error',
           code: 'internal_error'
         }
       }),
-      { 
-        status: 500, 
-        headers: { 'Content-Type': 'application/json' } 
+      {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' }
       }
     );
   }

@@ -639,7 +639,7 @@ function getModelByCapability(capability: string, fallback: string = 'gemini-fla
     'creative_writing': ['gemini-flash-lite', 'claude-sonnet-4-all', 'hunyuan-t1-latest', 'gpt-4o-all'],
     'code_generation': ['gemini-flash-lite', 'deepseek-chat', 'gpt4.1', 'claude-sonnet-4-all'],
     'mathematical_computation': ['gemini-flash-lite', 'deepseek-reasoner', 'hunyuan-t1-latest', 'gpt-4o-all'],
-    'web_search': ['gemini-flash-lite', 'gpt4.1', 'Qwen/Qwen3-235B-A22B-search', 'deepseek-ai/DeepSeek-V3-search'],
+    'web_search': ['gpt4.1', 'gemini-flash-lite', 'Qwen/Qwen3-235B-A22B-search', 'deepseek-ai/DeepSeek-V3-search'],
     'document_retrieval': ['gemini-flash-lite', 'gemini-flash', 'claude-sonnet-4-all'],
     'structured_analysis': ['gemini-flash-lite', 'hunyuan-turbos-latest', 'gpt-4o-all', 'qwen-turbo'],
     'agent_execution': ['gemini-flash-lite', 'hunyuan-t1-latest', 'gpt-4o-all', 'claude-sonnet-4-all'],

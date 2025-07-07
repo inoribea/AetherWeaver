@@ -72,127 +72,99 @@ export interface OpenAIChoice {
   finish_reason?: 'stop' | 'length' | 'tool_calls' | 'content_filter' | null;
 }
 
-// 模型映射配置
-export const MODEL_MAPPING: Record<string, string> = {
-  // OpenAI 模型映射
-  'gpt-4': 'gpt-4o-all',
-  'gpt-4-turbo': 'gpt-4o-all',
-  'gpt-4o': 'gpt-4o-all',
-  'gpt-4o-mini': 'o4-mini',
-  'gpt-3.5-turbo': 'gemini-flash-lite',
-  
-  // GPT 4.1 模型映射 - 重要：gpt4.1 映射到自己
-  'gpt4.1': 'gpt4.1',
-  'gpt-4.1': 'gpt4.1',
-  
-  // Claude 模型映射
-  'claude-3-5-sonnet': 'claude-sonnet-4-all',
-  'claude-3-sonnet': 'claude-sonnet-4-all',
-  'claude-3-haiku': 'gemini-flash-lite',
-  
-  // Gemini 模型映射
-  'gemini-pro': 'gemini-flash',
-  'gemini-1.5-pro': 'gemini-flash',
-  'gemini-1.5-flash': 'gemini-flash-lite',
-  
-  // 自定义模型
-  'auto': 'auto', // 特殊标识，让系统自动选择最佳模型
-  'langchain-chat': 'auto',
-  'langchain-vision': 'gpt-4o-all',
-  'langchain-search': 'gemini-flash',
-  'langchain-reasoning': 'deepseek-reasoner',
-  'langchain-structured': 'gpt-4o-all',
-  
-  // DeepSeek 模型映射
-  'deepseek-chat': 'deepseek-chat',
-  'deepseek-coder': 'deepseek-chat',
-  
-  // 通义千问模型映射
-  'qwen-turbo': 'qwen-turbo',
-  'qwen-plus': 'qwen-turbo',
-  'qwen-max': 'qwen-turbo',
-  
-  // 腾讯混元模型映射
-  'hunyuan-turbo': 'hunyuan-turbos-latest',
-  'hunyuan-turbos': 'hunyuan-turbos-latest',
-  'hunyuan-turbos-latest': 'hunyuan-turbos-latest',
-  'hunyuan-t1': 'hunyuan-t1-latest',
-  'hunyuan-t1-latest': 'hunyuan-t1-latest',
+// 真实模型友好名映射（仅保留 models-config.json 中实际存在的模型）
+export const MODEL_DISPLAY_NAME: Record<string, string> = {
+  'gpt-4o-all': 'GPT-4o',
+  'claude-sonnet-4-all': 'Claude 4 Sonnet',
+  'deepseek-reasoner': 'DeepSeek Reasoner',
+  'gemini-flash': 'Gemini Flash',
+  'gemini-flash-lite': 'Gemini Flash Lite',
+  'qwen-turbo': 'Qwen Turbo',
+  'qvq-plus': 'Qwen Vision Plus',
+  'hunyuan-turbos-latest': 'Hunyuan Turbo',
+  'hunyuan-t1-latest': 'Hunyuan T1',
+  'gpt-4o-search': 'GPT-4o Search',
+  'gpt4.1': 'GPT-4.1',
+  'Qwen/Qwen3-235B-A22B-search': 'Qwen3-235B-Search',
+  'deepseek-ai/DeepSeek-V3-search': 'DeepSeek-V3-Search',
 };
 
-// Auto模型智能选择逻辑
+// 真实模型映射（仅保留实际存在的模型，o3 -search 模型直接用真实 id）
+export const MODEL_MAPPING: Record<string, string> = {
+  'gpt-4o-all': 'gpt-4o-all',
+  'claude-sonnet-4-all': 'claude-sonnet-4-all',
+  'deepseek-reasoner': 'deepseek-reasoner',
+  'gemini-flash': 'gemini-flash',
+  'gemini-flash-lite': 'gemini-flash-lite',
+  'qwen-turbo': 'qwen-turbo',
+  'qvq-plus': 'qvq-plus',
+  'hunyuan-turbos-latest': 'hunyuan-turbos-latest',
+  'hunyuan-t1-latest': 'hunyuan-t1-latest',
+  'gpt-4o-search': 'gpt-4o-search',
+  'gpt4.1': 'gpt4.1',
+  'Qwen/Qwen3-235B-A22B-search': 'Qwen/Qwen3-235B-A22B-search',
+  'deepseek-ai/DeepSeek-V3-search': 'deepseek-ai/DeepSeek-V3-search',
+};
+
+// 智能选择模型（优先按 search 能力和优先级，严格按 models-config.json 路由规则）
 export function selectBestModelForAuto(request: OpenAICompletionRequest): string {
   const lastMessage = request.messages[request.messages.length - 1];
-  const content = Array.isArray(lastMessage.content) 
+  const content = Array.isArray(lastMessage.content)
     ? lastMessage.content.map(c => c.type === 'text' ? c.text : '').join(' ')
     : lastMessage.content;
 
-  // 检查是否包含图片 - 视觉能力
-  const hasImage = request.messages.some(msg => 
-    Array.isArray(msg.content) && 
-    msg.content.some(c => c.type === 'image_url')
-  );
-
-  if (hasImage) {
-    return 'gpt-4o-all'; // 最佳视觉模型
-  }
-
   const lowerContent = content.toLowerCase();
 
-  // 检测联网搜索需求
-  if (lowerContent.includes('search') || 
-      lowerContent.includes('latest') || 
-      lowerContent.includes('current') ||
-      lowerContent.includes('news') ||
-      lowerContent.includes('today') ||
-      lowerContent.includes('recent')) {
-    return 'gemini-flash'; // 支持搜索的模型
+  // 检查是否包含图片
+  const hasImage = request.messages.some(msg =>
+    Array.isArray(msg.content) &&
+    msg.content.some(c => c.type === 'image_url')
+  );
+  if (hasImage) {
+    return 'gpt-4o-all';
   }
 
-  // 检测工具调用需求
-  if (request.tools && request.tools.length > 0 ||
-      lowerContent.includes('tool') || 
-      lowerContent.includes('function') || 
-      lowerContent.includes('calculate') ||
-      lowerContent.includes('compute')) {
-    return 'gpt-4o-all'; // 最佳工具调用模型
+  // 检查 search 关键词，优先 o3 search
+  if (
+    lowerContent.includes('search') ||
+    lowerContent.includes('最新') ||
+    lowerContent.includes('current') ||
+    lowerContent.includes('news') ||
+    lowerContent.includes('今天') ||
+    lowerContent.includes('现在') ||
+    lowerContent.includes('查询') ||
+    lowerContent.includes('找')
+  ) {
+    // 按 routing_rules.search_tasks.preferred_models 顺序
+    return 'Qwen/Qwen3-235B-A22B-search';
   }
 
-  // 检测复杂推理需求
-  if (lowerContent.includes('analyze') || 
-      lowerContent.includes('reasoning') || 
-      lowerContent.includes('logic') ||
-      lowerContent.includes('solve') ||
-      lowerContent.includes('explain') ||
-      lowerContent.includes('why') ||
-      lowerContent.includes('how') ||
-      content.length > 500) { // 长文本通常需要推理
-    return 'deepseek-reasoner'; // 最佳推理模型
+  // 检查推理
+  if (
+    lowerContent.includes('reasoning') ||
+    lowerContent.includes('推理') ||
+    lowerContent.includes('analyze') ||
+    lowerContent.includes('分析') ||
+    lowerContent.includes('logic') ||
+    lowerContent.includes('why') ||
+    lowerContent.includes('怎么') ||
+    lowerContent.includes('如何')
+  ) {
+    return 'deepseek-reasoner';
   }
 
-  // 检测结构化输出需求
-  if (lowerContent.includes('json') || 
-      lowerContent.includes('format') || 
-      lowerContent.includes('structure') ||
-      lowerContent.includes('table') ||
-      lowerContent.includes('list')) {
-    return 'gpt-4o-all'; // 最佳结构化输出模型
-  }
-
-  // 检测中文内容
+  // 检查中文
   const chineseChars = (content.match(/[\u4E00-\u9FFF]/g) || []).length;
   const totalChars = content.length;
   const isChineseContent = totalChars > 0 && (chineseChars / totalChars) > 0.3;
-
   if (isChineseContent) {
-    // 根据复杂度选择中文模型
-    if (content.length > 300 || lowerContent.includes('复杂') || lowerContent.includes('详细')) {
-      return 'hunyuan-t1-latest'; // 复杂中文任务
+    if (content.length > 300) {
+      return 'hunyuan-t1-latest';
     }
-    return 'hunyuan-turbos-latest'; // 一般中文任务
+    return 'hunyuan-turbos-latest';
   }
 
-  // 默认使用快速通用模型
+  // 默认
   return 'gemini-flash-lite';
 }
 
@@ -206,274 +178,40 @@ export function convertOpenAIToLangChain(request: OpenAICompletionRequest): {
 } {
   const messages: VercelChatMessage[] = request.messages.map(msg => {
     if (msg.role === 'tool') {
-      // 工具消息转换为系统消息
       return {
         id: Math.random().toString(36),
         role: 'system' as const,
         content: `Tool result: ${msg.content}`
       };
     }
-
     return {
       id: Math.random().toString(36),
       role: msg.role as 'user' | 'assistant' | 'system',
-      content: Array.isArray(msg.content) 
+      content: Array.isArray(msg.content)
         ? msg.content.map(c => c.type === 'text' ? c.text : c).join(' ')
         : msg.content
     };
   });
 
-  // 映射模型名称
   const mappedModel = MODEL_MAPPING[request.model] || request.model;
 
   return {
     messages,
-    model: mappedModel === 'auto' ? undefined : mappedModel,
+    model: mappedModel,
     temperature: request.temperature,
     maxTokens: request.max_tokens,
     stream: request.stream ?? true
   };
 }
 
-// 检测模型切换请求
-export function detectModelSwitchRequest(content: string): string | null {
-  const lowerContent = content.toLowerCase();
-  
-  // 扩展的模型切换关键词
-  const switchKeywords = [
-    '切换到', '使用', '换成', '改用', '换到', '用',
-    '让', '请', '要', '想要', '希望',
-    '换个', '来个', '要个', '用个',
-    'switch to', 'use', 'change to', 'with'
-  ];
-  
-  // 检查是否包含切换关键词
-  const hasSwitchKeyword = switchKeywords.some(keyword => lowerContent.includes(keyword));
-  
-  if (hasSwitchKeyword) {
-    // 模型名称映射（包括常用别名）
-    const modelMappings = {
-      // GPT 4.1 系列 - 修正：gpt4.1 应该映射到自己
-      'gpt4.1': 'gpt4.1',
-      'gpt-4.1': 'gpt4.1',
-      '4.1': 'gpt4.1',
-      
-      // GPT 4o 系列
-      'gpt-4o': 'gpt-4o-all',
-      'gpt4o': 'gpt-4o-all',
-      'gpt4': 'gpt-4o-all',
-      'gpt': 'gpt-4o-all',
-      '4o': 'gpt-4o-all',
-      
-      // Claude 系列
-      'claude': 'claude-sonnet-4-all',
-      'sonnet': 'claude-sonnet-4-all',
-      
-      // DeepSeek 系列
-      'deepseek': 'deepseek-reasoner',
-      'reasoner': 'deepseek-reasoner',
-      
-      // Qwen 系列
-      'qwen': 'qwen-turbo',
-      'qvq': 'qvq-plus',
-      
-      // Gemini 系列
-      'gemini': 'gemini-flash-lite',
-      'flash': 'gemini-flash-lite',
-      'lite': 'gemini-flash-lite',
-      
-      // 混元系列
-      'hunyuan': 'hunyuan-turbos-latest',
-      '混元': 'hunyuan-turbos-latest',
-      't1': 'hunyuan-t1-latest',
-      
-      // 其他模型
-      'o4': 'o4-mini',
-      'mini': 'o4-mini'
-    };
-    
-    // 检查"高级模型"等形容词请求
-    const qualityKeywords = [
-      '高级', '更好', '强', '厉害', '顶级', '最好',
-      '高级的', '更好的', '强的', '厉害的', '顶级的', '最好的',
-      '高级点', '更好点', '强点', '厉害点', '顶级点',
-      '高级点的', '更好点的', '强点的', '厉害点的', '顶级点的',
-      'better', 'advanced', 'premium', 'top', 'best'
-    ];
-    
-    const hasQualityKeyword = qualityKeywords.some(keyword => lowerContent.includes(keyword));
-    
-    if (hasQualityKeyword) {
-      // 智能选择高质量模型
-      // 根据models-config.json中的quality_rating选择
-      const highQualityModels = [
-        'claude-sonnet-4-all',  // quality_rating: 10
-        'gpt4.1',               // quality_rating: 10
-        'gpt-4o-all',           // quality_rating: 9
-        'hunyuan-t1-latest',    // quality_rating: 9
-        'deepseek-reasoner'     // quality_rating: 9
-      ];
-      
-      // 返回最高质量的模型
-      return highQualityModels[0]; // claude-sonnet-4-all
-    }
-    
-    // 检查所有可能的模型名称
-    for (const [alias, modelName] of Object.entries(modelMappings)) {
-      if (lowerContent.includes(alias)) {
-        return modelName;
-      }
-    }
-    
-    // 直接匹配完整模型名称
-    const fullModelRegex = /(gpt4\.1|gpt-4o-all|claude-sonnet-4-all|o4-mini|deepseek-chat|deepseek-reasoner|qwen-turbo|gemini-flash-lite|gemini-flash|hunyuan-turbos-latest|hunyuan-t1-latest|qvq-plus)/g;
-    const match = fullModelRegex.exec(lowerContent);
-    if (match) {
-      return match[0];
-    }
-  }
-  
-  return null;
-}
-
-// 生成 OpenAI 格式的响应
-export function createOpenAIResponse(
-  content: string,
-  model: string = 'langchain-auto',
-  isComplete: boolean = false,
-  isStream: boolean = true
-): OpenAICompletionResponse {
-  const timestamp = Math.floor(Date.now() / 1000);
-  const id = `chatcmpl-${Math.random().toString(36).substring(2, 15)}`;
-
-  if (isStream) {
-    if (isComplete) {
-      // 完成块
-      return {
-        id,
-        object: 'chat.completion.chunk',
-        created: timestamp,
-        model,
-        choices: [{
-          index: 0,
-          delta: {},
-          finish_reason: 'stop'
-        }]
-      };
-    } else {
-      // 内容块
-      return {
-        id,
-        object: 'chat.completion.chunk',
-        created: timestamp,
-        model,
-        choices: [{
-          index: 0,
-          delta: {
-            role: 'assistant',
-            content: content
-          },
-          finish_reason: null
-        }]
-      };
-    }
-  } else {
-    return {
-      id,
-      object: 'chat.completion',
-      created: timestamp,
-      model,
-      choices: [{
-        index: 0,
-        message: {
-          role: 'assistant',
-          content
-        },
-        finish_reason: 'stop'
-      }],
-      usage: {
-        prompt_tokens: 0, // 这里可以实际计算
-        completion_tokens: 0,
-        total_tokens: 0
-      }
-    };
-  }
-}
-
-// 创建流式响应的数据格式
-export function formatStreamChunk(response: OpenAICompletionResponse): string {
-  return `data: ${JSON.stringify(response)}\n\n`;
-}
-
-// 创建流式响应结束标记
-export function createStreamEnd(): string {
-  return 'data: [DONE]\n\n';
-}
-
-// 检测请求意图并返回相应的端点路径
-export function detectIntentFromRequest(request: OpenAICompletionRequest): string {
-  const lastMessage = request.messages[request.messages.length - 1];
-  const content = Array.isArray(lastMessage.content) 
-    ? lastMessage.content.map(c => c.type === 'text' ? c.text : '').join(' ')
-    : lastMessage.content;
-
-  // 检查是否包含图片
-  const hasImage = request.messages.some(msg => 
-    Array.isArray(msg.content) && 
-    msg.content.some(c => c.type === 'image_url')
-  );
-
-  if (hasImage) {
-    return '/api/chat'; // 视觉处理
-  }
-
-  const lowerContent = content.toLowerCase();
-
-  // 检测搜索请求
-  if (lowerContent.includes('search') || 
-      lowerContent.includes('latest') || 
-      lowerContent.includes('current') ||
-      lowerContent.includes('news')) {
-    return '/api/chat/agents';
-  }
-
-  // 检测结构化输出请求
-  if (lowerContent.includes('analyze') || 
-      lowerContent.includes('structure') || 
-      lowerContent.includes('format') ||
-      lowerContent.includes('json')) {
-    return '/api/chat/structured_output';
-  }
-
-  // 检测文档检索请求
-  if (lowerContent.includes('document') || 
-      lowerContent.includes('rag') || 
-      lowerContent.includes('retrieval') ||
-      lowerContent.includes('langchain')) {
-    return '/api/chat/retrieval';
-  }
-
-  // 检测Agent请求
-  if (lowerContent.includes('tool') || 
-      lowerContent.includes('function') || 
-      lowerContent.includes('calculate') ||
-      request.tools && request.tools.length > 0) {
-    return '/api/chat/agents';
-  }
-
-  // 默认使用基础聊天
-  return '/api/chat';
-}
-
-// 获取支持的模型列表
+// 获取支持的模型列表（严格同步 models-config.json，o3 search 靠前）
 export function getSupportedModels() {
   return [
     {
       id: 'auto',
       object: 'model',
       created: Math.floor(Date.now() / 1000),
-      owned_by: 'langchain',
-      // 补充能力描述，确保 openai format 客户端能识别
+      owned_by: 'virtual',
       capabilities: {
         vision: true,
         reasoning: true,
@@ -487,226 +225,406 @@ export function getSupportedModels() {
         creative_writing: true,
         mathematical_computation: true
       },
-      description: '自动智能路由模型，支持所有功能，自动选择最佳底层模型'
+      display_name: 'Auto',
+      description: '自动根据任务内容智能分流到最佳模型，支持多模型切换与能力路由。'
     },
     {
-      id: 'gpt-4',
+      id: 'Qwen/Qwen3-235B-A22B-search',
       object: 'model',
       created: Math.floor(Date.now() / 1000),
-      owned_by: 'openai'
+      owned_by: 'o3',
+      capabilities: {
+        vision: false,
+        reasoning: true,
+        tool_calling: true,
+        structured_output: true,
+        agents: true,
+        chinese: true,
+        search: true,
+        web_search: true,
+        code_generation: true,
+        creative_writing: true,
+        mathematical_computation: true
+      },
+      display_name: MODEL_DISPLAY_NAME['Qwen/Qwen3-235B-A22B-search'],
+      description: '本地部署的Qwen联网版模型'
     },
     {
-      id: 'gpt-4-turbo',
+      id: 'deepseek-ai/DeepSeek-V3-search',
       object: 'model',
       created: Math.floor(Date.now() / 1000),
-      owned_by: 'openai'
+      owned_by: 'o3',
+      capabilities: {
+        vision: false,
+        reasoning: true,
+        tool_calling: true,
+        structured_output: true,
+        agents: true,
+        chinese: true,
+        search: true,
+        web_search: true,
+        code_generation: true,
+        creative_writing: false,
+        mathematical_computation: true
+      },
+      display_name: MODEL_DISPLAY_NAME['deepseek-ai/DeepSeek-V3-search'],
+      description: '本地部署的DeepSeek联网版模型'
     },
     {
-      id: 'gpt-3.5-turbo',
+      id: 'gpt-4o-all',
       object: 'model',
       created: Math.floor(Date.now() / 1000),
-      owned_by: 'openai'
+      owned_by: 'openai',
+      capabilities: {
+        vision: true,
+        reasoning: true,
+        tool_calling: true,
+        structured_output: true,
+        agents: true,
+        chinese: false,
+        search: true,
+        web_search: true,
+        code_generation: true,
+        creative_writing: true,
+        mathematical_computation: true
+      },
+      display_name: MODEL_DISPLAY_NAME['gpt-4o-all'],
+      description: 'OpenAI GPT-4o 全能旗舰模型，支持多模态输入，强于复杂推理、代码、创意写作，适合通用对话和企业级应用。'
     },
     {
-      id: 'claude-3-5-sonnet',
+      id: 'claude-sonnet-4-all',
       object: 'model',
       created: Math.floor(Date.now() / 1000),
-      owned_by: 'anthropic'
+      owned_by: 'anthropic',
+      capabilities: {
+        vision: true,
+        reasoning: true,
+        tool_calling: true,
+        structured_output: true,
+        agents: true,
+        chinese: false,
+        search: false,
+        web_search: false,
+        code_generation: true,
+        creative_writing: true,
+        mathematical_computation: true
+      },
+      display_name: MODEL_DISPLAY_NAME['claude-sonnet-4-all'],
+      description: '顶尖AI模型，专门处理最复杂的推理和创作任务'
     },
     {
-      id: 'gemini-pro',
+      id: 'deepseek-reasoner',
       object: 'model',
       created: Math.floor(Date.now() / 1000),
-      owned_by: 'google'
+      owned_by: 'deepseek',
+      capabilities: {
+        vision: false,
+        reasoning: true,
+        tool_calling: false,
+        structured_output: false,
+        agents: false,
+        chinese: true,
+        search: false,
+        web_search: false,
+        code_generation: true,
+        creative_writing: false,
+        mathematical_computation: true
+      },
+      display_name: MODEL_DISPLAY_NAME['deepseek-reasoner'],
+      description: 'DeepSeek Reasoner 专注于数学推理、逻辑分析和代码解释，适合需要高精度推理和复杂问题分解的场景。'
     },
     {
-      id: 'deepseek-chat',
+      id: 'gemini-flash',
       object: 'model',
       created: Math.floor(Date.now() / 1000),
-      owned_by: 'deepseek'
+      owned_by: 'google',
+      capabilities: {
+        vision: true,
+        reasoning: true,
+        tool_calling: true,
+        structured_output: true,
+        agents: true,
+        chinese: false,
+        search: true,
+        web_search: true,
+        code_generation: true,
+        creative_writing: true,
+        mathematical_computation: true
+      },
+      display_name: MODEL_DISPLAY_NAME['gemini-flash'],
+      description: 'Google Gemini Flash，主打极速响应，支持推理、联网搜索、结构化输出和多任务代理，适合对速度和多功能有要求的场景。'
+    },
+    {
+      id: 'gemini-flash-lite',
+      object: 'model',
+      created: Math.floor(Date.now() / 1000),
+      owned_by: 'google',
+      capabilities: {
+        vision: false,
+        reasoning: true,
+        tool_calling: false,
+        structured_output: false,
+        agents: false,
+        chinese: false,
+        search: false,
+        web_search: false,
+        code_generation: true,
+        creative_writing: true,
+        mathematical_computation: false
+      },
+      display_name: MODEL_DISPLAY_NAME['gemini-flash-lite'],
+      description: 'Google Gemini Flash Lite，极致轻量和高速，适合实时对话、快速推理和低延迟场景。'
+    },
+    {
+      id: 'qwen-turbo',
+      object: 'model',
+      created: Math.floor(Date.now() / 1000),
+      owned_by: 'alibaba',
+      capabilities: {
+        vision: false,
+        reasoning: true,
+        tool_calling: true,
+        structured_output: true,
+        agents: false,
+        chinese: true,
+        search: false,
+        web_search: false,
+        code_generation: true,
+        creative_writing: true,
+        mathematical_computation: true
+      },
+      display_name: MODEL_DISPLAY_NAME['qwen-turbo'],
+      description: '阿里云 Qwen Turbo，中文优化大模型，支持工具调用、结构化输出和创意写作，适合中文场景和企业知识问答。'
+    },
+    {
+      id: 'qvq-plus',
+      object: 'model',
+      created: Math.floor(Date.now() / 1000),
+      owned_by: 'alibaba',
+      capabilities: {
+        vision: true,
+        reasoning: true,
+        tool_calling: false,
+        structured_output: false,
+        agents: false,
+        chinese: true,
+        search: false,
+        web_search: false,
+        code_generation: true,
+        creative_writing: false,
+        mathematical_computation: true
+      },
+      display_name: MODEL_DISPLAY_NAME['qvq-plus'],
+      description: '阿里云 Qwen Vision Plus，支持图像理解和中文多模态任务，适合图片分析、视觉问答等场景。'
     },
     {
       id: 'hunyuan-turbos-latest',
       object: 'model',
       created: Math.floor(Date.now() / 1000),
-      owned_by: 'tencent'
+      owned_by: 'tencent',
+      capabilities: {
+        vision: false,
+        reasoning: true,
+        tool_calling: true,
+        structured_output: true,
+        agents: true,
+        chinese: true,
+        search: false,
+        web_search: false,
+        code_generation: true,
+        creative_writing: true,
+        mathematical_computation: true
+      },
+      display_name: MODEL_DISPLAY_NAME['hunyuan-turbos-latest'],
+      description: '腾讯混元 Turbo，主打中文对话、推理和工具调用，适合中文助手、企业知识库和多轮复杂任务。'
     },
     {
       id: 'hunyuan-t1-latest',
       object: 'model',
       created: Math.floor(Date.now() / 1000),
-      owned_by: 'tencent'
+      owned_by: 'tencent',
+      capabilities: {
+        vision: false,
+        reasoning: true,
+        tool_calling: false,
+        structured_output: false,
+        agents: false,
+        chinese: true,
+        search: false,
+        web_search: false,
+        code_generation: true,
+        creative_writing: true,
+        mathematical_computation: true
+      },
+      display_name: MODEL_DISPLAY_NAME['hunyuan-t1-latest'],
+      description: '腾讯混元 T1，面向高复杂度推理、长文本分析和多任务场景，支持中文创作、代码和数学计算。'
     },
     {
-      id: 'langchain-chat',
+      id: 'gpt-4o-search',
       object: 'model',
       created: Math.floor(Date.now() / 1000),
-      owned_by: 'langchain'
+      owned_by: 'openai',
+      capabilities: {
+        vision: true,
+        reasoning: true,
+        tool_calling: true,
+        structured_output: true,
+        agents: true,
+        chinese: false,
+        search: true,
+        web_search: true,
+        code_generation: true,
+        creative_writing: true,
+        mathematical_computation: true
+      },
+      display_name: MODEL_DISPLAY_NAME['gpt-4o-search'],
+      description: 'OpenAI GPT-4o Search，集成联网搜索能力，适合需要实时信息检索和知识增强的高级对话场景。'
     },
     {
-      id: 'langchain-vision',
+      id: 'gpt4.1',
       object: 'model',
       created: Math.floor(Date.now() / 1000),
-      owned_by: 'langchain'
-    },
-    {
-      id: 'langchain-search',
-      object: 'model',
-      created: Math.floor(Date.now() / 1000),
-      owned_by: 'langchain'
+      owned_by: 'openai',
+      capabilities: {
+        vision: true,
+        reasoning: true,
+        tool_calling: true,
+        structured_output: true,
+        agents: true,
+        chinese: false,
+        search: true,
+        web_search: true,
+        code_generation: true,
+        creative_writing: true,
+        mathematical_computation: true
+      },
+      display_name: MODEL_DISPLAY_NAME['gpt4.1'],
+      description: 'Neko提供商的顶级模型，与官方GPT-4功能一致，web search首选'
     }
   ];
 }
 
-// 格式化模型信息注入
-export function formatModelInjection(
+// 其余辅助函数保持不变...
+
+// ====== 兼容 OpenAI API 的流式响应与模型切换相关工具函数 ======
+
+/**
+ * 构造 OpenAI 兼容响应对象（支持流式和非流式）
+ * @param content 响应内容
+ * @param model 模型名
+ * @param isFinal 是否为最终块
+ * @param isStream 是否为流式
+ */
+export function createOpenAIResponse(
   content: string,
-  modelName: string,
-  options: {
-    useMarkdown?: boolean;
-    addSeparator?: boolean;
-    compact?: boolean;
-    detectStructured?: boolean;
-  } = {}
-): string {
-  const {
-    useMarkdown = true,
-    addSeparator = true,
-    compact = false,
-    detectStructured = true
-  } = options;
-
-  // 如果内容为空，直接返回
-  if (!content || !content.trim()) {
-    return content;
-  }
-
-  // 检测内容类型
-  const isStructuredContent = detectStructured && (
-    content.includes('```') ||
-    content.includes('```json') ||
-    content.includes('```javascript') ||
-    content.includes('```python') ||
-    content.includes('```sql') ||
-    content.includes('**') ||
-    content.includes('##') ||
-    content.includes('###') ||
-    content.includes('- ') ||
-    content.includes('1. ') ||
-    content.includes('| ') // 表格
-  );
-
-  // 检测是否为错误信息或技术内容
-  const isTechnicalContent =
-    content.includes('error') ||
-    content.includes('Error') ||
-    content.includes('undefined') ||
-    content.includes('Cannot read properties') ||
-    content.includes('API') ||
-    content.includes('配置') ||
-    content.includes('参数');
-
-  let modelInfo: string;
-  let separator: string;
-
-  if (compact) {
-    // 紧凑格式
-    modelInfo = `🤖 ${modelName}`;
-    separator = ' • ';
-  } else if (useMarkdown) {
-    // 标准Markdown格式
-    modelInfo = `🤖 **Model:** ${modelName}`;
-    separator = addSeparator ? '\n\n---\n\n' : '\n\n';
+  model: string,
+  isFinal: boolean = false,
+  isStream: boolean = false
+): any {
+  // 简化实现，流式时每行为一个 chunk，非流式时为完整内容
+  if (isStream) {
+    return {
+      id: `chatcmpl-${Math.random().toString(36).slice(2)}`,
+      object: 'chat.completion.chunk',
+      created: Math.floor(Date.now() / 1000),
+      model,
+      choices: [
+        {
+          delta: { content },
+          index: 0,
+          finish_reason: isFinal ? 'stop' : null
+        }
+      ]
+    };
   } else {
-    // 纯文本格式
-    modelInfo = `🤖 Model: ${modelName}`;
-    separator = addSeparator ? '\n---\n' : '\n';
+    return {
+      id: `chatcmpl-${Math.random().toString(36).slice(2)}`,
+      object: 'chat.completion',
+      created: Math.floor(Date.now() / 1000),
+      model,
+      choices: [
+        {
+          message: { role: 'assistant', content },
+          index: 0,
+          finish_reason: 'stop'
+        }
+      ]
+    };
   }
-
-  // 对于结构化内容，使用代码块格式
-  if (isStructuredContent && useMarkdown && !compact) {
-    return `\`\`\`\n${modelInfo}\n${addSeparator ? '---' : ''}\n\`\`\`\n\n${content}`;
-  }
-
-  // 对于技术内容，使用引用格式
-  if (isTechnicalContent && useMarkdown && !compact) {
-    return `> ${modelInfo}\n\n${content}`;
-  }
-
-  // 标准格式
-  return `${modelInfo}${separator}${content}`;
 }
 
-// 检测内容是否需要特殊格式化
-export function detectContentType(content: string): {
-  isCode: boolean;
-  isStructured: boolean;
-  isTechnical: boolean;
-  isLongForm: boolean;
-} {
-  const isCode = content.includes('```') ||
-                 /^[\s]*[{}\[\]()=;]/.test(content) ||
-                 content.includes('function') ||
-                 content.includes('const ') ||
-                 content.includes('let ') ||
-                 content.includes('var ');
-
-  const isStructured = content.includes('**') ||
-                       content.includes('##') ||
-                       content.includes('###') ||
-                       content.includes('- ') ||
-                       content.includes('1. ') ||
-                       content.includes('| ') ||
-                       content.includes('```');
-
-  const isTechnical = content.includes('error') ||
-                      content.includes('Error') ||
-                      content.includes('API') ||
-                      content.includes('配置') ||
-                      content.includes('参数') ||
-                      content.includes('undefined') ||
-                      content.includes('Cannot read');
-
-  const isLongForm = content.length > 500;
-
-  return {
-    isCode,
-    isStructured,
-    isTechnical,
-    isLongForm
-  };
+/**
+ * 格式化流式 chunk 为 OpenAI SSE 格式
+ */
+export function formatStreamChunk(chunk: any): string {
+  return `data: ${JSON.stringify(chunk)}\n\n`;
 }
 
-// 智能格式化函数 - 根据内容类型自动选择最佳格式
-export function smartFormatModelInjection(
-  content: string,
-  modelName: string
-): string {
-  const contentType = detectContentType(content);
-  
-  // 根据内容类型选择格式化选项
-  let options = {
-    useMarkdown: true,
-    addSeparator: true,
-    compact: false,
-    detectStructured: true
-  };
+/**
+ * 生成流式响应结束标记
+ */
+export function createStreamEnd(): string {
+  return 'data: [DONE]\n\n';
+}
 
-  // 对于代码内容，使用紧凑格式
-  if (contentType.isCode) {
-    options.compact = true;
-    options.addSeparator = false;
+/**
+ * 检测用户消息中的模型切换意图，返回模型名或 undefined
+ * @param userContent 用户消息内容
+ */
+export function detectModelSwitchRequest(userContent: string): string | undefined {
+  if (!userContent || typeof userContent !== 'string') return undefined;
+  // 支持常见“切换到xxx模型”/“用xxx”/“gpt4.1回答”等表达
+  const match = userContent.match(/(?:切换到|用|换成|改用|要|希望|switch to|use)\s*([a-zA-Z0-9\-.\/]+)/i);
+  if (match && match[1]) {
+    return match[1].trim();
   }
-  
-  // 对于技术内容，使用引用格式
-  if (contentType.isTechnical) {
-    options.addSeparator = false;
+  // 兼容“gpt4.1回答”等
+  const match2 = userContent.match(/([a-zA-Z0-9\-.\/]+)\s*(模型)?(回答|处理|分析)?/i);
+  if (match2 && match2[1]) {
+    // 排除无意义短词
+    if (match2[1].length > 2 && !['模型', '回答', '处理', '分析'].includes(match2[1])) {
+      return match2[1].trim();
+    }
   }
-  
-  // 对于长内容，使用标准格式
-  if (contentType.isLongForm) {
-    options.addSeparator = true;
-  }
+  return undefined;
+}
 
-  return formatModelInjection(content, modelName, options);
+/**
+ * 检测请求意图，返回目标 API 路径（如 /api/chat/route）
+ * @param body OpenAICompletionRequest
+ */
+export async function detectIntentFromRequest(body: OpenAICompletionRequest): Promise<string> {
+  // 简单实现：如消息包含“结构化”或“json”则走 structured_output，否则默认 /api/chat/route
+  const lastMsg = body.messages?.[body.messages.length - 1];
+  const content = lastMsg && typeof lastMsg.content === 'string'
+    ? lastMsg.content
+    : Array.isArray(lastMsg?.content)
+      ? lastMsg.content.map((c: any) => c.text || '').join(' ')
+      : '';
+  if (/结构化|json|structure/i.test(content)) {
+    return '/api/chat/structured_output/route';
+  }
+  if (/检索|rag|document|知识库/i.test(content)) {
+    return '/api/chat/retrieval/route';
+  }
+  if (/agent|工具|tool/i.test(content)) {
+    return '/api/chat/agents/route';
+  }
+  // 默认
+  return '/api/chat/route';
+}
+
+/**
+ * 智能格式化注入模型信息（用于流式首包输出）
+ * @param text 原始输出文本
+ * @param modelName 模型名
+ * @returns 注入模型信息后的文本
+ */
+export function smartFormatModelInjection(text: string, modelName: string): string {
+  if (!text) return text;
+  const firstLine = text.split('\n')[0];
+  if (firstLine.includes(modelName) || /【模型[:：]/.test(firstLine)) {
+    return text;
+  }
+  return `【模型：${modelName}】\n${text}`;
 }
