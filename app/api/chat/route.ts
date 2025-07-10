@@ -975,38 +975,22 @@ export async function POST(req: NextRequest) {
       // 优先级2: 会话锁定模型 (中优先级)
       finalModel = currentModel;
       console.log(`[Priority 2] Using session-locked model: ${finalModel}`);
+      // 在使用智能路由前，再次检查是否有会话锁定模型
+    let selectedChain: Runnable<any, string>;
+    let modelNameForOutput: string;
+let featureType = 'chat';
+    if (currentModel && currentModel !== 'auto' && LANGCHAIN_MODEL_PROVIDERS[currentModel]) {
+      console.log(`[Model Lock Protection] Using session-locked model: ${currentModel}`);
+      const { llmInstance } = getModel(currentModel);
+      const prompt = ChatPromptTemplate.fromMessages(formattedMessages);
+      selectedChain = prompt.pipe(llmInstance).pipe(new StringOutputParser());
+      modelNameForOutput = currentModel;
     } else {
+        // 使用新的统一路由器进行决策
+      console.log('[Unified Router] Using smart routing');
       // 优先级3: 自动路由选择 (最低优先级，保持现有逻辑)
       finalModel = 'auto'; // 标记使用自动路由
       console.log(`[Priority 3] Using automatic routing`);
-    }
-    
-    // 提取消息文本
-    const lastMessage = formattedMessages[formattedMessages.length - 1];
-    const messageText = extractTextContent(lastMessage.content);
-    
-    // 检查是否有图像
-    const hasImage = formattedMessages.some((msg: BaseMessage) =>
-      msg._getType() === 'human' && Array.isArray(msg.content) &&
-      msg.content.some((part: any) => part.type === 'image_url')
-    );
-
-    let selectedChain: Runnable<any, string>;
-    let modelNameForOutput: string;
-    let featureType = 'chat';
-
-    // 使用模型锁定机制的决策结果
-    if (finalModel !== 'auto') {
-      // 使用明确指定的模型（优先级1或2）
-      console.log(`[Model Lock] Using final model: ${finalModel}`);
-      const { llmInstance } = getModel(finalModel);
-      const prompt = ChatPromptTemplate.fromMessages(formattedMessages);
-      selectedChain = prompt.pipe(llmInstance).pipe(new StringOutputParser());
-      modelNameForOutput = finalModel;
-    } else {
-      // 使用新的统一路由器进行决策
-      console.log('[Unified Router] Using smart routing');
-      
       // 转换消息格式为统一路由器格式
       const routingMessages: OpenAIMessage[] = formattedMessages.map((msg: BaseMessage) => ({
         role: msg._getType() === 'human' ? 'user' as const :
@@ -1026,6 +1010,15 @@ export async function POST(req: NextRequest) {
       // 直接使用路由结果创建处理链
       const { llmInstance } = getModel(routingResult.selectedModel);
       modelNameForOutput = routingResult.selectedModel;
+let featureType = 'chat';
+const lastMessage = messages[messages.length - 1];
+const messageText = extractTextContent(lastMessage.content);
+const hasImage = formattedMessages.some(
+  (msg: BaseMessage) =>
+    msg._getType() === 'human' &&
+    Array.isArray(msg.content) &&
+    msg.content.some((part: any) => part.type === 'image_url')
+);
       featureType = 'chat'; // 简化为通用聊天
       
       // 检测特殊处理需求
@@ -1128,27 +1121,26 @@ export async function POST(req: NextRequest) {
             controller.error(streamError);
           }
         },
-      });
-
-      return new StreamingTextResponse(readableStream, {
-        headers: {
-          'x-selected-model': 'auto-routed',
-          'X-Model-Used': fallback.modelName,
-          'X-Error-Fallback': 'true',
-        },
-      });
-    } catch (fallbackError) {
-      console.error('Fallback error:', fallbackError);
-      return new Response(
-        JSON.stringify({ 
-          error: 'Internal server error', 
-          message: 'All models are currently unavailable' 
-        }),
-        { 
-          status: 500, 
-          headers: { 'Content-Type': 'application/json' } 
-        }
-      );
+      });return new StreamingTextResponse(readableStream, {
+          headers: {
+            'x-selected-model': fallback.modelName,
+            'X-Model-Used': fallback.modelName,
+            'X-Error-Fallback': 'true',
+          },
+        });
+      } catch (fallbackError) {
+        console.error('Fallback error:', fallbackError);
+        return new Response(
+          JSON.stringify({ 
+            error: 'Internal server error', 
+            message: 'All models are currently unavailable' 
+          }),
+          { 
+            status: 500, 
+            headers: { 'Content-Type': 'application/json' } 
+          }
+        );
+      }
     }
   }
 }
