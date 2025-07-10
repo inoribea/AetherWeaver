@@ -956,6 +956,7 @@ export async function POST(req: NextRequest) {
     console.log('[Intelligent Router] Request received');
     const body = await req.json();
     const messages = body.messages ?? [];
+    const currentModel = body.currentModel; // 新增：读取当前锁定的模型
     
     if (!messages.length) {
       return new Response("No messages provided", { status: 400 });
@@ -963,6 +964,22 @@ export async function POST(req: NextRequest) {
 
     const formattedMessages = messages.map(formatMessage);
     const requestedModel = body.model;
+
+    // 模型锁定机制 - 三级优先级决策树
+    let finalModel: string;
+    if (requestedModel && requestedModel !== 'auto' && LANGCHAIN_MODEL_PROVIDERS[requestedModel]) {
+      // 优先级1: 用户明确指定模型 (最高优先级)
+      finalModel = requestedModel;
+      console.log(`[Priority 1] User explicitly requested model: ${finalModel}`);
+    } else if (currentModel && LANGCHAIN_MODEL_PROVIDERS[currentModel]) {
+      // 优先级2: 会话锁定模型 (中优先级)
+      finalModel = currentModel;
+      console.log(`[Priority 2] Using session-locked model: ${finalModel}`);
+    } else {
+      // 优先级3: 自动路由选择 (最低优先级，保持现有逻辑)
+      finalModel = 'auto'; // 标记使用自动路由
+      console.log(`[Priority 3] Using automatic routing`);
+    }
     
     // 提取消息文本
     const lastMessage = formattedMessages[formattedMessages.length - 1];
@@ -978,13 +995,14 @@ export async function POST(req: NextRequest) {
     let modelNameForOutput: string;
     let featureType = 'chat';
 
-    // 处理明确指定的模型
-    if (requestedModel && requestedModel !== 'auto' && LANGCHAIN_MODEL_PROVIDERS[requestedModel]) {
-      console.log(`[Specific Model] Using requested model: ${requestedModel}`);
-      const { llmInstance } = getModel(requestedModel);
+    // 使用模型锁定机制的决策结果
+    if (finalModel !== 'auto') {
+      // 使用明确指定的模型（优先级1或2）
+      console.log(`[Model Lock] Using final model: ${finalModel}`);
+      const { llmInstance } = getModel(finalModel);
       const prompt = ChatPromptTemplate.fromMessages(formattedMessages);
       selectedChain = prompt.pipe(llmInstance).pipe(new StringOutputParser());
-      modelNameForOutput = requestedModel;
+      modelNameForOutput = finalModel;
     } else {
       // 使用新的统一路由器进行决策
       console.log('[Unified Router] Using smart routing');
@@ -1075,6 +1093,7 @@ export async function POST(req: NextRequest) {
 
     return new StreamingTextResponse(readableStream, {
       headers: {
+        'x-selected-model': modelNameForOutput,
         'X-Model-Used': modelNameForOutput,
         'X-Model-Provider': 'LangChain',
         'X-Feature': featureType,
@@ -1113,6 +1132,7 @@ export async function POST(req: NextRequest) {
 
       return new StreamingTextResponse(readableStream, {
         headers: {
+          'x-selected-model': 'auto-routed',
           'X-Model-Used': fallback.modelName,
           'X-Error-Fallback': 'true',
         },
