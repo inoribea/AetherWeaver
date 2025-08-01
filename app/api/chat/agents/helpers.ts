@@ -8,6 +8,7 @@ import { Calculator } from "@langchain/community/tools/calculator";
 import { Tool } from "@langchain/core/tools";
 import { BaseChatModel, BaseChatModelCallOptions } from "@langchain/core/language_models/chat_models";
 import { AIMessageChunk } from "@langchain/core/messages";
+import { getBestEmbeddingProvider } from "../../../../utils/embeddings";
 
 export function createAlibabaTongyiModel(config: {
   temperature?: number;
@@ -77,6 +78,13 @@ export function getAvailableAgentModel(): { model: BaseChatModel<BaseChatModelCa
   } else {
     throw new Error("No API keys configured for agent models. Please set up OpenAI, Google, or Alibaba Tongyi API keys.");
   }
+}
+
+/**
+ * Get the best available embedding provider for agents
+ */
+export function getBestAgentEmbeddingProvider() {
+  return getBestEmbeddingProvider();
 }
 
 export function getAgentTools(): Tool[] {

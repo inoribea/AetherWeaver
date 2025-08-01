@@ -6,6 +6,11 @@ import { createBasicChain } from '@/chains/basic-chain';
 import { createRAGChain } from '@/chains/rag-chain';
 import { wrapWithErrorHandling } from '@/utils/errorHandler';
 
+// 新增导入
+import { TavilySearch } from '@langchain/tavily';
+import { WebBrowser } from 'langchain/tools/webbrowser';
+import { ChatOpenAI, OpenAIEmbeddings } from '@langchain/openai';
+
 export async function POST(req: NextRequest) {
   return wrapWithErrorHandling(
     'POST /api/chat',
@@ -31,91 +36,86 @@ export async function POST(req: NextRequest) {
 
       const modelConfig = await modelSelector.invoke(routingResult);
 
-      // 3. 选择对应的链
-      let chain;
+      // 3. 创建模型和嵌入实例，用于工具
+      const llm = new ChatOpenAI({ model: modelConfig.model || 'gpt-4o-mini', temperature: 0 });
+      const embeddings = new OpenAIEmbeddings();
+
+      // 4. 实例化TavilySearch和WebBrowser工具，使用环境变量配置API Key
+      const tavilyApiKey = process.env.TAVILY_API_KEY || '';
+      const tavilyTool = new TavilySearch({
+        maxResults: 5,
+        topic: 'general',
+        apiKey: tavilyApiKey,
+      });
+
+      const webBrowserTool = new WebBrowser({ model: llm, embeddings });
+
+      // 5. 选择对应的链或工具
+      let result;
       switch (routingResult.route) {
         case 'basic':
-          chain = createBasicChain();
+          {
+            const chain = createBasicChain();
+            result = await chain.invoke({
+              input: message,
+              context_documents: '',
+              routing_context: routingResult,
+            });
+          }
           break;
         case 'rag':
-          chain = createRAGChain();
+          {
+            const chain = createRAGChain();
+            result = await chain.invoke({
+              input: message,
+              context_documents: '',
+              routing_context: routingResult,
+            });
+          }
+          break;
+        case 'tavily':
+          {
+            // 使用Tavily搜索工具
+            result = await tavilyTool.invoke({ query: message });
+          }
+          break;
+        case 'webbrowser':
+          {
+            // 使用WebBrowser工具，传入URL和查询内容，示例只传URL，空字符串表示摘要
+            result = await webBrowserTool.invoke(`${message},""`);
+          }
           break;
         default:
-          chain = createBasicChain();
-      }
-
-      // 4. 执行链
-      try {
-        const result = await chain.invoke({
-          input: message,
-          context_documents: '', // 如果是RAG模式，这里会有检索到的文档
-          routing_context: routingResult,
-        });
-
-        return new Response(
-          JSON.stringify({
-            response: result.content,
-            routing: {
-              route: routingResult.route,
-              confidence: routingResult.confidence,
-              model: modelConfig.model,
-            },
-            metadata: {
-              langchainjs_compatible: true,
-              vercel_ready: true,
-            },
-          }),
           {
-            status: 200,
-            headers: { 'Content-Type': 'application/json' },
+            const chain = createBasicChain();
+            result = await chain.invoke({
+              input: message,
+              context_documents: '',
+              routing_context: routingResult,
+            });
           }
-        );
-      } catch (chainError) {
-        console.error('Chain invoke error:', chainError);
-
-        // 回退逻辑示例：尝试使用基础链作为回退
-        try {
-          const fallbackChain = createBasicChain();
-          const fallbackResult = await fallbackChain.invoke({
-            input: message,
-            context_documents: '',
-            routing_context: routingResult,
-          });
-
-          console.info('Fallback chain executed successfully.');
-          return new Response(
-            JSON.stringify({
-              response: fallbackResult.content,
-              routing: {
-                route: 'basic-fallback',
-                confidence: routingResult.confidence,
-                model: modelConfig.model,
-              },
-              metadata: {
-                langchainjs_compatible: true,
-                vercel_ready: true,
-                fallback: true,
-              },
-            }),
-            {
-              status: 200,
-              headers: { 'Content-Type': 'application/json' },
-            }
-          );
-        } catch (fallbackError) {
-          console.error('Fallback error:', fallbackError);
-          return new Response(
-            JSON.stringify({
-              error: 'Internal server error',
-              message: 'All models are currently unavailable',
-            }),
-            {
-              status: 500,
-              headers: { 'Content-Type': 'application/json' },
-            }
-          );
-        }
+          break;
       }
+
+      // 6. 返回结果
+      return new Response(
+        JSON.stringify({
+          response: result.content || result,
+          routing: {
+            route: routingResult.route,
+            confidence: routingResult.confidence,
+            model: modelConfig.model,
+          },
+          metadata: {
+            langchainjs_compatible: true,
+            vercel_ready: true,
+          },
+        }),
+        {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }
+      );
     },
     {
       fallback: async () => {

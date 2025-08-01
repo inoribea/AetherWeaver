@@ -1,6 +1,10 @@
 import { Embeddings, EmbeddingsParams } from "@langchain/core/embeddings";
 import { chunkArray } from "@langchain/core/utils/chunk_array";
+import { OpenAIEmbeddings } from "@langchain/openai";
 
+/**
+ * Cloudflare Embeddings 参数接口
+ */
 export interface CloudflareEmbeddingsParams extends EmbeddingsParams {
   /** Cloudflare API token */
   apiToken?: string;
@@ -48,11 +52,6 @@ export class CloudflareEmbeddings extends Embeddings implements CloudflareEmbedd
     }
   }
 
-  /**
-   * Method to generate embeddings for an array of documents.
-   * @param texts Array of documents to generate embeddings for.
-   * @returns Promise that resolves to a 2D array of embeddings for each document.
-   */
   async embedDocuments(texts: string[]): Promise<number[][]> {
     const batches = chunkArray(
       this.stripNewLines ? texts.map((t) => t.replace(/\n/g, " ")) : texts,
@@ -71,22 +70,12 @@ export class CloudflareEmbeddings extends Embeddings implements CloudflareEmbedd
     return embeddings;
   }
 
-  /**
-   * Method to generate an embedding for a single document.
-   * @param text Document to generate an embedding for.
-   * @returns Promise that resolves to an embedding for the document.
-   */
   async embedQuery(text: string): Promise<number[]> {
     const cleanedText = this.stripNewLines ? text.replace(/\n/g, " ") : text;
     const embeddings = await this.embeddingWithRetry([cleanedText]);
     return embeddings[0];
   }
 
-  /**
-   * Private method to make embedding requests with retry logic.
-   * @param texts Array of texts to embed.
-   * @returns Promise that resolves to embeddings.
-   */
   private async embeddingWithRetry(texts: string[]): Promise<number[][]> {
     const maxRetries = 3;
     let lastError: Error | null = null;
@@ -97,7 +86,6 @@ export class CloudflareEmbeddings extends Embeddings implements CloudflareEmbedd
       } catch (error) {
         lastError = error as Error;
         if (attempt < maxRetries - 1) {
-          // Wait before retrying (exponential backoff)
           await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000));
         }
       }
@@ -106,11 +94,6 @@ export class CloudflareEmbeddings extends Embeddings implements CloudflareEmbedd
     throw lastError || new Error("Failed to generate embeddings after multiple attempts");
   }
 
-  /**
-   * Private method to call Cloudflare Workers AI API.
-   * @param texts Array of texts to embed.
-   * @returns Promise that resolves to embeddings.
-   */
   private async callCloudflareAPI(texts: string[]): Promise<number[][]> {
     const url = `${this.baseUrl}${this.modelName}`;
     
@@ -132,9 +115,7 @@ export class CloudflareEmbeddings extends Embeddings implements CloudflareEmbedd
 
     const data = await response.json();
     
-    // Handle different response formats
     if (data.result && Array.isArray(data.result)) {
-      // If result is an array of embeddings
       return data.result.map((item: any) => {
         if (Array.isArray(item)) {
           return item;
@@ -147,7 +128,6 @@ export class CloudflareEmbeddings extends Embeddings implements CloudflareEmbedd
         }
       });
     } else if (data.result && data.result.data && Array.isArray(data.result.data)) {
-      // If result has a data property with embeddings
       return data.result.data.map((item: any) => {
         if (Array.isArray(item)) {
           return item;
@@ -170,6 +150,32 @@ export class CloudflareEmbeddings extends Embeddings implements CloudflareEmbedd
  */
 export function createCloudflareEmbeddings(params?: CloudflareEmbeddingsParams): CloudflareEmbeddings {
   return new CloudflareEmbeddings(params);
+}
+
+/**
+ * OpenAI Embeddings 参数接口
+ */
+export interface OpenAIEmbeddingsParams extends EmbeddingsParams {
+  apiKey?: string;
+  model?: string;
+  batchSize?: number;
+  dimensions?: number;
+  configuration?: object;
+}
+
+/**
+ * Factory function to create OpenAIEmbeddings instance
+ * @param params Optional parameters for OpenAIEmbeddings
+ * @returns OpenAIEmbeddings instance
+ */
+export function createOpenAIEmbeddings(params?: OpenAIEmbeddingsParams): OpenAIEmbeddings {
+  return new OpenAIEmbeddings({
+    apiKey: params?.apiKey ?? process.env.OPENAI_API_KEY,
+    model: params?.model ?? process.env.OPENAI_EMBEDDINGS_MODEL ?? "text-embedding-3-small",
+    batchSize: params?.batchSize ?? 512,
+    dimensions: params?.dimensions ?? 1536,
+    configuration: params?.configuration,
+  });
 }
 
 /**
@@ -197,4 +203,79 @@ export function getEmbeddingModelDimensions(modelName: string): number {
     default:
       return 768; // Default to base model dimensions
   }
+}
+
+/**
+ * Get available embedding providers based on environment variables
+ */
+export function getAvailableEmbeddingProviders() {
+  const providers = [];
+
+  // OpenAI Embeddings
+  if (process.env.OPENAI_API_KEY) {
+    try {
+      const openaiEmbeddings = createOpenAIEmbeddings();
+      providers.push({
+        name: "OpenAI",
+        instance: openaiEmbeddings,
+        dimensions: openaiEmbeddings.dimensions ?? 1536,
+        available: true,
+      });
+    } catch (error) {
+      console.warn("Failed to initialize OpenAI embeddings:", error);
+    }
+  }
+
+  // Cloudflare Embeddings
+  if (process.env.CLOUDFLARE_API_TOKEN && process.env.CLOUDFLARE_ACCOUNT_ID) {
+    try {
+      const cloudflareEmbeddings = createCloudflareEmbeddings({
+        modelName: process.env.CLOUDFLARE_EMBEDDING_MODEL ?? CLOUDFLARE_EMBEDDING_MODELS.BGE_BASE_EN,
+      });
+      providers.push({
+        name: "Cloudflare",
+        instance: cloudflareEmbeddings,
+        dimensions: getEmbeddingModelDimensions(cloudflareEmbeddings.modelName),
+        available: true,
+      });
+    } catch (error) {
+      console.warn("Failed to initialize Cloudflare embeddings:", error);
+    }
+  }
+
+  return providers;
+}
+
+/**
+ * Get the best available embedding provider
+ * Supports environment variable EMBEDDING_PROVIDER to force select provider by name
+ */
+export function getBestEmbeddingProvider() {
+  const providers = getAvailableEmbeddingProviders();
+
+  if (providers.length === 0) {
+    return null;
+  }
+
+  const forcedProviderName = process.env.EMBEDDING_PROVIDER;
+
+  if (forcedProviderName) {
+    const forcedProvider = providers.find(p => p.name.toLowerCase() === forcedProviderName.toLowerCase());
+    if (forcedProvider) {
+      return forcedProvider;
+    }
+  }
+
+  // Default preference: Cloudflare first, then OpenAI
+  const cloudflareProvider = providers.find(p => p.name === "Cloudflare");
+  if (cloudflareProvider) {
+    return cloudflareProvider;
+  }
+
+  const openaiProvider = providers.find(p => p.name === "OpenAI");
+  if (openaiProvider) {
+    return openaiProvider;
+  }
+
+  return providers[0];
 }

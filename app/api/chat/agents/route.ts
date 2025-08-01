@@ -24,10 +24,7 @@ import { AIMessageChunk } from "@langchain/core/messages";
 
 import { convertVercelMessageToLangChainMessage, convertLangChainMessageToVercelMessage } from '@/utils/messageFormat';
 
-
-
-// Helper function to create Alibaba Tongyi model
-import { createAlibabaTongyiModel, getAvailableAgentModel, getAgentTools } from './helpers';
+import { createAlibabaTongyiModel, getAvailableAgentModel, getAgentTools, getBestAgentEmbeddingProvider } from './helpers';
 
 const AGENT_SYSTEM_TEMPLATE = `You are a talking parrot named Polly. All final responses must be how a talking parrot would respond. Squawk often!`;
 
@@ -53,7 +50,6 @@ export async function POST(req: NextRequest) {
       .map(convertVercelMessageToLangChainMessage);
 
     // Setup tools - try different search providers
-    // Setup tools - try different search providers
     const tools: Tool[] = getAgentTools();
     
     // Add search tool if available
@@ -65,6 +61,10 @@ export async function POST(req: NextRequest) {
     
     const { model: chat, modelName } = getAvailableAgentModel();
     console.log(`[Agents] Using model: ${modelName}`);
+
+    // Get embedding provider for agent
+    const embeddingProvider = getBestAgentEmbeddingProvider();
+    console.log(`[Agents] Using embedding provider: ${embeddingProvider?.name}`);
 
     /**
      * Use a prebuilt LangGraph agent.
@@ -79,6 +79,7 @@ export async function POST(req: NextRequest) {
        * https://langchain-ai.github.io/langgraphjs/tutorials/quickstart/
        */
       messageModifier: new SystemMessage(AGENT_SYSTEM_TEMPLATE),
+      // TODO: 根据实际agent构造，传入embeddingProvider.instance
     });
 
     if (!returnIntermediateSteps) {
