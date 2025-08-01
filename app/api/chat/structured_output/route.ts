@@ -34,7 +34,12 @@ async function getAvailableStructuredOutputModel(messages: any[]): Promise<{
 }> {
   try {
     // Use unified router to select the best model for structured output
+import { convertLangChainMessageToVercelMessage } from '../../../utils/messageFormat';
+import * as messageFormat from '../../../utils/messageFormat';
+    messages: messages.map(msg => messageFormat.convertLangChainMessageToVercelMessage(msg)),
     const routingRequest: RoutingRequest = {
+import { convertLangChainMessageToVercelMessage } from '../../../utils/messageFormat.js';
+import { convertLangChainMessageToVercelMessage } from '../../../utils/messageFormat.js';
       messages: messages.map(msg => ({
         role: msg.role as 'user' | 'assistant' | 'system',
         content: msg.content

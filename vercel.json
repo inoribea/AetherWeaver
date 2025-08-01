@@ -1,0 +1,25 @@
+{
+  "functions": {
+    "app/api/chat/route.ts": {
+      "maxDuration": 30
+    },
+    "app/api/v1/chat/completions/route.ts": {
+      "maxDuration": 30
+    }
+  },
+  "env": {
+    "OPENAI_API_KEY": "@openai_api_key",
+    "ANTHROPIC_API_KEY": "@anthropic_api_key",
+    "GOOGLE_API_KEY": "@google_api_key",
+    "DEEPSEEK_API_KEY": "@deepseek_api_key",
+    "CUSTOM_BASE_URL": "@custom_base_url",
+    "CUSTOM_API_KEY": "@custom_api_key",
+    "LANGFLOW_SMART_ROUTING_CONFIG": "@langflow_smart_routing_config",
+    "LANGFLOW_CONDITIONAL_ROUTER_CONFIG": "@langflow_conditional_router_config",
+    "LANGFLOW_AGENT_PROMPT_CONFIG": "@langflow_agent_prompt_config",
+    "LANGFLOW_MODEL_SELECTOR_CONFIG": "@langflow_model_selector_config",
+    "LANGFLOW_LANGUAGE_MODEL_CONFIG": "@langflow_language_model_config",
+    "VERCEL_REGION": "iad1",
+    "VERCEL_FUNCTION_TIMEOUT": "30"
+  }
+}

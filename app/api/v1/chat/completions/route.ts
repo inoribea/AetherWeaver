@@ -1,4 +1,4 @@
-import { NextRequest } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { 
   validateApiKey, 
   extractApiKey, 
@@ -11,30 +11,25 @@ import {
   createOpenAIResponse,
   formatStreamChunk,
   createStreamEnd,
-  detectIntentFromRequest,
   detectModelSwitchRequest,
+  detectIntentFromRequest,
   selectBestModelForAuto
 } from '@/utils/openai-compat';
+import { route } from '@/utils/unified-router';
+import { handleApiKeyValidation } from './helpers';
 import { routeRequest, RoutingRequest } from '@/utils/unified-router';
+import { wrapWithErrorHandling } from '@/utils/errorHandler';
+import { sendEvent } from '@/utils/langfuseClient';
 
 // OpenAI兼容的聊天完成端点
 export async function POST(req: NextRequest) {
-  try {
-    console.log('OpenAI Compatible API request received');
+  return wrapWithErrorHandling("v1_chat_completions_POST", async () => {
+    sendEvent({ event: 'request_start', properties: { endpoint: 'v1_chat_completions_POST' }, timestamp: new Date().toISOString() });
 
     // API密钥验证
-    if (isAuthEnabled() && process.env.ENABLE_API_AUTH !== 'false') {
-      const apiKey = extractApiKey(req);
-      const keyInfo = validateApiKey(apiKey);
-      
-      if (!keyInfo.isValid) {
-        console.log('Invalid API key provided:', apiKey?.substring(0, 10) + '...');
-        return createAuthResponse('Invalid API key provided');
-      }
-      
-      console.log(`Valid API key used: ${keyInfo.isAdmin ? 'Admin' : 'User'} key`);
-    } else {
-      console.log('API Authentication is disabled.');
+    const authResponse = await handleApiKeyValidation(req);
+    if (authResponse) {
+      return authResponse;
     }
 
     // 解析请求体
@@ -58,20 +53,20 @@ export async function POST(req: NextRequest) {
 
     console.log(`OpenAI API - Model: ${body.model}, Messages: ${body.messages.length}, Stream: ${body.stream}`);
 
-    // 🚀 使用统一智能路由器进行模型选择
-    // 首先检测用户消息中的模型切换意图
+    // 缓存用户消息内容，避免重复解析
     const userMessage = body.messages[body.messages.length - 1];
     const userContent = Array.isArray(userMessage.content)
       ? userMessage.content.map(c => typeof c === 'string' ? c : c.text).join('')
       : userMessage.content;
+
+    // 先检测模型切换意图
     const detectedModel = detectModelSwitchRequest(userContent);
-    
     console.log(`🔍 检测到的模型切换意图: ${detectedModel}`);
     console.log(`📝 用户消息: "${userContent}"`);
-    
+
+    // 统一路由请求构造，优先使用检测到的模型
     const routingRequest: RoutingRequest = {
       messages: body.messages,
-      // 优先使用检测到的模型，如果没有检测到且不是auto模型，则使用原始模型
       userIntent: detectedModel || (body.model !== 'auto' ? body.model : undefined),
       context: {
         taskType: 'chat',
@@ -81,25 +76,27 @@ export async function POST(req: NextRequest) {
       temperature: body.temperature,
       stream: body.stream
     };
-    
+
     console.log(`📦 路由请求 userIntent: ${routingRequest.userIntent}`);
 
     // 调用统一路由器进行智能选择
     const routingDecision = await routeRequest(routingRequest);
-    
+
+    sendEvent({ event: 'model_selected', properties: { model: routingDecision.selectedModel, confidence: routingDecision.confidence }, timestamp: new Date().toISOString() });
+
     console.log(`🎯 统一路由器决策:`);
     console.log(`  - 选择模型: ${routingDecision.selectedModel}`);
     console.log(`  - 置信度: ${routingDecision.confidence}`);
     console.log(`  - 策略: ${routingDecision.metadata.routingStrategy}`);
     console.log(`  - 推理: ${routingDecision.reasoning}`);
-    
+
     // 更新请求中的模型
     body.model = routingDecision.selectedModel;
-    
+
     // 转换为LangChain格式
     const langchainRequest = convertOpenAIToLangChain(body);
-    
-    // 智能路由 - 根据请求内容选择合适的端点
+
+    // 合并调用 detectIntentFromRequest，传入缓存的 body，避免重复解析
     const targetEndpoint = await detectIntentFromRequest(body);
     console.log(`[Smart Router] Routing to endpoint: ${targetEndpoint}`);
     console.log(`[Smart Router] Selected Model: ${body.model}`);
@@ -119,8 +116,11 @@ export async function POST(req: NextRequest) {
       body: JSON.stringify(langchainRequest)
     });
 
+    const startTime = Date.now();
     // 调用内部API
     const internalResponse = await fetch(internalRequest);
+    const durationMs = Date.now() - startTime;
+    sendEvent({ event: 'internal_api_call', properties: { status: internalResponse.status, durationMs }, timestamp: new Date().toISOString() });
     
     if (!internalResponse.ok) {
       const errorText = await internalResponse.text();
@@ -210,7 +210,22 @@ export async function POST(req: NextRequest) {
             controller.close();
           } catch (error) {
             console.error('Streaming error:', error);
-            controller.error(error);
+            // 优雅降级：发送错误信息块，避免中断流
+            const errorChunk = createOpenAIResponse(
+              JSON.stringify({
+                error: {
+                  message: 'Streaming error occurred: ' + (error instanceof Error ? error.message : String(error)),
+                  type: 'server_error',
+                  code: 'streaming_error'
+                }
+              }),
+              actualModel,
+              false,
+              true
+            );
+            controller.enqueue(encoder.encode(formatStreamChunk(errorChunk)));
+            controller.enqueue(encoder.encode(createStreamEnd()));
+            controller.close();
           }
         }
       });
@@ -241,30 +256,25 @@ export async function POST(req: NextRequest) {
         }
       });
     }
-
-  } catch (error) {
-    let errorMessage = 'Unknown error occurred';
-    if (error instanceof Error) {
-      errorMessage = error.message;
-    } else if (typeof error === 'string') {
-      errorMessage = error;
-    }
-    console.error('OpenAI Compatible API error:', error);
-
-    return new Response(
-      JSON.stringify({
-        error: {
-          message: errorMessage,
-          type: 'server_error',
-          code: 'internal_error'
+  }, {
+    interfaceName: "v1_chat_completions_POST",
+    fallback: async () => {
+      // 回退逻辑示例：返回标准错误响应，提示服务暂不可用
+      return new Response(
+        JSON.stringify({
+          error: {
+            message: 'Service temporarily unavailable, please try again later.',
+            type: 'server_error',
+            code: 'service_unavailable'
+          }
+        }),
+        {
+          status: 503,
+          headers: { 'Content-Type': 'application/json' }
         }
-      }),
-      {
-        status: 500,
-        headers: { 'Content-Type': 'application/json' }
-      }
-    );
-  }
+      );
+    }
+  });
 }
 
 // 处理OPTIONS请求 (CORS预检)

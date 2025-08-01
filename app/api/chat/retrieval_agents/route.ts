@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Message as VercelChatMessage, StreamingTextResponse } from "ai";
+import { promises as fs } from "fs";
+import path from "path";
 
 import {
   AIMessage,
@@ -22,236 +24,299 @@ import { BaseChatModel, BaseChatModelCallOptions } from "@langchain/core/languag
 import { AIMessageChunk } from "@langchain/core/messages";
 import { Tool } from "@langchain/core/tools";
 
-// export const runtime = "edge"; // Commented out to avoid edge runtime issues
+import { convertVercelMessageToLangChainMessage, convertLangChainMessageToVercelMessage } from '@/utils/messageFormat';
+import { wrapWithErrorHandling } from '@/utils/errorHandler';
 
-const convertVercelMessageToLangChainMessage = (message: VercelChatMessage) => {
-  if (message.role === "user") {
-    return new HumanMessage(message.content);
-  } else if (message.role === "assistant") {
-    return new AIMessage(message.content);
-  } else {
-    return new ChatMessage(message.content, message.role);
-  }
-};
+import { QdrantVectorStore } from "@langchain/qdrant";
+import qdrantClient from "@/utils/qdrantClient";
 
-const convertLangChainMessageToVercelMessage = (message: BaseMessage) => {
-  if (message._getType() === "human") {
-    return { content: message.content, role: "user" };
-  } else if (message._getType() === "ai") {
-    return {
-      content: message.content,
-      role: "assistant",
-      tool_calls: (message as AIMessage).tool_calls,
-    };
-  } else {
-    return { content: message.content, role: message._getType() };
-  }
-};
+import nodejieba from "nodejieba";
 
-// Helper function to create Alibaba Tongyi model
-function createAlibabaTongyiModel(config: {
-  temperature?: number;
-  model?: string;
-  apiKey?: string;
-}) {
-  return new ChatAlibabaTongyi({
-    temperature: config.temperature,
-    model: config.model,
-    alibabaApiKey: config.apiKey
-  });
+const englishStopwords = [
+  "a", "about", "above", "after", "again", "against", "all", "am", "an", "and", "any", "are", "aren't", "as", "at",
+  "be", "because", "been", "before", "being", "below", "between", "both", "but", "by",
+  "can't", "cannot", "could", "couldn't",
+  "did", "didn't", "do", "does", "doesn't", "doing", "don't", "down", "during",
+  "each",
+  "few", "for", "from", "further",
+  "had", "hadn't", "has", "hasn't", "have", "haven't", "having", "he", "he'd", "he'll", "he's", "her", "here", "here's", "hers", "herself", "him", "himself", "his", "how", "how's",
+  "i", "i'd", "i'll", "i'm", "i've", "if", "in", "into", "is", "isn't", "it", "it's", "its", "itself",
+  "let's",
+  "me", "more", "most", "mustn't", "my", "myself",
+  "no", "nor", "not",
+  "of", "off", "on", "once", "only", "or", "other", "ought", "our", "ours", "ourselves", "out", "over", "own",
+  "same", "shan't", "she", "she'd", "she'll", "she's", "should", "shouldn't", "so", "some", "such",
+  "than", "that", "that's", "the", "their", "theirs", "them", "themselves", "then", "there", "there's", "these", "they", "they'd", "they'll", "they're", "they've", "this", "those", "through", "to", "too",
+  "under", "until", "up",
+  "very",
+  "was", "wasn't", "we", "we'd", "we'll", "we're", "we've", "were", "weren't", "what", "what's", "when", "when's", "where", "where's", "which", "while", "who", "who's", "whom", "why", "why's", "with", "won't", "would", "wouldn't",
+  "you", "you'd", "you'll", "you're", "you've", "your", "yours", "yourself", "yourselves"
+];
+
+// 异步加载中文停用词集合
+async function loadChineseStopwords(): Promise<Set<string>> {
+  const filePath = path.resolve(process.cwd(), "data/chinese_stopwords.txt");
+  const content = await fs.readFile(filePath, "utf-8");
+  const words = content.split(/\r?\n/).map(w => w.trim()).filter(w => w.length > 0);
+  return new Set(words);
 }
 
-// Helper function to get available model for retrieval agents
-function getAvailableRetrievalAgentModel(): BaseChatModel<BaseChatModelCallOptions, AIMessageChunk> {
-  // Try models that support tool calling for agents
-  if (process.env.OPENAI_API_KEY || process.env.NEKO_API_KEY) {
-    return new ChatOpenAI({
-      model: "gpt-4o-mini",
-      temperature: 0.2,
-      apiKey: process.env.NEKO_API_KEY || process.env.OPENAI_API_KEY,
-      configuration: { baseURL: process.env.NEKO_BASE_URL || process.env.OPENAI_BASE_URL },
-    });
-  } else if (process.env.TENCENT_HUNYUAN_SECRET_ID && process.env.TENCENT_HUNYUAN_SECRET_KEY) {
-    return new ChatTencentHunyuan({
-      model: "hunyuan-t1-latest",
-      temperature: 0.2,
-      tencentSecretId: process.env.TENCENT_HUNYUAN_SECRET_ID,
-      tencentSecretKey: process.env.TENCENT_HUNYUAN_SECRET_KEY,
-    });
-  } else if (process.env.GOOGLE_API_KEY) {
-    return new ChatGoogleGenerativeAI({
-      model: "gemini-2.5-flash-preview-05-20",
-      temperature: 0.2,
-      apiKey: process.env.GOOGLE_API_KEY,
-    });
-  } else if (process.env.DASHSCOPE_API_KEY) {
-    return createAlibabaTongyiModel({
-      model: "qwen-turbo-latest",
-      temperature: 0.2,
-      apiKey: process.env.DASHSCOPE_API_KEY,
-    });
+// 中文分词函数，过滤停用词，停用词集合动态传入
+function chineseTokenize(text: string, stopwords: Set<string>): string[] {
+  const tokens: string[] = nodejieba.cut(text);
+  return tokens.filter((token: string) => token.trim() !== "" && !stopwords.has(token));
+}
+
+// 英文分词函数，使用正则分割并过滤英文停用词
+function englishTokenize(text: string): string[] {
+  return text
+    .toLowerCase()
+    .split(/\W+/)
+    .filter(word => word.length > 2 && !englishStopwords.includes(word));
+}
+
+// 综合分词函数，支持中英文混合文本，异步加载中文停用词
+async function tokenize(text: string, chineseStopwords: Set<string>): Promise<string[]> {
+  const hasChinese = /[\u4e00-\u9fa5]/.test(text);
+  if (hasChinese) {
+    const chineseTokens = chineseTokenize(text, chineseStopwords);
+    const englishTokens = englishTokenize(text);
+    return Array.from(new Set([...chineseTokens, ...englishTokens]));
   } else {
-    throw new Error("No API keys configured for retrieval agent models. Please set up OpenAI, Tencent Hunyuan, Google, or Alibaba Tongyi API keys.");
+    return englishTokenize(text);
   }
 }
 
-// Simple in-memory retriever for demo purposes
-class SimpleRetriever extends BaseRetriever {
+// EnhancedAdvancedRetriever: 支持中英文分词、停用词过滤、词频匹配和排序
+class EnhancedAdvancedRetriever extends BaseRetriever {
   lc_namespace = ["langchain", "retrievers"];
   private documents: Document[];
+  private chineseStopwords: Set<string>;
 
-  constructor(documents: Document[]) {
+  constructor(documents: Document[], chineseStopwords: Set<string>) {
     super();
     this.documents = documents;
+    this.chineseStopwords = chineseStopwords;
   }
 
   async _getRelevantDocuments(
     query: string,
     runManager?: CallbackManagerForRetrieverRun
   ): Promise<Document[]> {
-    // Simple keyword-based retrieval
-    const queryLower = query.toLowerCase();
-    const relevantDocs = this.documents.filter(doc => {
+    const queryTokens = await tokenize(query, this.chineseStopwords);
+
+    // 计算文档匹配分数，基于词频
+    let score = 0;
+    const scoredDocs = this.documents.map(doc => {
       const content = doc.pageContent.toLowerCase();
-      const queryWords = queryLower.split(' ');
-      return queryWords.some((word: string) => word.length > 2 && content.includes(word));
-    });
-    
-    // Return top 3 most relevant documents, or all if less than 3
-    return relevantDocs.slice(0, 3);
-  }
+      const contentTokens: string[] = nodejieba.cut(content).filter((token: string) => token.trim() !== "" && !this.chineseStopwords.has(token))
+        .concat(
+          englishTokenize(content)
+        );
+
+      // 计算queryTokens在contentTokens中的出现次数总和
+      let docScore = 0;
+      for (const token of queryTokens) {
+// 多策略融合检索结果的融合函数
+interface DocumentWithScore extends Document {
+  score: number;
+  source: "vector" | "keyword";
 }
 
-const AGENT_SYSTEM_TEMPLATE = `You are a stereotypical robot named Robbie and must answer all questions like a stereotypical robot. Use lots of interjections like "BEEP" and "BOOP".
-
-If you don't know how to answer a question, use the available tools to look up relevant information. You should particularly do this for questions about LangChain.`;
+function normalizeScores(docs: DocumentWithScore[]) {
+  if (docs.length === 0) return docs;
+  const scores = docs.map(d => d.score);
+  const maxScore = Math.max(...scores);
+  const minScore = Math.min(...scores);
+  const range = maxScore - minScore || 1;
+  return docs.map(d => ({
+    ...d,
+    score: (d.score - minScore) / range,
+  }));
+}
 
 /**
- * This handler initializes and calls a tool calling ReAct agent with retrieval capabilities.
- * See the docs for more information:
- *
- * https://langchain-ai.github.io/langgraphjs/tutorials/quickstart/
- * https://js.langchain.com/docs/use_cases/question_answering/conversational_retrieval_agents
+ * 融合向量检索和关键词检索结果
+ * @param vectorResults 向量检索结果，带分数
+ * @param keywordResults 关键词检索结果，带分数
+ * @param vectorWeight 向量检索权重，默认0.7
+ * @param keywordWeight 关键词检索权重，默认0.3
+ * @param topK 返回结果数量，默认5
+ * @returns 融合排序后的文档列表
+// 多策略融合检索结果的融合函数
+interface DocumentWithScore extends Document {
+  score: number;
+  source: "vector" | "keyword" | "fusion";
+}
+
+function normalizeScores(docs: DocumentWithScore[]) {
+  if (docs.length === 0) return docs;
+  const scores = docs.map(d => d.score);
+  const maxScore = Math.max(...scores);
+  const minScore = Math.min(...scores);
+  const range = maxScore - minScore || 1;
+  return docs.map(d => ({
+    ...d,
+    score: (d.score - minScore) / range,
+  }));
+}
+
+/**
+ * 融合向量检索和关键词检索结果
+ * @param vectorResults 向量检索结果，带分数
+ * @param keywordResults 关键词检索结果，带分数
+ * @param vectorWeight 向量检索权重，默认0.7
+ * @param keywordWeight 关键词检索权重，默认0.3
+ * @param topK 返回结果数量，默认5
+ * @returns 融合排序后的文档列表
  */
-export async function POST(req: NextRequest) {
-  try {
-    const body = await req.json();
-    /**
-     * We represent intermediate steps as system messages for display purposes,
-     * but don't want them in the chat history.
-     */
-    const messages = (body.messages ?? [])
-      .filter(
-        (message: VercelChatMessage) =>
-          message.role === "user" || message.role === "assistant",
-      )
-      .map(convertVercelMessageToLangChainMessage);
-    const returnIntermediateSteps = body.show_intermediate_steps;
+export function fuseRetrievalResults(
+  vectorResults: DocumentWithScore[],
+  keywordResults: DocumentWithScore[],
+  vectorWeight = 0.7,
+  keywordWeight = 0.3,
+  topK = 5
+): Document[] {
+  // 归一化分数
+  const normVector = normalizeScores(vectorResults);
+  const normKeyword = normalizeScores(keywordResults);
 
-    const chatModel = getAvailableRetrievalAgentModel();
+  // 合并并去重，使用Map以pageContent为key
+  const mergedMap = new Map<string, DocumentWithScore>();
 
-    // Sample documents for retrieval
-    const sampleDocuments = [
-      new Document({
-        pageContent: "LangChain is a framework for developing applications powered by language models. BEEP BOOP! It provides tools for prompt management, chains, and agents. Robbie thinks it's very efficient for building AI applications!",
-        metadata: { source: "langchain_docs", type: "framework" }
-      }),
-      new Document({
-        pageContent: "Vector databases store high-dimensional vectors and enable similarity search. BEEP! They are essential for RAG (Retrieval-Augmented Generation) applications. Robbie computes that vectors are like organized data storage!",
-        metadata: { source: "vector_db_guide", type: "database" }
-      }),
-      new Document({
-        pageContent: "Retrieval-Augmented Generation (RAG) combines retrieval systems with generative models. BOOP BEEP! It provides more accurate and contextual responses by fetching relevant information first. Robbie processes this as optimal information retrieval!",
-        metadata: { source: "rag_guide", type: "technique" }
-      }),
-      new Document({
-        pageContent: "Agents in LangChain can use tools to perform actions and make decisions. BEEP BOOP BEEP! They can search the web, perform calculations, and access databases. Robbie computes that agents are like robotic assistants!",
-        metadata: { source: "agents_guide", type: "concept" }
-      }),
-      new Document({
-        pageContent: "Robbie is a stereotypical robot who loves helping with AI and machine learning questions. BEEP BOOP! He processes information efficiently and always uses robot interjections. His circuits are optimized for helpful responses!",
-        metadata: { source: "robbie_bio", type: "character" }
-      }),
-    ];
-
-    // Create simple retriever
-    const retriever = new SimpleRetriever(sampleDocuments);
-
-    /**
-     * Wrap the retriever in a tool to present it to the agent in a
-     * usable form.
-     */
-    const tool = createRetrieverTool(retriever, {
-      name: "search_latest_knowledge",
-      description: "Searches and returns up-to-date general information about LangChain, AI, and machine learning topics. BEEP BOOP!",
+  normVector.forEach(doc => {
+    mergedMap.set(doc.pageContent, {
+      ...doc,
+      score: doc.score * vectorWeight,
+      source: "vector",
     });
+  });
 
-    /**
-     * Use a prebuilt LangGraph agent.
-     */
-    const agent = await createReactAgent({
-      llm: chatModel,
-      tools: [tool],
-      /**
-       * Modify the stock prompt in the prebuilt agent. See docs
-       * for how to customize your agent:
-       *
-       * https://langchain-ai.github.io/langgraphjs/tutorials/quickstart/
-       */
-      messageModifier: new SystemMessage(AGENT_SYSTEM_TEMPLATE),
-    });
-
-    if (!returnIntermediateSteps) {
-      /**
-       * Stream back all generated tokens and steps from their runs.
-       *
-       * We do some filtering of the generated events and only stream back
-       * the final response as a string.
-       *
-       * For this specific type of tool calling ReAct agents with OpenAI, we can tell when
-       * the agent is ready to stream back final output when it no longer calls
-       * a tool and instead streams back content.
-       *
-       * See: https://langchain-ai.github.io/langgraphjs/how-tos/stream-tokens/
-       */
-      const eventStream = await agent.streamEvents(
-        {
-          messages,
-        },
-        { version: "v2" },
-      );
-
-      const textEncoder = new TextEncoder();
-      const transformStream = new ReadableStream({
-        async start(controller) {
-          for await (const { event, data } of eventStream) {
-            if (event === "on_chat_model_stream") {
-              // Intermediate chat model generations will contain tool calls and no content
-              if (!!data.chunk.content) {
-                controller.enqueue(textEncoder.encode(data.chunk.content));
-              }
-            }
-          }
-          controller.close();
-        },
-      });
-
-      return new StreamingTextResponse(transformStream);
+  normKeyword.forEach(doc => {
+    if (mergedMap.has(doc.pageContent)) {
+      const existing = mergedMap.get(doc.pageContent)!;
+      // 分数加权累加
+      existing.score += doc.score * keywordWeight;
+      // 标记来源为多策略
+      existing.source = "fusion";
+      mergedMap.set(doc.pageContent, existing);
     } else {
-      /**
-       * We could also pick intermediate steps out from `streamEvents` chunks, but
-       * they are generated as JSON objects, so streaming and displaying them with
-       * the AI SDK is more complicated.
-       */
-      const result = await agent.invoke({ messages });
-      return NextResponse.json(
-        {
-          messages: result.messages.map(convertLangChainMessageToVercelMessage),
-        },
-        { status: 200 },
-      );
+      mergedMap.set(doc.pageContent, {
+        ...doc,
+        score: doc.score * keywordWeight,
+        source: "keyword",
+      });
     }
-  } catch (e: any) {
-    return NextResponse.json({ error: e.message }, { status: e.status ?? 500 });
+  });
+
+  // 转数组并排序
+  const mergedArray = Array.from(mergedMap.values());
+  mergedArray.sort((a, b) => b.score - a.score);
+
+  // 返回topK文档
+  return mergedArray.slice(0, topK).map(d => {
+    const { score, source, ...doc } = d;
+    return doc;
+  });
+}
+ */
+export function fuseRetrievalResults(
+  vectorResults: DocumentWithScore[],
+  keywordResults: DocumentWithScore[],
+  vectorWeight = 0.7,
+  keywordWeight = 0.3,
+  topK = 5
+): Document[] {
+  // 归一化分数
+  const normVector = normalizeScores(vectorResults);
+  const normKeyword = normalizeScores(keywordResults);
+
+  // 合并并去重，使用Map以pageContent为key
+  const mergedMap = new Map<string, DocumentWithScore>();
+
+  normVector.forEach(doc => {
+    mergedMap.set(doc.pageContent, {
+      ...doc,
+      score: doc.score * vectorWeight,
+      source: "vector",
+    });
+  });
+
+  normKeyword.forEach(doc => {
+    if (mergedMap.has(doc.pageContent)) {
+      const existing = mergedMap.get(doc.pageContent)!;
+      // 分数加权累加
+      existing.score += doc.score * keywordWeight;
+      // 标记来源为多策略
+      existing.source = "fusion";
+      mergedMap.set(doc.pageContent, existing);
+    } else {
+      mergedMap.set(doc.pageContent, {
+        ...doc,
+        score: doc.score * keywordWeight,
+        source: "keyword",
+      });
+    }
+  });
+
+  // 转数组并排序
+  const mergedArray = Array.from(mergedMap.values());
+  mergedArray.sort((a, b) => b.score - a.score);
+
+  // 返回topK文档
+  return mergedArray.slice(0, topK).map(d => {
+    const { score, source, ...doc } = d;
+    return doc;
+  });
+}
+        const freq = contentTokens.filter(t => t === token).length;
+        docScore += freq;
+      }
+
+      // 加强长度惩罚，避免长文档得分过高
+      const lengthPenalty = Math.pow(contentTokens.length, 3);
+      docScore = docScore / lengthPenalty;
+
+      return { doc, score: docScore };
+    });
+
+    // 过滤得分为0的文档，按得分降序排序
+    const filtered = scoredDocs.filter(item => item.score > 0);
+    filtered.sort((a, b) => b.score - a.score);
+
+    // 返回得分最高的前3条文档
+    return filtered.slice(0, 3).map(item => item.doc);
   }
 }
+
+async function createRetriever() {
+  const sampleDocuments = [
+    new Document({
+      pageContent: "LangChain is a framework for developing applications powered by language models. BEEP BOOP! It provides tools for prompt management, chains, and agents. Robbie thinks it's very efficient for building AI applications!",
+      metadata: { source: "langchain_docs", type: "framework" }
+    }),
+    new Document({
+      pageContent: "Vector databases store high-dimensional vectors and enable similarity search. BEEP! They are essential for RAG (Retrieval-Augmented Generation) applications. Robbie computes that vectors are like organized data storage!",
+      metadata: { source: "vector_db_guide", type: "database" }
+    }),
+    new Document({
+      pageContent: "Retrieval-Augmented Generation (RAG) combines retrieval systems with generative models. BOOP BEEP! It provides more accurate and contextual responses by fetching relevant information first. Robbie processes this as optimal information retrieval!",
+      metadata: { source: "rag_guide", type: "technique" }
+    }),
+    new Document({
+      pageContent: "Agents in LangChain can use tools to perform actions and make decisions. BEEP BOOP BEEP! They can search the web, perform calculations, and access databases. Robbie computes that agents are like robotic assistants!",
+      metadata: { source: "agents_guide", type: "concept" }
+    }),
+    new Document({
+      pageContent: "Robbie is a stereotypical robot who loves helping with AI and machine learning questions. BEEP BOOP! He processes information efficiently and always uses robot interjections. His circuits are optimized for helpful responses!",
+      metadata: { source: "robbie_bio", type: "character" }
+    }),
+  ];
+
+  const chineseStopwords = await loadChineseStopwords();
+  const retriever = new EnhancedAdvancedRetriever(sampleDocuments, chineseStopwords);
+
+  return retriever;
+}
+
+export { EnhancedAdvancedRetriever, createRetriever };

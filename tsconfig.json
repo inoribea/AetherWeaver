@@ -20,7 +20,9 @@
       }
     ],
     "paths": {
-      "@/*": ["./*"]
+      "@/*": ["./*"],
+      "@/components/*": ["./src/components/*"],
+      "@/chains/*": ["./src/chains/*"]
     },
     "typeRoots": ["./node_modules/@types"]
   },
