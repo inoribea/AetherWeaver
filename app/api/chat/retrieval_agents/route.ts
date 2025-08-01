@@ -87,63 +87,6 @@ async function tokenize(text: string, chineseStopwords: Set<string>): Promise<st
   }
 }
 
-// EnhancedAdvancedRetriever: 支持中英文分词、停用词过滤、词频匹配和排序
-class EnhancedAdvancedRetriever extends BaseRetriever {
-  lc_namespace = ["langchain", "retrievers"];
-  private documents: Document[];
-  private chineseStopwords: Set<string>;
-
-  constructor(documents: Document[], chineseStopwords: Set<string>) {
-    super();
-    this.documents = documents;
-    this.chineseStopwords = chineseStopwords;
-  }
-
-  async _getRelevantDocuments(
-    query: string,
-    runManager?: CallbackManagerForRetrieverRun
-  ): Promise<Document[]> {
-    const queryTokens = await tokenize(query, this.chineseStopwords);
-
-    // 计算文档匹配分数，基于词频
-    let score = 0;
-    const scoredDocs = this.documents.map(doc => {
-      const content = doc.pageContent.toLowerCase();
-      const contentTokens: string[] = nodejieba.cut(content).filter((token: string) => token.trim() !== "" && !this.chineseStopwords.has(token))
-        .concat(
-          englishTokenize(content)
-        );
-
-      // 计算queryTokens在contentTokens中的出现次数总和
-      let docScore = 0;
-      for (const token of queryTokens) {
-// 多策略融合检索结果的融合函数
-interface DocumentWithScore extends Document {
-  score: number;
-  source: "vector" | "keyword";
-}
-
-function normalizeScores(docs: DocumentWithScore[]) {
-  if (docs.length === 0) return docs;
-  const scores = docs.map(d => d.score);
-  const maxScore = Math.max(...scores);
-  const minScore = Math.min(...scores);
-  const range = maxScore - minScore || 1;
-  return docs.map(d => ({
-    ...d,
-    score: (d.score - minScore) / range,
-  }));
-}
-
-/**
- * 融合向量检索和关键词检索结果
- * @param vectorResults 向量检索结果，带分数
- * @param keywordResults 关键词检索结果，带分数
- * @param vectorWeight 向量检索权重，默认0.7
- * @param keywordWeight 关键词检索权重，默认0.3
- * @param topK 返回结果数量，默认5
- * @returns 融合排序后的文档列表
-// 多策略融合检索结果的融合函数
 interface DocumentWithScore extends Document {
   score: number;
   source: "vector" | "keyword" | "fusion";
@@ -219,56 +162,36 @@ export function fuseRetrievalResults(
     return doc;
   });
 }
- */
-export function fuseRetrievalResults(
-  vectorResults: DocumentWithScore[],
-  keywordResults: DocumentWithScore[],
-  vectorWeight = 0.7,
-  keywordWeight = 0.3,
-  topK = 5
-): Document[] {
-  // 归一化分数
-  const normVector = normalizeScores(vectorResults);
-  const normKeyword = normalizeScores(keywordResults);
 
-  // 合并并去重，使用Map以pageContent为key
-  const mergedMap = new Map<string, DocumentWithScore>();
+// EnhancedAdvancedRetriever: 支持中英文分词、停用词过滤、词频匹配和排序
+class EnhancedAdvancedRetriever extends BaseRetriever {
+  lc_namespace = ["langchain", "retrievers"];
+  private documents: Document[];
+  private chineseStopwords: Set<string>;
 
-  normVector.forEach(doc => {
-    mergedMap.set(doc.pageContent, {
-      ...doc,
-      score: doc.score * vectorWeight,
-      source: "vector",
-    });
-  });
+  constructor(documents: Document[], chineseStopwords: Set<string>) {
+    super();
+    this.documents = documents;
+    this.chineseStopwords = chineseStopwords;
+  }
 
-  normKeyword.forEach(doc => {
-    if (mergedMap.has(doc.pageContent)) {
-      const existing = mergedMap.get(doc.pageContent)!;
-      // 分数加权累加
-      existing.score += doc.score * keywordWeight;
-      // 标记来源为多策略
-      existing.source = "fusion";
-      mergedMap.set(doc.pageContent, existing);
-    } else {
-      mergedMap.set(doc.pageContent, {
-        ...doc,
-        score: doc.score * keywordWeight,
-        source: "keyword",
-      });
-    }
-  });
+  async _getRelevantDocuments(
+    query: string,
+    runManager?: CallbackManagerForRetrieverRun
+  ): Promise<Document[]> {
+    const queryTokens = await tokenize(query, this.chineseStopwords);
 
-  // 转数组并排序
-  const mergedArray = Array.from(mergedMap.values());
-  mergedArray.sort((a, b) => b.score - a.score);
+    // 计算文档匹配分数，基于词频
+    const scoredDocs = this.documents.map(doc => {
+      const content = doc.pageContent.toLowerCase();
+      const contentTokens: string[] = nodejieba.cut(content).filter((token: string) => token.trim() !== "" && !this.chineseStopwords.has(token))
+        .concat(
+          englishTokenize(content)
+        );
 
-  // 返回topK文档
-  return mergedArray.slice(0, topK).map(d => {
-    const { score, source, ...doc } = d;
-    return doc;
-  });
-}
+      // 计算queryTokens在contentTokens中的出现次数总和
+      let docScore = 0;
+      for (const token of queryTokens) {
         const freq = contentTokens.filter(t => t === token).length;
         docScore += freq;
       }

@@ -41,60 +41,84 @@ export async function POST(req: NextRequest) {
       const embeddings = new OpenAIEmbeddings();
 
       // 4. 实例化TavilySearch和WebBrowser工具，使用环境变量配置API Key
-      const tavilyApiKey = process.env.TAVILY_API_KEY || '';
       const tavilyTool = new TavilySearch({
         maxResults: 5,
-        topic: 'general',
-        apiKey: tavilyApiKey,
+        topic: "general",
       });
 
       const webBrowserTool = new WebBrowser({ model: llm, embeddings });
 
       // 5. 选择对应的链或工具
       let result;
-      switch (routingResult.route) {
-        case 'basic':
-          {
-            const chain = createBasicChain();
-            result = await chain.invoke({
-              input: message,
-              context_documents: '',
-              routing_context: routingResult,
-            });
-          }
-          break;
-        case 'rag':
-          {
-            const chain = createRAGChain();
-            result = await chain.invoke({
-              input: message,
-              context_documents: '',
-              routing_context: routingResult,
-            });
-          }
-          break;
-        case 'tavily':
-          {
-            // 使用Tavily搜索工具
-            result = await tavilyTool.invoke({ query: message });
-          }
-          break;
-        case 'webbrowser':
-          {
-            // 使用WebBrowser工具，传入URL和查询内容，示例只传URL，空字符串表示摘要
-            result = await webBrowserTool.invoke(`${message},""`);
-          }
-          break;
-        default:
-          {
-            const chain = createBasicChain();
-            result = await chain.invoke({
-              input: message,
-              context_documents: '',
-              routing_context: routingResult,
-            });
-          }
-          break;
+      if (routingResult.route === 'basic' || routingResult.route === 'enhanced' || routingResult.route === 'rag' || routingResult.route === 'agent') {
+        switch (routingResult.route) {
+          case 'basic':
+            {
+              const chain = createBasicChain();
+              result = await chain.invoke({
+                input: message,
+                context_documents: '',
+                routing_context: routingResult,
+              });
+            }
+            break;
+          case 'enhanced':
+            {
+              // 目前用basic链代替
+              const chain = createBasicChain();
+              result = await chain.invoke({
+                input: message,
+                context_documents: '',
+                routing_context: routingResult,
+              });
+            }
+            break;
+          case 'rag':
+            {
+              const chain = createRAGChain();
+              result = await chain.invoke({
+                input: message,
+                context_documents: '',
+                routing_context: routingResult,
+              });
+            }
+            break;
+          case 'agent':
+            {
+              // 目前用basic链代替
+              const chain = createBasicChain();
+              result = await chain.invoke({
+                input: message,
+                context_documents: '',
+                routing_context: routingResult,
+              });
+            }
+            break;
+          default:
+            {
+              const chain = createBasicChain();
+              result = await chain.invoke({
+                input: message,
+                context_documents: '',
+                routing_context: routingResult,
+              });
+            }
+            break;
+        }
+      } else if (routingResult.route === 'tavily') {
+        // 使用Tavily搜索工具，调用call方法
+        result = await tavilyTool.search(message);
+      } else if (routingResult.route === 'webbrowser') {
+        // 使用WebBrowser工具，传入URL和查询内容，示例传入对象参数
+        result = await webBrowserTool.invoke({ url: message, summary: '' });
+      } else {
+        // 默认使用basic链
+        const chain = createBasicChain();
+        result = await chain.invoke({
+          input: message,
+          context_documents: '',
+          routing_context: routingResult,
+        });
       }
 
       // 6. 返回结果

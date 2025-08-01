@@ -21,7 +21,11 @@
    | LANGFUSE_API_KEY                | LangFuse API 密钥                       | your-langfuse-api-key           |
    | TAVILY_API_KEY                  | 网络搜索服务 API 密钥                   | your-tavily-api-key             |
    | SUPABASE_URL                   | RAG 检索数据库地址                      | your-supabase-url               |
-| QDRANT_URL                      | Qdrant 向量数据库地址                   | http://localhost:6333            |
+   | QDRANT_URL                      | Qdrant 向量数据库地址                   | http://localhost:6333            |
+   | VERCEL_APP_URL                 | Vercel 应用的访问 URL                    | https://your-vercel-app.vercel.app |
+   | VERCEL_ENV                     | Vercel 部署环境（如 production, preview, development）| production                     |
+   | VERCEL_REGION                  | Vercel 部署区域                         | cdg1                           |
+   | VERCEL_FUNCTION_TIMEOUT        | Vercel 函数执行超时时间（秒）             | 30                             |
 
 3. **动态路由模型映射配置**  
    本项目支持通过环境变量动态配置决策路由的模型映射和复杂模型决策四路径对应模型选项，主要环境变量包括：
