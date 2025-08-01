@@ -66,7 +66,41 @@ export class OptimizedEnhancedRouter {
         enableParallel: true,
       },
     };
-    return loadEnvConfig(this.vercelMode, "LANGFLOW_CONDITIONAL_ROUTER_CONFIG", defaultConfig);
+
+    function parseJSONEnvVar(envVarName: string): any | null {
+      try {
+        const val = process.env[envVarName];
+        if (!val) return null;
+        return JSON.parse(val);
+      } catch {
+        return null;
+      }
+    }
+
+    // 逐个读取拆分的环境变量配置，合并覆盖默认配置
+    const matchingStrategies = parseJSONEnvVar("LANGFLOW_ROUTER_MATCHING_STRATEGIES");
+    if (matchingStrategies) Object.assign(defaultConfig.matchingStrategies, matchingStrategies);
+
+    const routeSimilarities = parseJSONEnvVar("LANGFLOW_ROUTER_ROUTE_SIMILARITIES");
+    if (routeSimilarities) Object.assign(defaultConfig.routeSimilarities, routeSimilarities);
+
+    const confidenceAdjustments = parseJSONEnvVar("LANGFLOW_ROUTER_CONFIDENCE_ADJUSTMENTS");
+    if (confidenceAdjustments) Object.assign(defaultConfig.confidenceAdjustments, confidenceAdjustments);
+
+    const memorySupport = parseJSONEnvVar("LANGFLOW_ROUTER_MEMORY_SUPPORT");
+    if (memorySupport) Object.assign(defaultConfig.memorySupport, memorySupport);
+
+    const langchainjsCompatibility = parseJSONEnvVar("LANGFLOW_ROUTER_LANGCHAINJS_COMPATIBILITY");
+    if (langchainjsCompatibility) Object.assign(defaultConfig.langchainjsCompatibility, langchainjsCompatibility);
+
+    const lcelConfiguration = parseJSONEnvVar("LANGFLOW_ROUTER_LCEL_CONFIGURATION");
+    if (lcelConfiguration) Object.assign(defaultConfig.lcelConfiguration, lcelConfiguration);
+
+    // 兼容旧环境变量，优先级最低
+    const legacyConfig = parseJSONEnvVar("LANGFLOW_CONDITIONAL_ROUTER_CONFIG");
+    if (legacyConfig) Object.assign(defaultConfig, legacyConfig);
+
+    return defaultConfig;
   }
 
   private extractRoutingInfo(message: Message): Record<string, any> {
@@ -186,7 +220,7 @@ export class OptimizedEnhancedRouter {
           matchResult = detectedRoute === targetRoute;
           matchReason = matchResult ? "langchainjs_match" : "langchainjs_no_match";
         } else {
-          [matchResult, matchReason, effectiveConfidence] = this._smartFlexibleMatch(
+          [matchResult, matchReason, effectiveConfidence] = this.smartFlexibleMatch(
             detectedRoute,
             targetRoute,
             textRoute,
@@ -197,7 +231,7 @@ export class OptimizedEnhancedRouter {
         }
         break;
       default:
-        [matchResult, matchReason, effectiveConfidence] = this._smartFlexibleMatch(
+        [matchResult, matchReason, effectiveConfidence] = this.smartFlexibleMatch(
           detectedRoute,
           targetRoute,
           textRoute,
@@ -209,7 +243,7 @@ export class OptimizedEnhancedRouter {
     return [matchResult, matchReason, effectiveConfidence];
   }
 
-  private _smartFlexibleMatch(
+  private smartFlexibleMatch(
     detectedRoute: string,
     targetRoute: string,
     textRoute: string | null,
@@ -219,14 +253,14 @@ export class OptimizedEnhancedRouter {
   ): [boolean, string, number] {
     if (detectedRoute === targetRoute) return [true, "smart_exact_match", effectiveConfidence];
     if (textRoute && textRoute === targetRoute) return [true, "smart_text_match", Math.min(1.0, effectiveConfidence + 0.1)];
-    if (this.enableFallback && this._checkFallbackMatch(detectedRoute, targetRoute, envConfig)) {
+    if (this.enableFallback && this.checkFallbackMatch(detectedRoute, targetRoute, envConfig)) {
       return [true, "smart_fallback_match", Math.max(0.4, effectiveConfidence - 0.1)];
     }
     if (effectiveConfidence < threshold - 0.1) return [false, "smart_low_confidence", effectiveConfidence];
     return [false, "smart_no_match", effectiveConfidence];
   }
 
-  private _checkFallbackMatch(detectedRoute: string, targetRoute: string, envConfig: Record<string, any>): boolean {
+  private checkFallbackMatch(detectedRoute: string, targetRoute: string, envConfig: Record<string, any>): boolean {
     const similarities = envConfig.routeSimilarities || {
       basic: ["simple", "easy", "quick", "fast"],
       enhanced: ["complex", "advanced", "detailed", "deep", "sophisticated"],
