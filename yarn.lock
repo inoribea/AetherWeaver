@@ -1569,11 +1569,11 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@langchain/community@npm:^0.3.47":
-  version: 0.3.48
-  resolution: "@langchain/community@npm:0.3.48"
+"@langchain/community@npm:^0.3.49":
+  version: 0.3.49
+  resolution: "@langchain/community@npm:0.3.49"
   dependencies:
-    "@langchain/openai": "npm:>=0.2.0 <0.6.0"
+    "@langchain/openai": "npm:>=0.2.0 <0.7.0"
     "@langchain/weaviate": "npm:^0.2.0"
     binary-extensions: "npm:^2.2.0"
     expr-eval: "npm:^2.0.2"
@@ -1961,7 +1961,7 @@ __metadata:
       optional: true
     youtubei.js:
       optional: true
-  checksum: 10c0/2288cf44f0340dc2859822bf02d56a1e1afe765fac354987b20b83e557e2e4efd37ba925add981f076c4f6540e2f74abc3de84da3525a71dfd68ae3c57ba2b69
+  checksum: 10c0/ae41ef958bac1a55d1230a42803705f485cd00919cc77bad3974bb5795f307c61c7cb674068a55e931da246d794d40064279fed8942853e90f0a82f5641b9149
   languageName: node
   linkType: hard
 
@@ -2057,7 +2057,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@langchain/openai@npm:>=0.1.0 <0.6.0, @langchain/openai@npm:>=0.2.0 <0.6.0, @langchain/openai@npm:^0.5.15, @langchain/openai@npm:^0.5.5":
+"@langchain/openai@npm:>=0.1.0 <0.6.0, @langchain/openai@npm:^0.5.15, @langchain/openai@npm:^0.5.5":
   version: 0.5.18
   resolution: "@langchain/openai@npm:0.5.18"
   dependencies:
@@ -2067,6 +2067,32 @@ __metadata:
   peerDependencies:
     "@langchain/core": ">=0.3.58 <0.4.0"
   checksum: 10c0/c8a42927de5d6b22d08fee38d1b47766f521e81f4e51c718896c4de2e9ed0e1667c0d5173658158a5e6d278336d7f8674615a04d699bb5e61668347b8c6116f3
+  languageName: node
+  linkType: hard
+
+"@langchain/openai@npm:>=0.2.0 <0.7.0":
+  version: 0.6.3
+  resolution: "@langchain/openai@npm:0.6.3"
+  dependencies:
+    js-tiktoken: "npm:^1.0.12"
+    openai: "npm:^5.3.0"
+    zod: "npm:^3.25.32"
+  peerDependencies:
+    "@langchain/core": ">=0.3.58 <0.4.0"
+  checksum: 10c0/cda9199446d241ba67da9bcf33571955043b69e5f21883e8f9052cfb5063871cac2e1a30d889b7b04e5cf4ab8f55643fe3cd13c9cfb5ab8ab514a190fa8104f0
+  languageName: node
+  linkType: hard
+
+"@langchain/pinecone@npm:^0.2.0":
+  version: 0.2.0
+  resolution: "@langchain/pinecone@npm:0.2.0"
+  dependencies:
+    flat: "npm:^5.0.2"
+    uuid: "npm:^10.0.0"
+  peerDependencies:
+    "@langchain/core": ">=0.2.21 <0.4.0"
+    "@pinecone-database/pinecone": ^5.0.2
+  checksum: 10c0/2f93151affb518e806f6ec4ec6225b6b0ddd993a71fa08fe54aeaf08fb828e730a8c2752fd6ad3318348d0e592ad0402cf0c2ac5d054c03b898d5f930538d8d6
   languageName: node
   linkType: hard
 
@@ -2287,6 +2313,13 @@ __metadata:
   version: 1.9.0
   resolution: "@opentelemetry/api@npm:1.9.0"
   checksum: 10c0/9aae2fe6e8a3a3eeb6c1fdef78e1939cf05a0f37f8a4fae4d6bf2e09eb1e06f966ece85805626e01ba5fab48072b94f19b835449e58b6d26720ee19a58298add
+  languageName: node
+  linkType: hard
+
+"@pinecone-database/pinecone@npm:^6.1.2":
+  version: 6.1.2
+  resolution: "@pinecone-database/pinecone@npm:6.1.2"
+  checksum: 10c0/81018d90e395f03bf42131737676e012983761291b40182b6edc3dba90dae0e9ce18dbea0826dbab5d4161e74ff72212df5307752bf10a602bbf45b619c9b1fc
   languageName: node
   linkType: hard
 
@@ -3572,6 +3605,13 @@ __metadata:
   version: 1.11.1
   resolution: "@unrs/resolver-binding-win32-x64-msvc@npm:1.11.1"
   conditions: os=win32 & cpu=x64
+  languageName: node
+  linkType: hard
+
+"@upstash/vector@npm:^1.2.2":
+  version: 1.2.2
+  resolution: "@upstash/vector@npm:1.2.2"
+  checksum: 10c0/f9ecb7ebff1668b29e5d15a1ca7ada0d093563c6603cb808ddf8175a2942e438671d62db7ad27d26a3190947863d2cb2342099a1ac8c73e54c9ebf54086fdf35
   languageName: node
   linkType: hard
 
@@ -7545,16 +7585,18 @@ __metadata:
   dependencies:
     "@browserbasehq/stagehand": "npm:^2.4.0"
     "@langchain/cloudflare": "npm:^0.1.0"
-    "@langchain/community": "npm:^0.3.47"
+    "@langchain/community": "npm:^0.3.49"
     "@langchain/core": "npm:^0.3.61"
     "@langchain/deepseek": "npm:^0.0.2"
     "@langchain/google-genai": "npm:^0.2.13"
     "@langchain/langgraph": "npm:^0.3.6"
     "@langchain/langgraph-sdk": "npm:^0.0.89"
     "@langchain/openai": "npm:^0.5.15"
+    "@langchain/pinecone": "npm:^0.2.0"
     "@langchain/qdrant": "npm:^0.1.2"
     "@langchain/tavily": "npm:^0.1.4"
     "@next/bundle-analyzer": "npm:^13.4.19"
+    "@pinecone-database/pinecone": "npm:^6.1.2"
     "@radix-ui/react-checkbox": "npm:^1.1.3"
     "@radix-ui/react-dialog": "npm:^1.1.4"
     "@radix-ui/react-popover": "npm:^1.1.4"
@@ -7564,6 +7606,7 @@ __metadata:
     "@types/node": "npm:20.12.12"
     "@types/react": "npm:18.3.2"
     "@types/react-dom": "npm:18.3.0"
+    "@upstash/vector": "npm:^1.2.2"
     ai: "npm:^3.0.19"
     autoprefixer: "npm:10.4.14"
     axios: "npm:^1.11.0"

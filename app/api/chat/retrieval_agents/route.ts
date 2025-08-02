@@ -14,7 +14,7 @@ import { ChatOpenAI } from "@langchain/openai";
 import { ChatDeepSeek } from "@langchain/deepseek";
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
 import { ChatAlibabaTongyi } from "@langchain/community/chat_models/alibaba_tongyi";
-import { ChatTencentHunyuan } from "@langchain/community/chat_models/tencent_hunyuan";
+import { ChatTencentHunyuanHunyuan } from "@langchain/community/chat_models/tencent_hunyuan";
 import { createRetrieverTool } from "langchain/tools/retriever";
 import { createReactAgent } from "@langchain/langgraph/prebuilt";
 import { Document } from "@langchain/core/documents";
@@ -27,8 +27,17 @@ import { Tool } from "@langchain/core/tools";
 import { convertVercelMessageToLangChainMessage, convertLangChainMessageToVercelMessage } from '@/utils/messageFormat';
 import { wrapWithErrorHandling } from '@/utils/errorHandler';
 
+// 保留Qdrant相关导入
 import { QdrantVectorStore } from "@langchain/qdrant";
 import qdrantClient from "@/utils/qdrantClient";
+
+// 新增导入 PineconeStore, NeonPostgres, UpstashVectorStore 和 OpenAIEmbeddings
+import { PineconeStore } from "@langchain/pinecone";
+import { NeonPostgres } from "@langchain/community/vectorstores/neon";
+import { UpstashVectorStore } from "@langchain/community/vectorstores/upstash";
+import { Index } from "@upstash/vector";
+import { OpenAIEmbeddings } from "@langchain/openai";
+import { Pinecone } from "@pinecone-database/pinecone";
 
 import nodejieba from "nodejieba";
 
@@ -104,22 +113,13 @@ function normalizeScores(docs: DocumentWithScore[]) {
   }));
 }
 
-/**
- * 融合向量检索和关键词检索结果
- * @param vectorResults 向量检索结果，带分数
- * @param keywordResults 关键词检索结果，带分数
- * @param vectorWeight 向量检索权重，默认0.7
- * @param keywordWeight 关键词检索权重，默认0.3
- * @param topK 返回结果数量，默认5
- * @returns 融合排序后的文档列表
- */
-export function fuseRetrievalResults(
+const fuseRetrievalResults = (
   vectorResults: DocumentWithScore[],
   keywordResults: DocumentWithScore[],
   vectorWeight = 0.7,
   keywordWeight = 0.3,
   topK = 5
-): Document[] {
+): Document[] => {
   // 归一化分数
   const normVector = normalizeScores(vectorResults);
   const normKeyword = normalizeScores(keywordResults);
@@ -161,56 +161,7 @@ export function fuseRetrievalResults(
     const { score, source, ...doc } = d;
     return doc;
   });
-}
-
-// EnhancedAdvancedRetriever: 支持中英文分词、停用词过滤、词频匹配和排序
-class EnhancedAdvancedRetriever extends BaseRetriever {
-  lc_namespace = ["langchain", "retrievers"];
-  private documents: Document[];
-  private chineseStopwords: Set<string>;
-
-  constructor(documents: Document[], chineseStopwords: Set<string>) {
-    super();
-    this.documents = documents;
-    this.chineseStopwords = chineseStopwords;
-  }
-
-  async _getRelevantDocuments(
-    query: string,
-    runManager?: CallbackManagerForRetrieverRun
-  ): Promise<Document[]> {
-    const queryTokens = await tokenize(query, this.chineseStopwords);
-
-    // 计算文档匹配分数，基于词频
-    const scoredDocs = this.documents.map(doc => {
-      const content = doc.pageContent.toLowerCase();
-      const contentTokens: string[] = nodejieba.cut(content).filter((token: string) => token.trim() !== "" && !this.chineseStopwords.has(token))
-        .concat(
-          englishTokenize(content)
-        );
-
-      // 计算queryTokens在contentTokens中的出现次数总和
-      let docScore = 0;
-      for (const token of queryTokens) {
-        const freq = contentTokens.filter(t => t === token).length;
-        docScore += freq;
-      }
-
-      // 加强长度惩罚，避免长文档得分过高
-      const lengthPenalty = Math.pow(contentTokens.length, 3);
-      docScore = docScore / lengthPenalty;
-
-      return { doc, score: docScore };
-    });
-
-    // 过滤得分为0的文档，按得分降序排序
-    const filtered = scoredDocs.filter(item => item.score > 0);
-    filtered.sort((a, b) => b.score - a.score);
-
-    // 返回得分最高的前3条文档
-    return filtered.slice(0, 3).map(item => item.doc);
-  }
-}
+};
 
 async function createRetriever() {
   const sampleDocuments = [
@@ -237,9 +188,41 @@ async function createRetriever() {
   ];
 
   const chineseStopwords = await loadChineseStopwords();
-  const retriever = new EnhancedAdvancedRetriever(sampleDocuments, chineseStopwords);
+
+  const embeddings = new OpenAIEmbeddings({
+    apiKey: process.env.OPENAI_API_KEY,
+    model: "text-embedding-3-small",
+  });
+
+  let retriever: BaseRetriever | null = null;
+
+  if (process.env.PINECONE_API_KEY && process.env.PINECONE_ENVIRONMENT && process.env.PINECONE_INDEX) {
+    const pineconeClient = new Pinecone();
+    const pineconeIndex = pineconeClient.Index(process.env.PINECONE_INDEX);
+    retriever = await PineconeStore.fromExistingIndex(embeddings, {
+      pineconeIndex,
+      maxConcurrency: 5,
+    }) as unknown as BaseRetriever;
+  } else if (process.env.DATABASE_URL) {
+    retriever = await NeonPostgres.initialize(embeddings, {
+      connectionString: process.env.DATABASE_URL,
+    }) as unknown as BaseRetriever;
+  } else if (process.env.UPSTASH_VECTOR_REST_URL && process.env.UPSTASH_VECTOR_REST_TOKEN) {
+    const indexWithCredentials = new Index({
+      url: process.env.UPSTASH_VECTOR_REST_URL,
+      token: process.env.UPSTASH_VECTOR_REST_TOKEN,
+    });
+    const upstashStore = new UpstashVectorStore(embeddings, {
+      index: indexWithCredentials,
+    });
+    retriever = upstashStore.asRetriever() as BaseRetriever;
+  } else {
+    retriever = new QdrantVectorStore(embeddings, {
+      collectionName: "default_collection",
+    }) as unknown as BaseRetriever;
+  }
 
   return retriever;
 }
 
-export { EnhancedAdvancedRetriever, createRetriever };
+export { fuseRetrievalResults, createRetriever, englishTokenize, chineseTokenize, tokenize };

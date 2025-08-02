@@ -51,14 +51,14 @@ export async function POST(req: NextRequest) {
 
     // Setup tools - try different search providers
     const tools: Tool[] = getAgentTools();
-    
+
     // Add search tool if available
     if (process.env.SERPAPI_API_KEY) {
       tools.push(new SerpAPI());
     } else if (process.env.TAVILY_API_KEY) {
       tools.push(new TavilySearchResults({ maxResults: 5, apiKey: process.env.TAVILY_API_KEY }));
     }
-    
+
     const { model: chat, modelName } = getAvailableAgentModel();
     console.log(`[Agents] Using model: ${modelName}`);
 

@@ -1,3 +1,58 @@
+# 项目数据库支持说明
+
+本项目支持多种向量数据库和标准数据库，方便用户根据需求选择合适的存储方案。
+
+## 新增支持的数据库
+
+- **PineconeStore**  
+  通过环境变量 `PINECONE_API_KEY`、`PINECONE_INDEX` 和 `PINECONE_ENVIRONMENT` 配置。  
+  需要安装依赖：`@langchain/pinecone` 和 `@pinecone-database/pinecone`。  
+  支持高并发批量请求，适合大规模向量检索。
+
+- **Neon Postgres**  
+  通过环境变量 `DATABASE_URL` 配置，使用 Neon 提供的无服务器 PostgreSQL。  
+  需要安装依赖：`@neondatabase/serverless` 和 `@langchain/community`。  
+  支持 pgvector 扩展，方便存储和查询向量。
+
+- **UpstashVectorStore**  
+  通过环境变量 `UPSTASH_VECTOR_REST_URL` 和 `UPSTASH_VECTOR_REST_TOKEN` 配置。  
+  需要安装依赖：`@langchain/community` 和 `@upstash/vector`。  
+## 部署指南
+
+本项目支持在 Vercel 平台部署，详细部署步骤和环境变量配置请参考 
+[Vercel 部署指南](docs/vercel_deployment_guide.md)。
+
+该指南涵盖了如何配置 Pinecone、Neon Postgres 和 Upstash 向量数据库的环境变量，以及项目依赖安装和部署注意事项，帮助您快速完成项目上线。
+  支持内置向量嵌入模型，也可使用 OpenAI Embeddings。
+
+以上数据库支持已从项目中移除，相关环境变量和依赖请清理。
+
+## 环境变量示例
+
+请参考 `.env.example` 文件，配置对应的环境变量以启用所需数据库支持。
+
+## 使用说明
+
+在调用 `createVectorStore` 函数时，可通过传入参数选择使用的数据库类型：
+
+```ts
+const { vectorStore, provider } = await createVectorStore(documents, "pinecone");
+// 或 "neon"、"upstash"、不传则使用默认内存存储
+```
+
+确保已正确配置对应数据库的环境变量，并安装相关依赖。
+
+## 依赖安装示例
+
+```bash
+npm install @langchain/pinecone @pinecone-database/pinecone @langchain/community @neondatabase/serverless @upstash/vector
+```
+
+## 备注
+
+- 本项目默认优先使用 Cloudflare Embeddings，若无则使用 OpenAI Embeddings。  
+- 请根据实际部署环境（如 Vercel）配置环境变量，确保数据库连接正常。  
+- 详细使用请参考项目文档和各数据库官方文档。
 # 🤖 LangChain + Next.js 统一智能路由系统
 
 [![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/langchain-ai/langchain-nextjs-template)
@@ -55,17 +110,32 @@
 
 路由器根据输入内容和置信度动态选择上述路径，支持从基础到复杂的逐级升级，确保任务得到最合适的处理。
 
-## 🚀 v1版本支持特色
+## 🚀 数据库和向量存储支持
 
-v1版本作为项目的稳定接口，具备以下特色：
+本项目支持多种数据库和向量存储方案，满足不同部署需求：
 
-- **OpenAI兼容接口**：支持OpenAI标准的聊天完成请求格式，方便集成和迁移。
-- **统一路由请求构造**：自动检测用户意图和模型切换请求，构建统一的路由请求。
-- **智能模型选择**：调用统一路由器，根据多维度评分和策略选择最合适模型。
-- **流式响应支持**：支持OpenAI兼容的流式响应，提升用户体验和响应速度。
-- **丰富的监控与日志**：集成LangFuse性能监控，记录请求生命周期和模型选择数据。
-- **错误处理与降级**：完善的错误捕获和回退机制，保证服务稳定性。
-- **环境变量动态路由配置**：支持通过环境变量灵活配置路由模型映射和四路径模型选项，适配Vercel部署环境。
+- **PineconeStore**：云端向量数据库，适合大规模、高性能检索。
+- **Neon Postgres**：基于Postgres的云数据库，支持向量扩展。
+- **UpstashVectorStore**：基于Redis的云向量存储，支持快速访问。
+- **Qdrant**：本地向量数据库，作为后备和本地开发环境使用。
+- **Redis**：标准Redis数据库，作为后备数据库支持。
+
+### 环境变量配置示例
+
+请在项目根目录创建或更新`.env.local`文件，添加：
+
+```bash
+PINECONE_API_KEY=your-pinecone-api-key
+PINECONE_ENVIRONMENT=your-pinecone-environment
+NEON_CONNECTION_STRING=your-neon-connection-string
+UPSTASH_VECTOR_URL=your-upstash-vector-url
+UPSTASH_VECTOR_TOKEN=your-upstash-vector-token
+QDRANT_URL=your-qdrant-url
+REDIS_URL=your-redis-url
+REDIS_TOKEN=your-redis-token
+```
+
+确保在部署环境（如Vercel）中也配置相应环境变量。
 
 ## 🔧 新增工具集成说明
 
@@ -94,17 +164,6 @@ v1版本作为项目的稳定接口，具备以下特色：
 ```bash
 yarn add @langchain/tavily cheerio axios
 ```
-
-### 环境变量配置示例
-
-请在项目根目录创建或更新`.env.local`文件，添加：
-
-```bash
-TAVILY_API_KEY=your-tavily-api-key
-OPENAI_API_KEY=your-openai-api-key
-```
-
-确保在部署环境（如Vercel）中也配置相应环境变量。
 
 ## 🚀 快速开始
 

@@ -1,3 +1,8 @@
+import { PineconeStore } from "@langchain/pinecone";
+import { NeonPostgres } from "@langchain/community/vectorstores/neon";
+import { UpstashVectorStore } from "@langchain/community/vectorstores/upstash";
+import { Index as UpstashIndex } from "@upstash/vector";
+import { Pinecone as PineconeClient } from "@pinecone-database/pinecone";
 import { Document } from "@langchain/core/documents";
 import { Embeddings } from "@langchain/core/embeddings";
 import { VectorStore } from "@langchain/core/vectorstores";
@@ -180,21 +185,58 @@ export function getBestEmbeddingProvider(): EmbeddingProvider | null {
 /**
  * Create a vector store with the best available embedding provider
  */
-export async function createVectorStore(documents?: Document[]): Promise<{
-  vectorStore: SimpleVectorStore;
-  provider: EmbeddingProvider;
+export async function createVectorStore(documents?: Document[], storeType?: string): Promise<{
+  vectorStore: VectorStore;
+  provider: EmbeddingProvider | null;
 }> {
   const provider = getBestEmbeddingProvider();
-  
+
   if (!provider) {
     throw new Error("No embedding providers available. Please configure OPENAI_API_KEY or CLOUDFLARE credentials.");
   }
 
   console.log(`Using ${provider.name} embeddings for vector store`);
-  
-  const vectorStore = documents 
-    ? await SimpleVectorStore.fromDocuments(documents, provider.instance)
-    : new SimpleVectorStore(provider.instance);
+
+  let vectorStore: VectorStore;
+
+  switch (storeType) {
+    case "pinecone":
+      {
+        const pinecone = new PineconeClient();
+        const pineconeIndex = pinecone.Index(process.env.PINECONE_INDEX!);
+        vectorStore = await PineconeStore.fromExistingIndex(provider.instance, {
+          pineconeIndex,
+          maxConcurrency: 5,
+        });
+      }
+      break;
+    case "neon":
+      {
+        vectorStore = await NeonPostgres.initialize(provider.instance, {
+          connectionString: process.env.DATABASE_URL as string,
+        });
+      }
+      break;
+    case "upstash":
+      {
+        const upstashIndex = new UpstashIndex({
+          url: process.env.UPSTASH_VECTOR_REST_URL!,
+          token: process.env.UPSTASH_VECTOR_REST_TOKEN!,
+        });
+        vectorStore = new UpstashVectorStore(provider.instance, {
+          index: upstashIndex,
+        });
+      }
+      break;
+    default:
+      vectorStore = documents
+        ? await SimpleVectorStore.fromDocuments(documents, provider.instance)
+        : new SimpleVectorStore(provider.instance);
+  }
+
+  if (documents && storeType !== "pinecone" && storeType !== "neon" && storeType !== "upstash") {
+    await vectorStore.addDocuments(documents);
+  }
 
   return { vectorStore, provider };
 }

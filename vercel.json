@@ -20,6 +20,14 @@
     "LANGFLOW_MODEL_SELECTOR_CONFIG": "@langflow_model_selector_config",
     "LANGFLOW_LANGUAGE_MODEL_CONFIG": "@langflow_language_model_config",
     "VERCEL_REGION": "iad1",
-    "VERCEL_FUNCTION_TIMEOUT": "30"
+    "VERCEL_FUNCTION_TIMEOUT": "30",
+    "PINECONE_API_KEY": "@pinecone_api_key",
+    "PINECONE_ENVIRONMENT": "@pinecone_environment",
+    "NEON_CONNECTION_STRING": "@neon_connection_string",
+    "UPSTASH_VECTOR_URL": "@upstash_vector_url",
+    "UPSTASH_VECTOR_TOKEN": "@upstash_vector_token",
+    "QDRANT_URL": "@qdrant_url",
+    "REDIS_URL": "@redis_url",
+    "REDIS_TOKEN": "@redis_token"
   }
 }
