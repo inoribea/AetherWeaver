@@ -13,7 +13,8 @@
     "test-router": "node scripts/test-router.js",
     "models:list": "node -e \"console.log('Available models:', require('./utils/intelligent-router').intelligentRouter.getAvailableModels())\"",
     "models:reload": "curl -X POST http://localhost:3000/api/admin/models/reload",
-    "test": "jest"
+    "test": "jest",
+    "postinstall": "npm rebuild"
   },
   "engines": {
     "node": ">=18"
