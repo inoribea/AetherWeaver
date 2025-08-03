@@ -1,15 +1,15 @@
-import { NextRequest, NextResponse } from "next/server";
-import { Message as VercelChatMessage, StreamingTextResponse } from "ai";
+import { NextRequest, NextResponse } from 'next/server';
+import { Message as VercelChatMessage, StreamingTextResponse } from 'ai';
 
-import { createReactAgent } from "@langchain/langgraph/prebuilt";
-import { ChatOpenAI } from "@langchain/openai";
-import { ChatDeepSeek } from "@langchain/deepseek";
-import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
-import { ChatAlibabaTongyi } from "@langchain/community/chat_models/alibaba_tongyi";
-import { SerpAPI } from "@langchain/community/tools/serpapi";
-import { TavilySearchResults } from "@langchain/community/tools/tavily_search";
-import { Calculator } from "@langchain/community/tools/calculator";
-import { Tool } from "@langchain/core/tools";
+import { createReactAgent } from '@langchain/langgraph/prebuilt';
+import { ChatOpenAI } from '@langchain/openai';
+import { ChatDeepSeek } from '@langchain/deepseek';
+import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
+import { ChatAlibabaTongyi } from '@langchain/community/chat_models/alibaba_tongyi';
+import { SerpAPI } from '@langchain/community/tools/serpapi';
+import { TavilySearchResults } from '@langchain/community/tools/tavily_search';
+import { Calculator } from '@langchain/community/tools/calculator';
+import { Tool } from '@langchain/core/tools';
 import {
   AIMessage,
   BaseMessage,
@@ -17,14 +17,14 @@ import {
   HumanMessage,
   SystemMessage,
 } from "@langchain/core/messages";
-import { BaseChatModel, BaseChatModelCallOptions } from "@langchain/core/language_models/chat_models";
-import { AIMessageChunk } from "@langchain/core/messages";
+import { BaseChatModel, BaseChatModelCallOptions } from '@langchain/core/language_models/chat_models';
+import { AIMessageChunk } from '@langchain/core/messages';
 
 // export const runtime = "edge"; // Commented out to avoid edge runtime issues
 
 import { convertVercelMessageToLangChainMessage, convertLangChainMessageToVercelMessage } from '@/utils/messageFormat';
 
-import { createAlibabaTongyiModel, getAvailableAgentModel, getAgentTools, getBestAgentEmbeddingProvider } from './helpers';
+import { createAlibabaTongyiModel, getAvailableAgentModel, getAgentTools, getBestEmbeddingProvider } from './helpers';
 
 const AGENT_SYSTEM_TEMPLATE = `You are a talking parrot named Polly. All final responses must be how a talking parrot would respond. Squawk often!`;
 
@@ -63,7 +63,7 @@ export async function POST(req: NextRequest) {
     console.log(`[Agents] Using model: ${modelName}`);
 
     // Get embedding provider for agent
-    const embeddingProvider = getBestAgentEmbeddingProvider();
+    const embeddingProvider = getBestEmbeddingProvider();
     console.log(`[Agents] Using embedding provider: ${embeddingProvider?.name}`);
 
     /**

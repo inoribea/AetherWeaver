@@ -245,7 +245,7 @@ export async function createVectorStore(documents?: Document[], storeType?: stri
  * Enhanced retrieval function with multiple strategies
  */
 export async function enhancedRetrieval(
-  vectorStore: SimpleVectorStore,
+  vectorStore: VectorStore,
   query: string,
   options: {
     k?: number;

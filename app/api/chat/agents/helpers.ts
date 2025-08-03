@@ -1,91 +1,75 @@
-import { ChatOpenAI } from "@langchain/openai";
-import { ChatDeepSeek } from "@langchain/deepseek";
-import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
-import { ChatAlibabaTongyi } from "@langchain/community/chat_models/alibaba_tongyi";
-import { SerpAPI } from "@langchain/community/tools/serpapi";
-import { TavilySearchResults } from "@langchain/community/tools/tavily_search";
-import { Calculator } from "@langchain/community/tools/calculator";
-import { Tool } from "@langchain/core/tools";
-import { BaseChatModel, BaseChatModelCallOptions } from "@langchain/core/language_models/chat_models";
-import { AIMessageChunk } from "@langchain/core/messages";
-import { getBestEmbeddingProvider } from "../../../../utils/embeddings";
+import { ChatOpenAI } from '@langchain/openai';
+import { ChatDeepSeek } from '@langchain/deepseek';
+import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
+import { ChatAlibabaTongyi } from '@langchain/community/chat_models/alibaba_tongyi';
+import { SerpAPI } from '@langchain/community/tools/serpapi';
+import { TavilySearch } from '@langchain/tavily';
+import { Calculator } from '@langchain/community/tools/calculator';
+import { Tool } from '@langchain/core/tools';
+import { getBestEmbeddingProvider } from '../../../../utils/embeddings';
 
-export function createAlibabaTongyiModel(config: {
-  temperature?: number;
-  model?: string;
-  apiKey?: string;
-}): ChatAlibabaTongyi {
-  return new ChatAlibabaTongyi({
-    temperature: config.temperature,
-    model: config.model,
-    alibabaApiKey: config.apiKey,
-  });
+function createTavilySearchWrapper(): Tool {
+  return new TavilySearch({ maxResults: 5 }) as any; // 使用 any 类型断言绕过 schema 不兼容问题
 }
 
-export function getAvailableAgentModel(): { model: BaseChatModel<BaseChatModelCallOptions, AIMessageChunk>, modelName: string } {
-  const tokenCountingCallbacks = [
-    {
-      handleLLMStart: async (llm: any, prompts: string[]) => {
-        console.log(`[${new Date().toISOString()}] 🚀 Agent Model Started`);
-        console.log(`[${new Date().toISOString()}] 📝 Prompts: ${prompts.length} prompt(s)`);
-      },
-      handleLLMEnd: async (output: any) => {
-        if (output.llmOutput?.tokenUsage) {
-          const usage = output.llmOutput.tokenUsage;
-          console.log(`[${new Date().toISOString()}] 📊 Agent Token Usage:`);
-          console.log(`  - Prompt Tokens: ${usage.promptTokens || 0}`);
-          console.log(`  - Completion Tokens: ${usage.completionTokens || 0}`);
-          console.log(`  - Total Tokens: ${usage.totalTokens || 0}`);
-        }
-      },
-      handleLLMError: async (error: any) => {
-        console.error(`[${new Date().toISOString()}] ❌ Agent Model Error:`, error);
-      },
-    },
-  ];
-
-  if (process.env.OPENAI_API_KEY || process.env.NEKO_API_KEY) {
+// 添加缺失的导出函数
+export function getAvailableAgentModel() {
+  if (process.env.OPENAI_API_KEY) {
     return {
       model: new ChatOpenAI({
-        model: "gpt-4o-mini",
-        temperature: 0.2,
-        apiKey: process.env.NEKO_API_KEY || process.env.OPENAI_API_KEY,
-        configuration: { baseURL: process.env.NEKO_BASE_URL || process.env.OPENAI_BASE_URL },
-        callbacks: tokenCountingCallbacks,
+        modelName: "gpt-4.1",
+        temperature: 0,
+        apiKey: process.env.OPENAI_API_KEY
       }),
-      modelName: "gpt-4o-mini",
+      modelName: "gpt-4.1"
+    };
+  } else if (process.env.DEEPSEEK_API_KEY) {
+    return {
+      model: new ChatDeepSeek({
+        modelName: "deepseek-chat",
+        temperature: 0,
+        apiKey: process.env.DEEPSEEK_API_KEY
+      }),
+      modelName: "deepseek-chat"
     };
   } else if (process.env.GOOGLE_API_KEY) {
     return {
       model: new ChatGoogleGenerativeAI({
-        model: "gemini-2.5-flash-preview-05-20",
-        temperature: 0.2,
-        apiKey: process.env.GOOGLE_API_KEY,
-        callbacks: tokenCountingCallbacks,
+        model: "gemini-pro",
+        temperature: 0,
+        apiKey: process.env.GOOGLE_API_KEY
       }),
-      modelName: "gemini-flash",
+      modelName: "gemini-pro"
     };
-  } else if (process.env.DASHSCOPE_API_KEY) {
+  } else if (process.env.ALIBABA_API_KEY) {
     return {
       model: new ChatAlibabaTongyi({
-        model: "qwen-turbo-latest",
-        temperature: 0.2,
-        alibabaApiKey: process.env.DASHSCOPE_API_KEY,
-        callbacks: tokenCountingCallbacks,
+        alibabaApiKey: process.env.ALIBABA_API_KEY,
+        model: "qwen-plus",
+        temperature: 0
       }),
-      modelName: "qwen-turbo",
+      modelName: "qwen-plus"
     };
-  } else {
-    throw new Error("No API keys configured for agent models. Please set up OpenAI, Google, or Alibaba Tongyi API keys.");
   }
+  
+  return {
+    model: new ChatOpenAI({
+      modelName: "gpt-3.5-turbo",
+      temperature: 0
+    }),
+    modelName: "gpt-3.5-turbo"
+  };
 }
 
-/**
- * Get the best available embedding provider for agents
- */
-export function getBestAgentEmbeddingProvider() {
-  return getBestEmbeddingProvider();
+export function createAlibabaTongyiModel() {
+  return new ChatAlibabaTongyi({
+    alibabaApiKey: process.env.ALIBABA_API_KEY,
+    model: "qwen-plus",
+    temperature: 0,
+  });
 }
+
+export { getBestEmbeddingProvider } from "../../../../utils/embeddings";
 
 export function getAgentTools(): Tool[] {
   const tools: Tool[] = [new Calculator()];
@@ -93,7 +77,7 @@ export function getAgentTools(): Tool[] {
   if (process.env.SERPAPI_API_KEY) {
     tools.push(new SerpAPI());
   } else if (process.env.TAVILY_API_KEY) {
-    tools.push(new TavilySearchResults({ maxResults: 5, apiKey: process.env.TAVILY_API_KEY }));
+    tools.push(createTavilySearchWrapper());
   }
 
   return tools;

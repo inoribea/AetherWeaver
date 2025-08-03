@@ -1,13 +1,13 @@
-import { NextRequest, NextResponse } from "next/server";
-import { z } from "zod";
+import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
 
-import { ChatOpenAI } from "@langchain/openai";
-import { ChatDeepSeek } from "@langchain/deepseek";
-import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
-import { ChatAlibabaTongyi } from "@langchain/community/chat_models/alibaba_tongyi";
-import { ChatTencentHunyuan } from "@langchain/community/chat_models/tencent_hunyuan"; 
-import { PromptTemplate } from "@langchain/core/prompts";
-import { BaseChatModel } from "@langchain/core/messages";
+import { ChatOpenAI } from '@langchain/openai';
+import { ChatDeepSeek } from '@langchain/deepseek';
+import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
+import { ChatAlibabaTongyi } from '@langchain/community/chat_models/alibaba_tongyi';
+import { ChatTencentHunyuan } from '@langchain/community/chat_models/tencent_hunyuan'; 
+import { PromptTemplate } from '@langchain/core/prompts';
+import { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { routeRequest, RoutingRequest } from '@/utils/unified-router';
 
 async function getAvailableStructuredOutputModel(messages: any[]): Promise<{ model: BaseChatModel; modelName: string }> {
@@ -126,7 +126,7 @@ Input: ${currentMessage.content}`
         "X-Feature": "Structured Output",
       },
     });
-  } catch (e) {
+  } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 });
   }
 }

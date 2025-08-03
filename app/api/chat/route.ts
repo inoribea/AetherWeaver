@@ -1,14 +1,17 @@
 /* eslint-disable no-console */
 import { NextRequest } from 'next/server';
 import { HumanMessage } from '@langchain/core/messages';
-import { OptimizedEnhancedRouter } from '@/components/routing/optimizedEnhancedRouter';
-import { ModelSelector } from '@/components/models/model-selector';
+
+import { OptimizedEnhancedRouter } from '../../components/routing/optimizedEnhancedRouter';
+import { ModelSelectorComponent } from '../../components/models/model-selector';
 import { createBasicChain } from '@/chains/basic-chain';
 import { createRAGChain } from '@/chains/rag-chain';
 
 import { TavilySearch } from '@langchain/tavily';
 import { WebBrowser } from 'langchain/tools/webbrowser';
 import { ChatOpenAI, OpenAIEmbeddings } from '@langchain/openai';
+
+import { SmartRouterComponent } from '../../components/routing/smart-router';
 
 export async function POST(req: NextRequest) {
   try {
@@ -52,8 +55,15 @@ export async function POST(req: NextRequest) {
     });
 
     // 5. 选择对应的链或工具
+    const route = routingResult.route as
+      | "basic"
+      | "enhanced"
+      | "rag"
+      | "agent"
+      | "tavily"
+      | "webbrowser";
     let result;
-    switch (routingResult.route) {
+    switch (route) {
       case 'basic':
       case 'enhanced':
       case 'agent': {
@@ -99,7 +109,7 @@ export async function POST(req: NextRequest) {
         response: result?.content ?? result,
         routing: {
           route: routingResult.route,
-          confidence: routingResult.confidence,
+          confidence: routingResult.confidence ?? 1,
           model: modelConfig.model,
         },
         metadata: {
@@ -109,7 +119,7 @@ export async function POST(req: NextRequest) {
       }),
       {
         status: 200,
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
           'Access-Control-Allow-Origin': '*',
         },
@@ -117,7 +127,7 @@ export async function POST(req: NextRequest) {
     );
   } catch (error) {
     console.error('POST /api/chat error:', error);
-    
+
     return new Response(
       JSON.stringify({
         error: 'Service temporarily unavailable',
@@ -125,7 +135,7 @@ export async function POST(req: NextRequest) {
       }),
       {
         status: 503,
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
           'Access-Control-Allow-Origin': '*',
         },
@@ -143,6 +153,6 @@ export async function OPTIONS(req: NextRequest) {
       'Access-Control-Allow-Methods': 'POST, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-API-Key',
       'Access-Control-Max-Age': '86400',
-    }
+    },
   });
 }

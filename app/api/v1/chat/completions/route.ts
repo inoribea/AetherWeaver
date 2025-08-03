@@ -15,7 +15,7 @@ import {
   detectIntentFromRequest,
   selectBestModelForAuto
 } from '@/utils/openai-compat';
-import { route } from '@/utils/unified-router';
+import { routeRequest as route } from '@/utils/unified-router';
 import { handleApiKeyValidation } from './helpers';
 import { routeRequest, RoutingRequest } from '@/utils/unified-router';
 import { wrapWithErrorHandling } from '@/utils/errorHandler';
@@ -210,11 +210,20 @@ export async function POST(req: NextRequest) {
             controller.close();
           } catch (error) {
             console.error('Streaming error:', error);
+            // 明确类型处理 unknown 错误
+            let errorMessage = 'Unknown error';
+            if (error instanceof Error) {
+              errorMessage = error.message;
+            } else if (typeof error === 'string') {
+              errorMessage = error;
+            } else if (error && typeof error === 'object' && 'message' in error && typeof (error as any).message === 'string') {
+              errorMessage = (error as any).message;
+            }
             // 优雅降级：发送错误信息块，避免中断流
             const errorChunk = createOpenAIResponse(
               JSON.stringify({
                 error: {
-                  message: 'Streaming error occurred: ' + (error instanceof Error ? error.message : String(error)),
+                  message: 'Streaming error occurred: ' + errorMessage,
                   type: 'server_error',
                   code: 'streaming_error'
                 }

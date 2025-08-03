@@ -13,6 +13,10 @@ interface SmartRoutingResult {
   langchain_ready: boolean;
 }
 
+/**
+ * SmartRoutingResult 的所有字段均为必填，避免 route 可能为 undefined。
+ * 通过断言和默认值保证严格类型。
+ */
 export class SmartRouterComponent extends Runnable<BaseMessage> {
   lc_namespace = ["langchain", "custom", "smart_router"];
   private llm: any;

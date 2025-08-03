@@ -1,99 +1,22 @@
-import { NextRequest, NextResponse } from "next/server";
-import { Message as VercelChatMessage, StreamingTextResponse } from "ai";
-import { promises as fs } from "fs";
-import path from "path";
+import { NextRequest, NextResponse } from 'next/server';
+import { promises as fs } from 'fs';
+import path from 'path';
+import { Document } from '@langchain/core/documents';
+import { OpenAIEmbeddings } from '@langchain/openai';
+import { PineconeStore } from '@langchain/pinecone';
+import { NeonPostgres } from '@langchain/community/vectorstores/neon';
+import { UpstashVectorStore } from '@langchain/community/vectorstores/upstash';
+import { Index } from '@upstash/vector';
+import { QdrantVectorStore } from '@langchain/qdrant';
+import { Pinecone } from '@pinecone-database/pinecone';
 
-import {
-  AIMessage,
-  BaseMessage,
-  ChatMessage,
-  HumanMessage,
-  SystemMessage,
-} from "@langchain/core/messages";
-import { ChatOpenAI } from "@langchain/openai";
-import { ChatDeepSeek } from "@langchain/deepseek";
-import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
-import { ChatAlibabaTongyi } from "@langchain/community/chat_models/alibaba_tongyi";
-import { ChatTencentHunyuan } from "@langchain/community/chat_models/tencent_hunyuan";
-import { createRetrieverTool } from "langchain/tools/retriever";
-import { createReactAgent } from "@langchain/langgraph/prebuilt";
-import { Document } from "@langchain/core/documents";
-import { BaseRetriever } from "@langchain/core/retrievers";
-import { CallbackManagerForRetrieverRun } from "@langchain/core/callbacks/manager";
-import { BaseChatModel, BaseChatModelCallOptions } from "@langchain/core/language_models/chat_models";
-import { AIMessageChunk } from "@langchain/core/messages";
-import { Tool } from "@langchain/core/tools";
+import { tokenize, EnhancedAdvancedRetriever } from './enhancedAdvancedRetriever';
 
-import { convertVercelMessageToLangChainMessage, convertLangChainMessageToVercelMessage } from '@/utils/messageFormat';
-import { wrapWithErrorHandling } from '@/utils/errorHandler';
-
-// 保留Qdrant相关导入
-import { QdrantVectorStore } from "@langchain/qdrant";
-import qdrantClient from "@/utils/qdrantClient";
-
-// 新增导入 PineconeStore, NeonPostgres, UpstashVectorStore 和 OpenAIEmbeddings
-import { PineconeStore } from "@langchain/pinecone";
-import { NeonPostgres } from "@langchain/community/vectorstores/neon";
-import { UpstashVectorStore } from "@langchain/community/vectorstores/upstash";
-import { Index } from "@upstash/vector";
-import { OpenAIEmbeddings } from "@langchain/openai";
-import { Pinecone } from "@pinecone-database/pinecone";
-
-import nodejieba from "nodejieba";
-
-const englishStopwords = [
-  "a", "about", "above", "after", "again", "against", "all", "am", "an", "and", "any", "are", "aren't", "as", "at",
-  "be", "because", "been", "before", "being", "below", "between", "both", "but", "by",
-  "can't", "cannot", "could", "couldn't",
-  "did", "didn't", "do", "does", "doesn't", "doing", "don't", "down", "during",
-  "each",
-  "few", "for", "from", "further",
-  "had", "hadn't", "has", "hasn't", "have", "haven't", "having", "he", "he'd", "he'll", "he's", "her", "here", "here's", "hers", "herself", "him", "himself", "his", "how", "how's",
-  "i", "i'd", "i'll", "i'm", "i've", "if", "in", "into", "is", "isn't", "it", "it's", "its", "itself",
-  "let's",
-  "me", "more", "most", "mustn't", "my", "myself",
-  "no", "nor", "not",
-  "of", "off", "on", "once", "only", "or", "other", "ought", "our", "ours", "ourselves", "out", "over", "own",
-  "same", "shan't", "she", "she'd", "she'll", "she's", "should", "shouldn't", "so", "some", "such",
-  "than", "that", "that's", "the", "their", "theirs", "them", "themselves", "then", "there", "there's", "these", "they", "they'd", "they'll", "they're", "they've", "this", "those", "through", "to", "too",
-  "under", "until", "up",
-  "very",
-  "was", "wasn't", "we", "we'd", "we'll", "we're", "we've", "were", "weren't", "what", "what's", "when", "when's", "where", "where's", "which", "while", "who", "who's", "whom", "why", "why's", "with", "won't", "would", "wouldn't",
-  "you", "you'd", "you'll", "you're", "you've", "your", "yours", "yourself", "yourselves"
-];
-
-// 异步加载中文停用词集合
 async function loadChineseStopwords(): Promise<Set<string>> {
   const filePath = path.resolve(process.cwd(), "data/chinese_stopwords.txt");
   const content = await fs.readFile(filePath, "utf-8");
   const words = content.split(/\r?\n/).map(w => w.trim()).filter(w => w.length > 0);
   return new Set(words);
-}
-
-// 中文分词函数，过滤停用词，停用词集合动态传入
-function chineseTokenize(text: string, stopwords: Set<string>): string[] {
-  const tokens: string[] = nodejieba.cut(text);
-  return tokens.filter((token: string) => token.trim() !== "" && !stopwords.has(token));
-}
-
-// 英文分词函数，使用正则分割并过滤英文停用词
-function englishTokenize(text: string): string[] {
-  return text
-    .toLowerCase()
-    .split(/\W+/)
-    .filter(word => word.length > 2 && !englishStopwords.includes(word));
-}
-
-// 综合分词函数，支持中英文混合文本，异步加载中文停用词
-async function tokenize(text: string, chineseStopwords: Set<string>): Promise<string[]> {
-  const hasChinese = /[\u4e00-\u9fa5]/.test(text);
-  if (hasChinese) {
-    const chineseTokens = chineseTokenize(text, chineseStopwords);
-    const englishTokens = englishTokenize(text);
-    return Array.from(new Set([...chineseTokens, ...englishTokens]));
-  } else {
-    return englishTokenize(text);
-  }
 }
 
 function normalizeScores(docs: Document[]) {
@@ -134,40 +57,24 @@ async function createRetriever() {
 
   const chineseStopwords = await loadChineseStopwords();
 
-  const embeddings = new OpenAIEmbeddings({
-    apiKey: process.env.OPENAI_API_KEY,
-    model: "text-embedding-3-small",
-  });
-
-  let retriever: BaseRetriever | null = null;
-
-  if (process.env.PINECONE_API_KEY && process.env.PINECONE_ENVIRONMENT && process.env.PINECONE_INDEX) {
-    const pineconeClient = new Pinecone();
-    const pineconeIndex = pineconeClient.Index(process.env.PINECONE_INDEX);
-    retriever = await PineconeStore.fromExistingIndex(embeddings, {
-      pineconeIndex,
-      maxConcurrency: 5,
-    }) as unknown as BaseRetriever;
-  } else if (process.env.DATABASE_URL) {
-    retriever = await NeonPostgres.initialize(embeddings, {
-      connectionString: process.env.DATABASE_URL,
-    }) as unknown as BaseRetriever;
-  } else if (process.env.UPSTASH_VECTOR_REST_URL && process.env.UPSTASH_VECTOR_REST_TOKEN) {
-    const indexWithCredentials = new Index({
-      url: process.env.UPSTASH_VECTOR_REST_URL,
-      token: process.env.UPSTASH_VECTOR_REST_TOKEN,
-    });
-    const upstashStore = new UpstashVectorStore(embeddings, {
-      index: indexWithCredentials,
-    });
-    retriever = upstashStore.asRetriever() as BaseRetriever;
-  } else {
-    retriever = new QdrantVectorStore(embeddings, {
-      collectionName: "default_collection",
-    }) as unknown as BaseRetriever;
-  }
-
-  return retriever;
+  return new EnhancedAdvancedRetriever(sampleDocuments, chineseStopwords);
 }
 
+export async function POST(req: NextRequest) {
+  try {
+    const body = await req.json();
+    const query = body.query;
+    if (typeof query !== 'string' || query.trim() === '') {
+      return new NextResponse(JSON.stringify({ error: 'Invalid query' }), { status: 400 });
+    }
 
+    const retriever = await createRetriever();
+    const results = await retriever.getRelevantDocuments(query);
+    const normalizedResults = normalizeScores(results);
+
+    return NextResponse.json({ documents: normalizedResults });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    return new NextResponse(JSON.stringify({ error: message }), { status: 500 });
+  }
+}

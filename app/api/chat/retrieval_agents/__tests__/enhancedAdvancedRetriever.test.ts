@@ -1,7 +1,5 @@
-import { EnhancedAdvancedRetriever } from "../route";
+import { EnhancedAdvancedRetriever } from "../enhancedAdvancedRetriever";
 import { Document } from "@langchain/core/documents";
-
-// 引入jest全局函数声明，避免TS错误
 import { describe, beforeAll, test, expect } from '@jest/globals';
 
 describe("EnhancedAdvancedRetriever", () => {
@@ -10,7 +8,6 @@ describe("EnhancedAdvancedRetriever", () => {
   let chineseStopwords: Set<string>;
 
   beforeAll(async () => {
-    // 简单中文停用词集合示例
     chineseStopwords = new Set(["的", "了", "和"]);
 
     documents = [
@@ -37,16 +34,16 @@ describe("EnhancedAdvancedRetriever", () => {
 
   test("关键词提取应正确过滤停用词并分词", async () => {
     const query = "构建语言模型的框架和工具";
-    const tokens = await (retriever as any).constructor.prototype._getRelevantDocuments.call(retriever, query);
+    const tokens = await (retriever as any).getRelevantDocuments(query);
     expect(tokens.length).toBeGreaterThan(0);
   });
 
   test("检索结果应按匹配词频排序且过滤无匹配文档", async () => {
     const query = "向量数据库 相似度搜索";
-    const results = await retriever._getRelevantDocuments(query);
+    const results = await retriever.getRelevantDocuments(query);
     expect(results.length).toBeGreaterThan(0);
-    expect(results.some(doc => doc.metadata.source === "doc2")).toBe(true);
-    expect(results.every(doc => {
+    expect(results.some((doc: Document) => doc.metadata.source === "doc2")).toBe(true);
+    expect(results.every((doc: Document) => {
       const content = doc.pageContent;
       return content.includes("向量") || content.includes("相似度") || content.includes("搜索");
     })).toBe(true);
@@ -54,7 +51,7 @@ describe("EnhancedAdvancedRetriever", () => {
 
   test("检索结果数量不超过3条", async () => {
     const query = "的";
-    const results = await retriever._getRelevantDocuments(query);
+    const results = await retriever.getRelevantDocuments(query);
     expect(results.length).toBeLessThanOrEqual(3);
   });
 
@@ -68,7 +65,7 @@ describe("EnhancedAdvancedRetriever", () => {
       metadata: { source: "shortDoc" },
     });
     const testRetriever = new EnhancedAdvancedRetriever([longDoc, shortDoc], chineseStopwords);
-    const results = await testRetriever._getRelevantDocuments("关键词");
+    const results = await testRetriever.getRelevantDocuments("关键词");
     expect(results[0].metadata.source).toBe("shortDoc");
   });
 });

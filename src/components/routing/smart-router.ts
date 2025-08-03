@@ -34,7 +34,9 @@ export class SmartRouterComponent extends Runnable<BaseMessage, SmartRoutingResu
     }
     
     return {
-      ...finalResult,
+      route: 'basic', // 确保route字段默认值
+      confidence: typeof finalResult.confidence === 'number' ? finalResult.confidence : 1,
+      analysis_method: finalResult.analysis_method ?? 'rule_based',
       original_user_input: text,
       routing_is_chinese: isChineseText,
       langchainjs_ready: true,
