@@ -25,6 +25,10 @@ function isValidMessage(message: any): message is string | { content: string } {
 }
 
 export async function POST(req: NextRequest) {
+    const body = await req.json();
+    console.log('Received request body in /api/chat POST:', JSON.stringify(body));
+console.log('Received request body in /api/chat POST:', JSON.stringify(body));
+    console.log('Received request body in /api/chat POST:', JSON.stringify(body));
   try {
     const body = await req.json();
     const { message, sessionId } = body;
