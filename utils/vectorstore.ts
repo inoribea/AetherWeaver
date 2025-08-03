@@ -224,7 +224,7 @@ export async function createVectorStore(documents?: Document[], storeType?: stri
           token: process.env.UPSTASH_VECTOR_REST_TOKEN!,
         });
         vectorStore = new UpstashVectorStore(provider.instance, {
-          index: upstashIndex,
+          index: upstashIndex as any,
         });
       }
       break;
