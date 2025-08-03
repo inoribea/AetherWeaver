@@ -37,13 +37,13 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-        <title>{process.env.APP_TITLE || "LangChain + Next.js Template"}</title>
+        <title>{process.env.APP_TITLE || "LangChain 智能路由系统"}</title>
         <link rel="shortcut icon" href="/images/favicon.ico" />
         <meta
           name="description"
           content="Starter template showing how to use LangChain in Next.js projects. See source code and deploy your own at https://github.com/langchain-ai/langchain-nextjs-template!"
         />
-        <meta property="og:title" content={process.env.APP_TITLE || "LangChain + Next.js Template"} />
+        <meta property="og:title" content={process.env.APP_TITLE || "LangChain 智能路由系统"} />
         <meta
           property="og:description"
           content="Starter template showing how to use LangChain in Next.js projects. See source code and deploy your own at https://github.com/langchain-ai/langchain-nextjs-template!"
