@@ -153,7 +153,7 @@ class OptimizedRoutingChatOutput(ChatComponent):
                 "flatten_metadata": self.flatten_metadata
             },
             "model_fallback": {
-                "basic": "gpt-3.5-turbo",
+                "basic": "gpt-4.1",
                 "enhanced": "gpt-4o-mini",
                 "rag": "gpt-4o-mini",
                 "agent": "gpt-4o"

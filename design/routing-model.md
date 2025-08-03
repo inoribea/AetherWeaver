@@ -398,7 +398,7 @@
             """动态配置更新，支持LCEL和LangChain.js模式"""
             if field_name == "provider":
                 if field_value == "OpenAI":
-                    build_config["model_name"]["options"] = ["gpt-4o-mini", "gpt-3.5-turbo", "gpt-4o"]
+                    build_config["model_name"]["options"] = ["gpt-4o-mini", "gpt-4.1", "gpt-4o"]
                     build_config["model_name"]["value"] = "gpt-4o-mini"
                     build_config["api_key"]["display_name"] = "OpenAI API Key"
                     

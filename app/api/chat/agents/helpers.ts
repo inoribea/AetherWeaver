@@ -54,10 +54,10 @@ export function getAvailableAgentModel() {
   
   return {
     model: new ChatOpenAI({
-      modelName: "gpt-3.5-turbo",
+      modelName: "gpt-4.1",
       temperature: 0
     }),
-    modelName: "gpt-3.5-turbo"
+    modelName: "gpt-4.1"
   };
 }
 

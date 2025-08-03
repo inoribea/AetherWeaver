@@ -184,7 +184,7 @@
                 "session_id": f"session_{uuid.uuid4().hex[:8]}",
                 "user_id": "anonymous",
                 "model_configs": {
-                    "basic": {"model": "gpt-3.5-turbo", "temperature": 0.1},
+                    "basic": {"model": "gpt-4.1", "temperature": 0.1},
                     "enhanced": {"model": "gpt-4o-mini", "temperature": 0.3},
                     "rag": {"model": "gpt-4o-mini", "temperature": 0.2},
                     "agent": {"model": "gpt-4o", "temperature": 0.5}
