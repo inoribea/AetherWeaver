@@ -44,6 +44,9 @@ const { vectorStore, provider } = await createVectorStore(documents, "pinecone")
 ```bash
 npm install @langchain/pinecone @pinecone-database/pinecone @langchain/community @neondatabase/serverless @upstash/vector
 ```
+## 测试相关指南
+
+[Vercel 测试指南](docs/testing.md)。
 
 ## 备注
 
@@ -172,4 +175,3 @@ yarn add @langchain/tavily cheerio axios
 
 感谢 [LangChain](https://langchain.com) 和 [Vercel](https://vercel.com) 团队提供的优秀工具和平台。
 
----
