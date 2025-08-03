@@ -69,18 +69,14 @@ function extractTextFromResult(result: any): string {
   if (!result) return "";
   if (typeof result === "string") return result;
   if (typeof result === "object") {
-    // 如果 result 有 content 属性，优先取 content
     if ("content" in result && typeof result.content === "string") {
       return result.content;
     }
-    // 如果是数组，拼接其字符串表示
     if (Array.isArray(result)) {
       return result.map(item => typeof item === "string" ? item : JSON.stringify(item)).join("\n");
     }
-    // 否则转成 JSON 字符串
     return JSON.stringify(result);
   }
-  // 其他类型转字符串
   return String(result);
 }
 
@@ -90,6 +86,7 @@ function extractTextFromResult(result: any): string {
  * @returns 美化后的字符串
  */
 function beautifyRouteName(route: string): string {
+// 删除重复的 extractTextFromResult 函数，保留第一个定义
 /**
  * 从结果中提取文本内容，兼容字符串、对象或数组
  * @param result 调用链返回结果
@@ -99,18 +96,14 @@ function extractTextFromResult(result: any): string {
   if (!result) return "";
   if (typeof result === "string") return result;
   if (typeof result === "object") {
-    // 如果 result 有 content 属性，优先取 content
     if ("content" in result && typeof result.content === "string") {
       return result.content;
     }
-    // 如果是数组，拼接其字符串表示
     if (Array.isArray(result)) {
       return result.map(item => typeof item === "string" ? item : JSON.stringify(item)).join("\n");
     }
-    // 否则转成 JSON 字符串
     return JSON.stringify(result);
   }
-  // 其他类型转字符串
   return String(result);
 }
   switch (route) {
