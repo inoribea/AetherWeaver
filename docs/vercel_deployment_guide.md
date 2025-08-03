@@ -28,7 +28,7 @@
 
 ### 3. 部署步骤
 
-1. 在 Vercel 项目设置中配置环境变量（详见下文环境变量配置）。
+1. 在 Vercel 项目设置中配置环境变量（详见各自环境变量配置）。
 2. 部署项目，Vercel 会自动构建并启动。
 3. 访问部署的应用，确认数据库连接正常。
 
@@ -37,307 +37,95 @@
 - 确保环境变量配置正确，避免连接失败。
 - 根据实际需求选择使用的数据库类型，修改项目配置或调用参数。
 - 监控 Vercel 部署日志，及时排查问题。
-## Vercel 环境下配置自定义 OpenAI Base URL
-
-若需在 Vercel 部署时为项目指定自定义的 OpenAI 接口基础 URL，可通过 Vercel 仪表盘设置环境变量。
-
-### 配置步骤
-
-1. 登录 Vercel 控制台，进入到对应项目的设置界面。
-2. 选择 "**Environment Variables**"（环境变量）配置区域。
-3. 新建变量，变量名填写示例中的配置键名，例如：
-
-   ```
-   CUSTOM_LANGUAGE_COMPONENT_CONFIG
-   ```
-
-4. 变量值填入 JSON 格式字符串，包含 openAI 的 baseUrl 和其他相关配置，如：
-
-   ```json
-   {
-     "openAI": {
-       "baseUrl": "https://custom-openai.example.com/v1",
-       "apiKey": "your_openai_api_key"
-     }
-   }
-   ```
-
-5. 保存并重新部署项目，系统将自动载入该配置。
-
-### 注意事项
-
-- 确保 JSON 格式合法，避免因格式错误导致项目配置加载失败。
-### 在 Vercel 图形界面填写环境变量的 JSON 字符串示例
-
-在 Vercel 项目设置的 **Environment Variables** 中：
-
-- **Name(变量名)**: `CUSTOM_LANGUAGE_COMPONENT_CONFIG`
-- **Value(变量值)**: 需要填写一行合法的 JSON 字符串，格式示例如下（注意不要换行）：
-
-  ```json
-  {"openAI":{"baseUrl":"https://custom-openai.example.com/v1","apiKey":"your_api_key"}}
-  ```
-
-> ⚠️ 注意：  
-> - Vercel 界面要求输入单行字符串，不支持带换行的多行格式。  
-> - 请确保所有双引号和符号正确无误，否则解析会失败。  
-> - 推荐先在本地用 JSON 校验工具确认无误后复制粘贴。  
-> - 例子中可根据实际情况替换 `baseUrl` 和 `apiKey` 内容。
-
-这样配置后，部署时项目便能通过 `loadEnvConfig` 将此配置加载为对象使用。
-- apiKey 可根据需是否放入同一配置内或通过其他安全方式管理。
-- 该配置会覆盖默认的 openAI baseUrl 设置。
 
 ---
 
-此方案灵活支持根据不同部署环境动态配置 OpenAI 接口地址，方便用户自定义和切换接口服务。
+## 二、普通 Chat 路径部署环境变量配置指南
+
+请在 Vercel 项目环境变量设置中添加以下变量，适用于普通聊天接口（非 v1 路径）：
+
+- OPENAI_API_KEY="your-openai-api-key"
+- GOOGLE_API_KEY="your-google-api-key"
+- DEEPSEEK_API_KEY="your-deepseek-api-key"
+- DASHSCOPE_API_KEY="your-dashscope-api-key"
+- NEKO_API_KEY="your-neko-api-key"
+- NEKO_BASE_URL="your-neko-base-url"
+- CLAUDE_API_KEY="your-claude-api-key"
+- CLAUDE_BASE_URL="https://api.anthropic.com"
+- O3_API_KEY="your-o3-api-key"
+- O3_BASE_URL="your-o3-base-url"
+- OPENROUTER_API_KEY="your-openrouter-api-key"
+- OPENROUTER_BASE_URL="https://openrouter.ai/api/v1"
+- TENCENT_HUNYUAN_SECRET_ID="your-tencent-secret-id"
+- TENCENT_HUNYUAN_SECRET_KEY="your-tencent-secret-key"
+
+高级功能及路由配置可参考 `.env.example` 文件，普通路由默认使用SmartRouterComponent和ModelManager控制模型选择。
 
 ---
 
-## 二、环境变量配置
+## 三、v1 路径部署环境变量配置指南
 
-请在 Vercel 项目的环境变量设置中添加以下变量，确保项目功能正常运行。
+v1 路径独立使用统一智能路由器，模型配置和决策逻辑依赖于 `models-config.json` 配置和统一路由器代码，相关环境变量如下：
 
-### 1. 向量数据库配置
+- LANGCHAIN_API_KEYS="your_api_key_1,your_api_key_2"    # 多个API Key 用逗号分隔
+- LANGCHAIN_API_KEY="your_default_api_key"                # 单个默认API Key
+- LANGCHAIN_API_KEY_1="your_api_key_1"                    # 编号API Key 1
+- LANGCHAIN_API_KEY_2="your_api_key_2"                    # 编号API Key 2
+- ENABLE_API_AUTH="true"                                   # 是否启用API认证
+- LANGCHAIN_ADMIN_KEY="your_admin_api_key"                 # 管理员Key
+- OPENAI_API_KEY="your-openai-api-key"
+- OPENAI_BASE_URL="https://url/v1"                         # 自定义OpenAI Base URL
+- LANGFLOW_ROUTER_MODEL_NAME="gpt-4.1-nano"                # 统一路由器默认模型名
 
-- **Pinecone 向量数据库**
+其他第三方API Key同普通chat一致配置。
 
-  - `PINECONE_API_KEY`（必填）：Pinecone API 密钥
-  - `PINECONE_INDEX`（必填）：Pinecone 索引名称
-  - `PINECONE_ENVIRONMENT`（选填）：Pinecone 环境
+### 路由功能开关及配置
 
-- **Neon Postgres 数据库**
+- ENABLE_UNIFIED_ROUTING="true"              # 启用统一路由器
+- ENABLE_INTELLIGENT_ROUTING="true"          # 启用智能路由决策
+- ENABLE_MODEL_SWITCHING="true"               # 启用模型切换
+- ENABLE_PERFORMANCE_MONITORING="true"       # 性能监控
+- ROUTING_CONFIDENCE_THRESHOLD="0.7"         # 路由置信度阈值
+- ROUTING_FALLBACK_MODEL="gpt-4o-all"         # 回退模型
+- ROUTING_CACHE_TTL="300"                      # 路由缓存时间（秒）
 
-  - `DATABASE_URL`（必填）：Neon Postgres 连接字符串，格式示例：
+### 分路由模型复杂度分类
 
-    ```
-    postgresql://user:password@host:port/database?schema=public
-    ```
+- COMPLEXITY_HIGH_MODELS="claude-sonnet-4-all,gpt-4o-all,deepseek-reasoner,hunyuan-t1-latest"
+- COMPLEXITY_MEDIUM_MODELS="gpt-4o-all,gemini-flash,qwen-turbo,hunyuan-turbos-latest,claude-sonnet-4-all"
+- COMPLEXITY_LOW_MODELS="gemini-flash,qwen-turbo,hunyuan-turbos-latest,gpt-4o-all"
 
-- **Upstash 向量数据库**
+### 模型选择权重
 
-  - `UPSTASH_VECTOR_REST_URL`（必填）：Upstash 向量数据库 REST URL
-  - `UPSTASH_VECTOR_REST_TOKEN`（必填）：Upstash 向量数据库访问令牌
-
-### 2. 主模型 API 密钥
-
-- `OPENAI_API_KEY`（必填）：用于 OpenAI API 密钥
-
-### 3. 应用基础配置
-
-- `VERCEL_APP_URL`：应用基础 URL
-- `APP_TITLE`：应用标题
-
-### 4. 多模型 API 密钥配置
-
-支持多种模型的 API 密钥配置，详见 `.env.example` 文件，包括 Google Gemini、DeepSeek、阿里云通义千问、Neko、Claude、OpenRouter、腾讯混元、Cloudflare Workers AI 等。
-
-### 5. 统一智能路由系统配置
-
-- 路由功能开关、路由决策配置、复杂度阈值模型优先级配置等。
-
-### 6. 高级功能配置
-
-- 网络搜索、内存和持久化、监控和日志、性能和限制、安全配置、功能开关、语言优化、开发和测试配置等。
+- MODEL_SELECTION_CAPABILITY_WEIGHT="0.4"
+- MODEL_SELECTION_COST_WEIGHT="0.3"
+- MODEL_SELECTION_PERFORMANCE_WEIGHT="0.3"
 
 ---
-### 决策路由模型名称自定义
 
-为支持通过环境变量灵活控制智能路由中的默认模型名称，增加以下环境变量配置：
+## 四、配置 JSON 环境变量示例
 
-- `LANGFLOW_ROUTER_MODEL_NAME`  
-  作用：指定决策路由默认使用的模型名称  
-  类型：字符串  
-  示例值：`"gpt-4.1-nano"`  
-  说明：该配置优先级高于代码内默认值，若不设置，则由代码内默认名称生效。
+示例：自定义 OpenAI Base URL 配置变量
 
-示例：  
-```bash
-LANGFLOW_ROUTER_MODEL_NAME="gpt-4.1-nano"
-```
-
-## 三、通过环境变量配置决策路由
-
-### 1. 环境变量 `LANGFLOW_CONDITIONAL_ROUTER_CONFIG`
-
-该环境变量为 JSON 格式字符串，用于覆盖默认的决策路由配置，主要包括：
-
-- **matching_strategies**：定义多种路由匹配策略及其参数。
-- **route_similarities**：路由名称与相似词的映射，用于模糊匹配。
-- **confidence_adjustments**：置信度调整参数。
-- **memory_support**：记忆相关支持配置。
-- **langchainjs_compatibility**：LangChain.js 兼容性配置。
-- **lcel_configuration**：LCEL 相关可运行接口配置。
-
-#### 示例配置（需转义为单行字符串）：
+- 变量名：`CUSTOM_LANGUAGE_COMPONENT_CONFIG`
+- 变量值（单行 JSON 字符串）：
 
 ```json
-{
-  "matching_strategies": {
-    "exact_match": { "strict": true, "fallback": false },
-    "metadata_priority": { "prefer_metadata": true, "text_fallback": true },
-    "confidence_aware": { "threshold_required": true, "dynamic_threshold": false },
-    "smart_flexible": { "multi_level": true, "adaptive": true },
-    "langchainjs_compatible": { "runnable_interface": true, "flatten_output": true }
-  },
-  "route_similarities": {
-    "basic": ["simple", "easy", "quick", "fast"],
-    "enhanced": ["complex", "advanced", "detailed", "deep", "sophisticated"],
-    "rag": ["search", "retrieve", "document", "knowledge", "lookup"],
-    "agent": ["tool", "execute", "action", "api", "compute"]
-  },
-  "confidence_adjustments": {
-    "reassignment_penalty": 0.2,
-    "fallback_boost": 0.1,
-    "memory_boost": 0.15
-  },
-  "memory_support": {
-    "langflow_chat_memory": true,
-    "custom_memory": true,
-    "boost_factor": 0.1
-  },
-  "langchainjs_compatibility": {
-    "export_format": true,
-    "flatten_metadata": true,
-    "runnable_interface": true,
-    "async_support": true,
-    "streaming_support": true
-  },
-  "lcel_configuration": {
-    "enable_runnable": true,
-    "enable_passthrough": true,
-    "enable_lambda": true,
-    "enable_parallel": true
-  }
-}
+{"openAI":{"baseUrl":"https://custom-openai.example.com/v1","apiKey":"your_openai_api_key"}}
 ```
-
-### 2. 拆分环境变量配置
-
-为简化管理，支持将配置拆分为多个独立环境变量：
-
-| 环境变量名称                              | 配置字段                  | 说明                             |
-|-----------------------------------------|---------------------------|----------------------------------|
-| `LANGFLOW_ROUTER_MATCHING_STRATEGIES`   | matchingStrategies        | 路由匹配策略及参数               |
-| `LANGFLOW_ROUTER_ROUTE_SIMILARITIES`    | routeSimilarities         | 路由名称与相似词映射             |
-| `LANGFLOW_ROUTER_CONFIDENCE_ADJUSTMENTS`| confidenceAdjustments     | 置信度调整参数                   |
-| `LANGFLOW_ROUTER_MEMORY_SUPPORT`        | memorySupport             | 记忆相关支持配置                 |
-| `LANGFLOW_ROUTER_LANGCHAINJS_COMPATIBILITY` | langchainjsCompatibility | LangChain.js 兼容性配置          |
-| `LANGFLOW_ROUTER_LCEL_CONFIGURATION`    | lcelConfiguration        | LCEL 相关可运行接口配置          |
-
-#### 示例拆分配置：
-
-```bash
-export LANGFLOW_ROUTER_MEMORY_SUPPORT='{
-  "langflowChatMemory": true,
-  "customMemory": true,
-  "boostFactor": 0.2
-}'
-
-export LANGFLOW_ROUTER_MATCHING_STRATEGIES='{
-  "exact_match": { "strict": true, "fallback": false },
-  "smart_flexible": { "multiLevel": true, "adaptive": true }
-}'
-```
-
-### 3. 配置加载顺序与建议
-
-- 系统优先加载拆分的多个环境变量，逐个合并覆盖默认配置。
-- 兼容旧的单一大环境变量 `LANGFLOW_CONDITIONAL_ROUTER_CONFIG`，优先级最低。
-- 推荐拆分配置，便于单独调整和版本管理。
-- 保持 JSON 格式合法，避免加载失败。
-- 根据业务需求灵活启用或禁用各部分配置。
 
 ---
 
-## 四、总结
+## 五、环境变量配置管理建议
 
-通过以上步骤，您可以在 Vercel 平台顺利部署本项目，并通过环境变量灵活配置数据库连接及智能路由决策，满足不同业务场景需求。
-
-如需详细环境变量说明，请参考项目根目录下的 `.env.example` 文件。
-
----
-# 环境变量配置指南 — loadEnvConfig 使用说明
-
-本项目通过 `loadEnvConfig` 函数统一加载和管理环境变量配置，兼容在本地和 Vercel 等云平台的部署环境。
-
-## 函数定义
-
-```ts
-/**
- * 统一环境变量加载工具，兼容 Vercel 部署环境
- * @param vercelMode 是否为 Vercel 环境模式（production 时启用）
- * @param configKey 环境变量中存储配置 JSON 字符串的键名
- * @param defaultConfig 默认配置对象（会被合并覆盖）
- * @returns 合并后的配置对象
- */
-export function loadEnvConfig(
-  vercelMode: boolean,
-  configKey: string,
-  defaultConfig: Record<string, any>
-): Record<string, any> {
-  try {
-    if (vercelMode) {
-      const configStr = process.env[configKey] || "{}";
-      const vercelConfig = JSON.parse(configStr);
-      Object.assign(defaultConfig, vercelConfig);
-      Object.assign(defaultConfig.deployment, {
-        env: "vercel",
-        edgeCompatible: true,
-        region: process.env.VERCEL_REGION || "unknown",
-        functionTimeout: parseInt(process.env.VERCEL_FUNCTION_TIMEOUT || "30"),
-      });
-    } else {
-      const configStr = process.env[configKey] || "{}";
-      const envConfig = JSON.parse(configStr);
-      Object.assign(defaultConfig, envConfig);
-    }
-  } catch {
-    // 忽略 JSON 解析错误，使用默认配置
-  }
-  return defaultConfig;
-}
-```
-
-## 使用说明
-
-- **环境变量格式**  
-  环境变量为字符串形式的 JSON，对应项目的配置对象，例如：
-
-  ```json
-  {
-    "openAI": {
-      "baseUrl": "https://custom-openai.endpoint/v1",
-      "apiKey": "your-api-key"
-    },
-    "deployment": {
-      "env": "vercel"
-    }
-  }
-  ```
-
-- **部署环境**  
-  - 在本地或非 Vercel 环境，函数从对应环境变量中读取配置并合并到默认配置中。  
-  - 在 Vercel 环境（`VERCEL_ENV=production`）下，函数同时注入 Vercel 相关运行时信息。
-
-- **用例示例**  
-  在项目中调用如下：
-
-  ```ts
-  const config = loadEnvConfig(
-    process.env.VERCEL_ENV === "production",
-    "CUSTOM_LANGUAGE_COMPONENT_CONFIG",
-    { openAI: { baseUrl: "", apiKey: "" }, deployment: {} }
-  );
-  ```
-
-  并使用 `config.openAI.baseUrl` 等字段获取自定义 OpenAI 接口地址等配置。
-
-## 备注
-
-- JSON 配置请确保语法正确，防止解析失败导致使用默认配置。  
-- 通过该方式，可以灵活配置自定义OpenAI接口URL、API密钥、部署相关参数等。
+- 建议拆分复杂 JSON 配置为多个单独环境变量，便于调整和管理。
+- 配置加载遵循合并覆盖规则，Vercel 环境注入专有参数。
+- 确保格式合法，避免运行时加载失败。
 
 ---
 
-此配置方案使得项目在多环境部署时配置统一且灵活，推荐所有需要调整接口地址或参数的场景通过环境变量传入实现。
+## 六、总结
+
+本指南拆分普通 Chat 路径与 v1 路径的环境变量配置，方便根据业务需求灵活调整和使用。v1路劲使用统一路由器进行智能模型调度，普通路径依赖传统模型管理组件。两者环境变量配置可共存也可分开管理。
+
+---
