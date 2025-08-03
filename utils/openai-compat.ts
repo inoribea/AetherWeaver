@@ -594,7 +594,7 @@ export function detectModelSwitchRequest(userContent: string): string | undefine
  * @param body OpenAICompletionRequest
  */
 export async function detectIntentFromRequest(body: OpenAICompletionRequest): Promise<string> {
-  // 简单实现：如消息包含“结构化”或“json”则走 structured_output，否则默认 /api/chat/route
+  // 简单实现：如消息包含“结构化”或“json”则走 structured_output，否则默认 /api/chat
   const lastMsg = body.messages?.[body.messages.length - 1];
   const content = lastMsg && typeof lastMsg.content === 'string'
     ? lastMsg.content
@@ -611,7 +611,7 @@ export async function detectIntentFromRequest(body: OpenAICompletionRequest): Pr
     return '/api/chat/agents/route';
   }
   // 默认
-  return '/api/chat/route';
+  return '/api/chat';
 }
 
 /**
