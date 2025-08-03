@@ -87,8 +87,31 @@ async function getAvailableStructuredOutputModel(messages: any[]): Promise<{ mod
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const messages = body.messages ?? [];
+
+    if (!body.messages || !Array.isArray(body.messages) || body.messages.length === 0) {
+      console.error('Invalid or empty messages array in /api/chat/structured_output POST:', body.messages);
+      return NextResponse.json(
+        {
+          error: 'Invalid or empty messages array',
+          message: 'Request body must contain non-empty messages array',
+        },
+        { status: 400 }
+      );
+    }
+
+    const messages = body.messages;
     const currentMessage = messages[messages.length - 1];
+
+    if (!currentMessage || typeof currentMessage.content !== 'string' || currentMessage.content.trim().length === 0) {
+      console.error('Invalid last message content in /api/chat/structured_output POST:', currentMessage);
+      return NextResponse.json(
+        {
+          error: 'Invalid last message content',
+          message: 'The last message must have a non-empty content string',
+        },
+        { status: 400 }
+      );
+    }
 
     const { model, modelName } = await getAvailableStructuredOutputModel(messages);
 
@@ -115,7 +138,7 @@ export async function POST(req: NextRequest) {
 - chat_response: Provide an appropriate response
 - final_punctuation: Identify the final punctuation mark
 
-Input: ${currentMessage.content}`
+Input: ${currentMessage.content.trim()}`
       }
     ]);
 
@@ -127,6 +150,7 @@ Input: ${currentMessage.content}`
       },
     });
   } catch (e: any) {
+    console.error('POST /api/chat/structured_output error:', e);
     return NextResponse.json({ error: e.message }, { status: 500 });
   }
 }

@@ -9,14 +9,46 @@ import { ChatOpenAI, OpenAIEmbeddings } from '@langchain/openai';
 import { SmartRouterComponent } from '../../components/routing/smart-router';
 import { ModelManager } from '../../admin/models/ModelManager';
 
+function isValidMessage(message: any): message is string | { content: string } {
+  if (typeof message === 'string' && message.trim().length > 0) {
+    return true;
+  }
+  if (
+    message &&
+    typeof message === 'object' &&
+    typeof message.content === 'string' &&
+    message.content.trim().length > 0
+  ) {
+    return true;
+  }
+  return false;
+}
+
 export async function POST(req: NextRequest) {
   try {
-    const { message, sessionId } = await req.json();
+    const body = await req.json();
+    const { message, sessionId } = body;
+
+    if (!isValidMessage(message)) {
+      console.error('Invalid message format in /api/chat POST:', message);
+      return new Response(
+        JSON.stringify({
+          error: 'Invalid message format',
+          message: 'Message must be a non-empty string or an object with a non-empty content string',
+        }),
+        {
+          status: 400,
+          headers: {
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*',
+          },
+        }
+      );
+    }
 
     const safeMessageContent =
-      typeof message === "string" ? message :
-      message && typeof message.content === "string" ? message.content :
-      "";
+      typeof message === "string" ? message.trim() :
+      message.content.trim();
 
     // 智能路由决策
     const router = new SmartRouterComponent({
