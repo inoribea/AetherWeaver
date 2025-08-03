@@ -8,7 +8,7 @@ export class OptimizedEnhancedRouter {
   name = "OptimizedEnhancedRouter";
 
   routingMessage?: Message;
-  matchRoute: string = "basic";
+  matchRoute: string = "gpt-4.1-nano"; 
   matchingStrategy: string = "smart_flexible";
   vercelMode: boolean = false;
   langchainjsExport: boolean = false;
@@ -24,6 +24,11 @@ export class OptimizedEnhancedRouter {
   constructor(config?: Partial<OptimizedEnhancedRouter>) {
     if (config) {
       Object.assign(this, config);
+    }
+    // 优先从环境变量读取模型名称作为匹配路由
+    const envModelName = process.env.LANGFLOW_ROUTER_MODEL_NAME;
+    if (envModelName) {
+      this.matchRoute = envModelName;
     }
   }
 
