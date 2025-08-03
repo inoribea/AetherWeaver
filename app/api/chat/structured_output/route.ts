@@ -38,8 +38,8 @@ async function getAvailableStructuredOutputModel(messages: any[]): Promise<{ mod
       model = new ChatTencentHunyuan({
         temperature: 0.8,
         model: selectedModel,
-        tencentSecretId: process.env.TENCENT_SECRET_ID,
-        tencentSecretKey: process.env.TENCENT_SECRET_KEY,
+        tencentSecretId: process.env.TENCENT_HUNYUAN_SECRET_ID,
+        tencentSecretKey: process.env.TENCENT_HUNYUAN_SECRET_KEY,
       });
     } else if (selectedModel.includes("google")) {
       model = new ChatGoogleGenerativeAI({
@@ -51,7 +51,7 @@ async function getAvailableStructuredOutputModel(messages: any[]): Promise<{ mod
       model = new ChatAlibabaTongyi({
         temperature: 0.8,
         model: selectedModel,
-        alibabaApiKey: process.env.ALIBABA_API_KEY,
+        alibabaApiKey: process.env.DASHSCOPE_API_KEY,
       });
     } else if (selectedModel.includes("deepseek")) {
       model = new ChatDeepSeek({
