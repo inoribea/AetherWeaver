@@ -58,28 +58,37 @@ export async function POST(req: NextRequest) {
       case 'enhanced':
       case 'agent': {
         const chain = createBasicChain();
-        result = await chain.invoke({ input: message });
+        result = await chain.invoke(message);
         break;
       }
       case 'rag': {
         const chain = createRAGChain();
-        result = await chain.invoke({ input: message });
+        // rag chain 需要 context_documents 参数，暂时传空数组，后续根据需求完善
+        result = await chain.invoke({ input: message, context_documents: [] });
         break;
       }
-      /* /* case 'tavily': { */ */
+      case 'tavily': {
         // 使用Tavily工具
-        result = await tavilyTool.call({ query: message });
+        if (typeof tavilyTool.invoke === 'function') {
+          result = await tavilyTool.invoke({ query: message });
+        } else {
+          throw new Error('TavilySearch工具不支持invoke方法');
+        }
         break;
       }
       case 'webbrowser': {
         // 使用WebBrowser工具
-        result = await webBrowserTool.call({ url: message });
+        if (typeof webBrowserTool.invoke === 'function') {
+          result = await webBrowserTool.invoke({ url: message });
+        } else {
+          throw new Error('WebBrowser工具不支持invoke方法');
+        }
         break;
       }
       default: {
         // 默认使用basic链
         const chain = createBasicChain();
-        result = await chain.invoke({ input: message });
+        result = await chain.invoke(message);
         break;
       }
     }
