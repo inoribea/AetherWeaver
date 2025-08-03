@@ -2,7 +2,7 @@ import { Runnable } from "@langchain/core/runnables";
 import { BaseMessage } from "@langchain/core/messages";
 
 interface SmartRoutingResult {
-  route: 'basic' | 'enhanced' | 'rag' | 'agent';
+  route: "basic" | "enhanced" | "rag" | "agent";
   confidence: number;
   analysis_method: string;
   has_memory: boolean;
@@ -13,10 +13,6 @@ interface SmartRoutingResult {
   langchain_ready: boolean;
 }
 
-/**
- * SmartRoutingResult 的所有字段均为必填，避免 route 可能为 undefined。
- * 通过断言和默认值保证严格类型。
- */
 export class SmartRouterComponent extends Runnable<BaseMessage> {
   lc_namespace = ["langchain", "custom", "smart_router"];
   private llm: any;
@@ -29,7 +25,14 @@ export class SmartRouterComponent extends Runnable<BaseMessage> {
   }
 
   async invoke(input: BaseMessage): Promise<SmartRoutingResult> {
-    // 兼容 Vercel 环境变量
+    if (!input || !input.content || typeof input.content !== "string") {
+      throw new Error(
+        "SmartRouterComponent.invoke: input must be BaseMessage with a string content"
+      );
+    }
+    if (!input.additional_kwargs) {
+      input.additional_kwargs = {};
+    }
     if (typeof process !== "undefined" && process.env && process.env.VERCEL) {
       this.config.vercel_mode = true;
     }
@@ -41,20 +44,57 @@ export class SmartRouterComponent extends Runnable<BaseMessage> {
     return chineseChars ? chineseChars.length > text.length * 0.3 : false;
   }
 
-  private analyzeByRules(text: string, isChinese: boolean): Partial<SmartRoutingResult> {
-    // 规则分析实现，结合关键词和上下文
+  private analyzeByRules(
+    text: string,
+    isChinese: boolean
+  ): Partial<SmartRoutingResult> {
     const lower = text.toLowerCase();
 
     const keywords = {
-      agent: ["计算", "执行", "调用", "运行", "查询", "上传", "下载", "api", "工具", "action"],
-      rag: ["查找", "搜索", "资料", "文档", "数据库", "知识库", "记录", "历史"],
-      enhanced: ["写", "创作", "生成", "分析", "解释", "详细", "专业", "复杂", "方案", "设计", "优化"],
+      agent: [
+        "计算",
+        "执行",
+        "调用",
+        "运行",
+        "查询",
+        "上传",
+        "下载",
+        "api",
+        "工具",
+        "action",
+      ],
+      rag: [
+        "查找",
+        "搜索",
+        "资料",
+        "文档",
+        "数据库",
+        "知识库",
+        "记录",
+        "历史",
+      ],
+      enhanced: [
+        "写",
+        "创作",
+        "生成",
+        "分析",
+        "解释",
+        "详细",
+        "专业",
+        "复杂",
+        "方案",
+        "设计",
+        "优化",
+      ],
     };
 
     const counts = {
       agent: keywords.agent.reduce((acc, kw) => acc + (lower.includes(kw) ? 1 : 0), 0),
       rag: keywords.rag.reduce((acc, kw) => acc + (lower.includes(kw) ? 1 : 0), 0),
-      enhanced: keywords.enhanced.reduce((acc, kw) => acc + (lower.includes(kw) ? 1 : 0), 0),
+      enhanced: keywords.enhanced.reduce(
+        (acc, kw) => acc + (lower.includes(kw) ? 1 : 0),
+        0
+      ),
     };
 
     if (counts.agent >= 2) {
@@ -62,13 +102,20 @@ export class SmartRouterComponent extends Runnable<BaseMessage> {
     } else if (counts.rag >= 2) {
       return { route: "rag", confidence: 0.85, analysis_method: "rule_based" };
     } else if (counts.enhanced >= 2) {
-      return { route: "enhanced", confidence: 0.8, analysis_method: "rule_based" };
+      return {
+        route: "enhanced",
+        confidence: 0.8,
+        analysis_method: "rule_based",
+      };
     } else {
       return { route: "basic", confidence: 0.6, analysis_method: "rule_based" };
     }
   }
 
-  private async enhanceWithLLM(ruleResult: Partial<SmartRoutingResult>, text: string): Promise<Partial<SmartRoutingResult>> {
+  private async enhanceWithLLM(
+    ruleResult: Partial<SmartRoutingResult>,
+    text: string
+  ): Promise<Partial<SmartRoutingResult>> {
     if (!this.llm) {
       return ruleResult;
     }
@@ -106,14 +153,23 @@ export class SmartRouterComponent extends Runnable<BaseMessage> {
     return ruleResult;
   }
 
-  private async invokeWithRetry(input: BaseMessage, maxRetries = 3): Promise<SmartRoutingResult> {
+  private async invokeWithRetry(
+    input: BaseMessage,
+    maxRetries = 3
+  ): Promise<SmartRoutingResult> {
     let attempt = 0;
     let lastResult: Partial<SmartRoutingResult> | null = null;
     const threshold = 0.6;
 
     while (attempt < maxRetries) {
-      const ruleRes = this.analyzeByRules(input.content.toString(), this.detectChinese(input.content.toString()));
-      const enhancedRes = this.config.analysis_mode === "llm_enhanced" ? await this.enhanceWithLLM(ruleRes, input.content.toString()) : ruleRes;
+      const ruleRes = this.analyzeByRules(
+        input.content.toString(),
+        this.detectChinese(input.content.toString())
+      );
+      const enhancedRes =
+        this.config.analysis_mode === "llm_enhanced"
+          ? await this.enhanceWithLLM(ruleRes, input.content.toString())
+          : ruleRes;
 
       if (enhancedRes.confidence && enhancedRes.confidence >= threshold) {
         return {
@@ -128,7 +184,6 @@ export class SmartRouterComponent extends Runnable<BaseMessage> {
           langchain_ready: true,
         };
       } else {
-        // 置信度低，升级路由
         if (enhancedRes.route === "basic") {
           enhancedRes.route = "enhanced";
           enhancedRes.confidence = (enhancedRes.confidence || 0.5) + 0.1;
