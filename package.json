@@ -4,6 +4,7 @@
   "private": true,
   "packageManager": "yarn@4.9.2",
   "scripts": {
+    "type": "module",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
@@ -11,6 +12,9 @@
     "format": "prettier --write \"app\"",
     "add-model": "node scripts/add-model.js",
     "test-router": "node scripts/test-router.js",
+    "v1-route-request": "ts-node scripts/v1-route-request.js",
+    "test-claude-routing": "ts-node scripts/test-claude-routing.ts",
+    "test-complexity-models": "ts-node scripts/test-complexity-models.ts",
     "models:list": "node -e \"console.log('Available models:', require('./utils/intelligent-router').intelligentRouter.getAvailableModels())\"",
     "models:reload": "curl -X POST http://localhost:3000/api/admin/models/reload",
     "test": "jest"
@@ -88,6 +92,7 @@
     "tailwindcss": "3.3.3",
     "ts-jest": "^29.4.0",
     "ts-node": "^10.9.2",
-    "typescript": "5.1.6"
+    "ts-node-esm": "^0.0.6",
+    "typescript": "^5.9.2"
   }
 }

@@ -1,11 +1,9 @@
-#!/usr/bin/env node
-
 /**
  * Claude模型复杂度阈值路由测试脚本
  * 测试Claude模型是否只处理高复杂度任务
  */
 
-const { routeRequest } = require('../utils/unified-router');
+import { routeRequest } from '../utils/unified-router';
 
 // 测试用例
 const testCases = [
@@ -61,48 +59,52 @@ const testCases = [
 
 async function runTest() {
   console.log('🧪 开始测试Claude模型复杂度阈值路由...\n');
-  
+
   let passedTests = 0;
-  let totalTests = testCases.length;
-  
+  const totalTests = testCases.length;
+
   for (const testCase of testCases) {
     console.log(`📋 测试: ${testCase.name}`);
     console.log(`📝 输入: ${testCase.messages[0].content.substring(0, 100)}${testCase.messages[0].content.length > 100 ? '...' : ''}`);
-    
+
     try {
       const decision = await routeRequest({
         messages: testCase.messages
       });
-      
+
       const usedClaude = decision.selectedModel === 'claude-sonnet-4-all';
       const testPassed = usedClaude === testCase.shouldUseClaude;
-      
+
       console.log(`🎯 选择模型: ${decision.selectedModel}`);
       console.log(`🔍 路由策略: ${decision.metadata.routingStrategy}`);
       console.log(`📊 置信度: ${decision.confidence.toFixed(2)}`);
       console.log(`💭 推理: ${decision.reasoning}`);
       console.log(`✅ 测试结果: ${testPassed ? '通过' : '失败'}`);
-      
+
       if (!testPassed) {
         console.log(`❌ 预期使用Claude: ${testCase.shouldUseClaude}, 实际使用: ${usedClaude}`);
       }
-      
+
       if (testPassed) {
         passedTests++;
       }
-      
-    } catch (error) {
-      console.log(`❌ 测试失败: ${error.message}`);
+
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        console.log(`❌ 测试失败: ${error.message}`);
+      } else {
+        console.log(`❌ 测试失败: Unknown error`);
+      }
     }
-    
+
     console.log('─'.repeat(80));
   }
-  
-  console.log(`\n📊 测试总结:`);
+
+  console.log('\n📊 测试总结:');
   console.log(`✅ 通过: ${passedTests}/${totalTests}`);
   console.log(`❌ 失败: ${totalTests - passedTests}/${totalTests}`);
   console.log(`📈 成功率: ${((passedTests / totalTests) * 100).toFixed(1)}%`);
-  
+
   if (passedTests === totalTests) {
     console.log('\n🎉 所有测试通过！Claude模型复杂度阈值路由功能正常！');
   } else {
@@ -115,4 +117,4 @@ if (require.main === module) {
   runTest().catch(console.error);
 }
 
-module.exports = { runTest, testCases };
+export { runTest, testCases };

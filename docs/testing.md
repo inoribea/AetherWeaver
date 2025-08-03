@@ -61,3 +61,51 @@ curl -X POST https://langchain-git-build-inoribea-projects.vercel.app/api/chat \
 ---
 
 感谢您对测试工作的支持和配合！
+# 本地使用 curl 调试 v1 端口接口指南
+
+该项目的 `/api/v1/chat/completions` 是一个 OpenAI 兼容的接口入口，实际请求会代理到底层 `/api/chat/route` 等实际处理接口。接口请求格式和实际处理接口请求格式存在差异。
+
+## 如何用 curl 调试 `/api/v1/chat/completions`
+
+示例请求命令（假设本地服务运行在 3000 端口，API Key 为 `your_api_key`）：
+
+```bash
+curl -X POST http://localhost:3000/api/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer your_api_key" \
+  -d '{
+    "model": "gpt-4o-mini",
+    "messages": [
+      {"role": "user", "content": "你好，帮我写个测试示例。"}
+    ],
+    "stream": false
+  }'
+```
+
+> 注意：该接口请求体使用的是 OpenAI 兼容格式，即`messages`数组。
+
+## 关于内部代理与请求体转换
+
+项目实现中，`/api/v1/chat/completions` 仅为代理入口，内部会将请求转换后调用 `/api/chat/route` 接口。后者要求请求体格式为：
+
+- `message`（字符串类型）为用户消息内容
+- `sessionId`（可选）会话标识
+
+为方便调试，可使用项目中提供的 Node.js 脚本 `scripts/convert_v1_to_chat_route_request.js`，它可以将 v1 格式请求体转换为 `/api/chat/route` 接口所需格式。
+
+### 使用示例
+
+```bash
+node scripts/convert_v1_to_chat_route_request.js
+```
+
+该脚本会输出转换后的请求体格式。
+
+## 备注
+
+- 确保本地服务已启动且监听 3000 端口或相应端口
+- 请求头需带有效API Key，支持两种写法：
+  - `Authorization: Bearer your_api_key`
+  - `X-API-Key: your_api_key`
+
+通过以上方式，你可以在本地调试和验证 v1 端口接口的行为。
