@@ -58,15 +58,15 @@ export async function POST(req: NextRequest) {
       case 'enhanced':
       case 'agent': {
         const chain = createBasicChain();
-        result = await chain.invoke(message);
+        result = await chain.invoke({ input: message });
         break;
       }
       case 'rag': {
         const chain = createRAGChain();
-        result = await chain.invoke(message);
+        result = await chain.invoke({ input: message });
         break;
       }
-      case 'tavily': {
+      /* /* case 'tavily': { */ */
         // 使用Tavily工具
         result = await tavilyTool.call({ query: message });
         break;
@@ -79,7 +79,7 @@ export async function POST(req: NextRequest) {
       default: {
         // 默认使用basic链
         const chain = createBasicChain();
-        result = await chain.invoke(message);
+        result = await chain.invoke({ input: message });
         break;
       }
     }
