@@ -1,25 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
-import { Message as VercelChatMessage, StreamingResponse } from "ai";
-
+import { Message as VercelMessage, StreamingTextResponse } from "ai";
 import { createReactAgent } from "@langchain/langgraph/prebuilt";
 import { ChatOpenAI } from "@langchain/openai";
 import { ChatDeepSeek } from "@langchain/deepseek";
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
-import { ChatAlibaba } from "@langchain/community/chat_models/alibaba_tongyi";
+import { AlibabaTongyiEmbeddings } from "@langchain/community/embeddings/alibaba_tongyi";
 import { SerpAPI } from "@langchain/community/tools/serpapi";
 import { TavilySearch } from "@langchain/community/tools/tavily_search";
 import { Calculator } from "@langchain/community/tools/calculator";
-import { Tool } from "langchain/tools";
+import { Tool } from "@langchain/core/tools";
+
+import { AIMessage, BaseMessage, ChatMessage, HumanMessage, SystemMessage } from "@langchain/core/messages";
 
 import {
-  AIMessage,
-  BaseMessage,
-  ChatMessage,
-  HumanMessage,
-  SystemMessage,
-} from "@langchain/schema";
-
-import { convertToLangChainMessage, convertToVercelMessage } from "@/utils/messageFormat";
+  convertVercelMessageToLangChainMessage,
+  convertLangChainMessageToVercelMessage,
+} from "@/utils/messageFormat";
 
 const AGENT_SYSTEM_PROMPT = `You are a helpful assistant.`;
 
@@ -28,22 +24,31 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const showIntermediate = body.showIntermediateSteps;
     const messages = (body.messages ?? [])
-      .filter((msg: VercelChatMessage) => msg.role === "user" || msg.role === "assistant")
-      .map(convertToLangChainMessage);
+      .filter((msg: VercelMessage) => msg.role === "user" || msg.role === "assistant")
+      .map(convertVercelMessageToLangChainMessage);
 
     const tools: Tool[] = [];
 
     if (process.env.SERPAPI_API_KEY) {
       tools.push(new SerpAPI());
-    } else if (process.env.TAVILY_API_KEY) {
+    }
+    if (process.env.TAVILY_API_KEY) {
       tools.push(new TavilySearch({ maxResults: 5, apiKey: process.env.TAVILY_API_KEY }));
     }
 
     tools.push(new Calculator());
 
+    if (!process.env.OPENAI_API_KEY) {
+      return NextResponse.json({ error: "OpenAI API key is not configured." }, { status: 500 });
+    }
+
+    // 动态模型选择
+    const modelName = process.env.OPENAI_MODEL_NAME || "gpt-4o-mini";
+
     const chatModel = new ChatOpenAI({
       temperature: 0,
-      modelName: "gpt-4o-mini",
+      modelName,
+      openAIApiKey: process.env.OPENAI_API_KEY,
     });
 
     const agent = createReactAgent({
@@ -65,14 +70,17 @@ export async function POST(req: NextRequest) {
           controller.close();
         },
       });
-      return new StreamingResponse(stream);
+      return new StreamingTextResponse(stream);
     } else {
       const result = await agent.invoke({ messages });
       return NextResponse.json({
-        messages: result.messages.map(convertToVercelMessage),
+        messages: result.messages.map(convertLangChainMessageToVercelMessage),
       });
     }
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: error.status ?? 500 });
+    // 区分错误类型，避免敏感信息泄露
+    const status = error.status ?? 500;
+    const message = status === 500 ? "Internal Server Error" : error.message;
+    return NextResponse.json({ error: message }, { status });
   }
 }

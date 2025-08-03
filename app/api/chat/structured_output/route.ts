@@ -3,11 +3,11 @@ import { z } from "zod";
 
 import { ChatOpenAI } from "@langchain/openai";
 import { ChatDeepSeek } from "@langchain/deepseek";
-import { ChatGoogleGenerativeAI } from "@langchain/google";
+import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
 import { ChatAlibabaTongyi } from "@langchain/community/chat_models/alibaba_tongyi";
 import { ChatTencentHunyuan } from "@langchain/community/chat_models/tencent_hunyuan"; 
 import { PromptTemplate } from "@langchain/core/prompts";
-import { BaseChatModel } from "@langchain/core/language_models";
+import { BaseChatModel } from "@langchain/core";
 import { routeRequest, RoutingRequest } from '@/utils/unified-router';
 
 async function getAvailableStructuredOutputModel(messages: any[]): Promise<{ model: BaseChatModel; modelName: string }> {

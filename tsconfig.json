@@ -21,7 +21,7 @@
     ],
     "paths": {
       "@/*": ["./*"],
-      "@/components/*": ["./src/components/*"],
+      "@/components/*": ["./components/*"],
       "@/chains/*": ["./src/chains/*"]
     },
     "typeRoots": ["./node_modules/@types"]

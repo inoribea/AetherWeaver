@@ -1,8 +1,8 @@
 /* eslint-disable no-console */
 import { NextRequest } from 'next/server';
 import { HumanMessage } from '@langchain/core/messages';
-import { SmartRouterComponent } from '@/components/routing/smart-router';
-import { ModelSelectorComponent } from '@/components/models/model-selector';
+import { OptimizedEnhancedRouter } from '@/components/routing/optimizedEnhancedRouter';
+import { ModelSelector } from '@/components/models/model-selector';
 import { createBasicChain } from '@/chains/basic-chain';
 import { createRAGChain } from '@/chains/rag-chain';
 
