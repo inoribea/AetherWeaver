@@ -1,22 +1,3 @@
-# 项目数据库支持说明
-
-本项目支持多种向量数据库和标准数据库，方便用户根据需求选择合适的存储方案。
-
-## 新增支持的数据库
-
-- **PineconeStore**  
-  通过环境变量 `PINECONE_API_KEY`、`PINECONE_INDEX` 和 `PINECONE_ENVIRONMENT` 配置。  
-  需要安装依赖：`@langchain/pinecone` 和 `@pinecone-database/pinecone`。  
-  支持高并发批量请求，适合大规模向量检索。
-
-- **Neon Postgres**  
-  通过环境变量 `DATABASE_URL` 配置，使用 Neon 提供的无服务器 PostgreSQL。  
-  需要安装依赖：`@neondatabase/serverless` 和 `@langchain/community`。  
-  支持 pgvector 扩展，方便存储和查询向量。
-
-- **UpstashVectorStore**  
-  通过环境变量 `UPSTASH_VECTOR_REST_URL` 和 `UPSTASH_VECTOR_REST_TOKEN` 配置。  
-  需要安装依赖：`@langchain/community` 和 `@upstash/vector`。  
 ## 部署指南
 
 本项目支持在 Vercel 平台部署，详细部署步骤和环境变量配置请参考 
@@ -39,6 +20,22 @@
 const { vectorStore, provider } = await createVectorStore(documents, "pinecone");
 // 或 "neon"、"upstash"、不传则使用默认内存存储
 ```
+
+## 新增支持的数据库
+
+- **PineconeStore**  
+  通过环境变量 `PINECONE_API_KEY`、`PINECONE_INDEX` 和 `PINECONE_ENVIRONMENT` 配置。  
+  需要安装依赖：`@langchain/pinecone` 和 `@pinecone-database/pinecone`。  
+  支持高并发批量请求，适合大规模向量检索。
+
+- **Neon Postgres**  
+  通过环境变量 `DATABASE_URL` 配置，使用 Neon 提供的无服务器 PostgreSQL。  
+  需要安装依赖：`@neondatabase/serverless` 和 `@langchain/community`。  
+  支持 pgvector 扩展，方便存储和查询向量。
+
+- **UpstashVectorStore**  
+  通过环境变量 `UPSTASH_VECTOR_REST_URL` 和 `UPSTASH_VECTOR_REST_TOKEN` 配置。  
+  需要安装依赖：`@langchain/community` 和 `@upstash/vector`。  
 
 确保已正确配置对应数据库的环境变量，并安装相关依赖。
 
@@ -137,7 +134,7 @@ REDIS_TOKEN=your-redis-token
 
 确保在部署环境（如Vercel）中也配置相应环境变量。
 
-## 🔧 新增工具集成说明
+## 🔧 工具集成说明
 
 ### Tavily 搜索工具
 
