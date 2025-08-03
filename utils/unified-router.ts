@@ -126,7 +126,24 @@ export class IntelligentRouterUnified implements UnifiedRouter {
     };
   }
 }
+
+// 新增 intelligentRouter 实例导出
+export const intelligentRouter = new IntelligentRouterUnified();
+
+// 新增导出函数，兼容现有导入
+export function reloadModelConfiguration() {
+  intelligentRouter.reloadConfiguration();
+}
+
+export function getAvailableModels() {
+  return intelligentRouter.getAvailableModels();
+}
+
+export function analyzeModelCapabilities(capabilities: string[]) {
+  return intelligentRouter.analyzeCapabilities(capabilities);
+}
+
+// 兼容原有 routeRequest 导出
 export async function routeRequest(request: RoutingRequest): Promise<RoutingDecision> {
-  const intelligentRouter = new IntelligentRouterUnified();
   return intelligentRouter.route(request);
 }

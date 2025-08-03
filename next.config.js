@@ -1,15 +1,18 @@
 const withBundleAnalyzer = require('@next/bundle-analyzer')({
   enabled: process.env.ANALYZE === 'true',
-})
+});
+const path = require('path');
 
-const nextConfig = withBundleAnalyzer({
+module.exports = withBundleAnalyzer({
   webpack(config) {
     config.module.rules.push({
+      test: /\.cs$/,
+      use: 'ignore-loader',
+    });
+    config.module.rules.push({
       test: /\.html$/,
-      use: ['html-loader'],
-    })
-    return config
+      use: 'ignore-loader',
+    });
+    return config;
   },
-})
-
-module.exports = nextConfig
+});

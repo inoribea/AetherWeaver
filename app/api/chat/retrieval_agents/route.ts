@@ -14,7 +14,7 @@ import { ChatOpenAI } from "@langchain/openai";
 import { ChatDeepSeek } from "@langchain/deepseek";
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
 import { ChatAlibabaTongyi } from "@langchain/community/chat_models/alibaba_tongyi";
-import { ChatTencentHunyuanHunyuan } from "@langchain/community/chat_models/tencent_hunyuan";
+import { ChatTencentHunyuan } from "@langchain/community/chat_models/tencent_hunyuan";
 import { createRetrieverTool } from "langchain/tools/retriever";
 import { createReactAgent } from "@langchain/langgraph/prebuilt";
 import { Document } from "@langchain/core/documents";
@@ -96,72 +96,17 @@ async function tokenize(text: string, chineseStopwords: Set<string>): Promise<st
   }
 }
 
-interface DocumentWithScore extends Document {
-  score: number;
-  source: "vector" | "keyword" | "fusion";
-}
-
-function normalizeScores(docs: DocumentWithScore[]) {
+function normalizeScores(docs: Document[]) {
   if (docs.length === 0) return docs;
-  const scores = docs.map(d => d.score);
+  const scores = docs.map(d => (d as any).score);
   const maxScore = Math.max(...scores);
   const minScore = Math.min(...scores);
   const range = maxScore - minScore || 1;
   return docs.map(d => ({
     ...d,
-    score: (d.score - minScore) / range,
+    score: ((d as any).score - minScore) / range,
   }));
 }
-
-const fuseRetrievalResults = (
-  vectorResults: DocumentWithScore[],
-  keywordResults: DocumentWithScore[],
-  vectorWeight = 0.7,
-  keywordWeight = 0.3,
-  topK = 5
-): Document[] => {
-  // 归一化分数
-  const normVector = normalizeScores(vectorResults);
-  const normKeyword = normalizeScores(keywordResults);
-
-  // 合并并去重，使用Map以pageContent为key
-  const mergedMap = new Map<string, DocumentWithScore>();
-
-  normVector.forEach(doc => {
-    mergedMap.set(doc.pageContent, {
-      ...doc,
-      score: doc.score * vectorWeight,
-      source: "vector",
-    });
-  });
-
-  normKeyword.forEach(doc => {
-    if (mergedMap.has(doc.pageContent)) {
-      const existing = mergedMap.get(doc.pageContent)!;
-      // 分数加权累加
-      existing.score += doc.score * keywordWeight;
-      // 标记来源为多策略
-      existing.source = "fusion";
-      mergedMap.set(doc.pageContent, existing);
-    } else {
-      mergedMap.set(doc.pageContent, {
-        ...doc,
-        score: doc.score * keywordWeight,
-        source: "keyword",
-      });
-    }
-  });
-
-  // 转数组并排序
-  const mergedArray = Array.from(mergedMap.values());
-  mergedArray.sort((a, b) => b.score - a.score);
-
-  // 返回topK文档
-  return mergedArray.slice(0, topK).map(d => {
-    const { score, source, ...doc } = d;
-    return doc;
-  });
-};
 
 async function createRetriever() {
   const sampleDocuments = [
@@ -225,4 +170,4 @@ async function createRetriever() {
   return retriever;
 }
 
-export { fuseRetrievalResults, createRetriever, englishTokenize, chineseTokenize, tokenize };
+

@@ -6415,6 +6415,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"ignore-loader@npm:^0.1.2":
+  version: 0.1.2
+  resolution: "ignore-loader@npm:0.1.2"
+  checksum: 10c0/0ba7f0fbcd4d796e68cc05723279b662dea32f229f5912c6ce4fbcc5a50f592d2b6f32baaf047b47b24dccdfdc9faf2db504b48cb6eb886a4969bfc293739cab
+  languageName: node
+  linkType: hard
+
 "ignore@npm:^5.2.0":
   version: 5.3.2
   resolution: "ignore@npm:5.3.2"
@@ -7644,6 +7651,7 @@ __metadata:
     crypto-js: "npm:^4.2.0"
     eslint: "npm:8.46.0"
     eslint-config-next: "npm:13.4.12"
+    ignore-loader: "npm:^0.1.2"
     ioredis: "npm:^5.3.2"
     jest: "npm:^30.0.5"
     langchain: "npm:^0.3.30"

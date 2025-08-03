@@ -20,13 +20,14 @@ export async function GET() {
     const configWithStatus = {
       ...config,
       modelStatus: Object.keys(config.models).reduce((acc, modelName) => {
-        const modelInfo = availableModels.find(m => m.id === modelName);
+        // availableModels 是字符串数组，改为判断是否包含 modelName
+        const isAvailable = availableModels.includes(modelName);
         acc[modelName] = {
-          available: modelInfo?.available || false,
-          capabilities: analyzeModelCapabilities(modelName),
-          cost_per_1k_tokens: modelInfo?.cost_per_1k_tokens || 0,
-          speed_rating: modelInfo?.speed_rating || 0,
-          quality_rating: modelInfo?.quality_rating || 0
+          available: isAvailable,
+          capabilities: analyzeModelCapabilities([modelName]), // 传数组以兼容
+          cost_per_1k_tokens: 0, // 原 modelInfo 不存在，暂设默认
+          speed_rating: 0,
+          quality_rating: 0
         };
         return acc;
       }, {} as Record<string, any>),
@@ -35,7 +36,7 @@ export async function GET() {
         version: '1.0.0',
         features: ['semantic-routing', 'capability-matching', 'fallback-chains', 'dynamic-registration'],
         totalModels: availableModels.length,
-        availableModels: availableModels.filter(m => m.available).length
+        availableModels: availableModels.length
       }
     };
     
@@ -80,10 +81,7 @@ export async function PUT(request: NextRequest) {
     }
     
     // 运行时添加模型到统一路由器
-    unifiedRouter.registerModel({
-      id: modelName,
-      ...modelConfig
-    });
+    unifiedRouter.registerModel(modelName, modelConfig);
     
     // 保存到配置文件
     const configPath = path.join(process.cwd(), 'models-config.json');

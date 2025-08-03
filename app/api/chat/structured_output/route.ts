@@ -7,7 +7,7 @@ import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
 import { ChatAlibabaTongyi } from "@langchain/community/chat_models/alibaba_tongyi";
 import { ChatTencentHunyuan } from "@langchain/community/chat_models/tencent_hunyuan"; 
 import { PromptTemplate } from "@langchain/core/prompts";
-import { BaseChatModel } from "@langchain/core";
+import { BaseChatModel } from "@langchain/core/messages";
 import { routeRequest, RoutingRequest } from '@/utils/unified-router';
 
 async function getAvailableStructuredOutputModel(messages: any[]): Promise<{ model: BaseChatModel; modelName: string }> {
