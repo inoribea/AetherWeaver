@@ -623,8 +623,8 @@ export async function detectIntentFromRequest(body: OpenAICompletionRequest): Pr
 export function smartFormatModelInjection(text: string, modelName: string): string {
   if (!text) return text;
   const firstLine = text.split('\n')[0];
-  if (firstLine.includes(modelName) || /【模型[:：]/.test(firstLine)) {
+  if (firstLine.includes(modelName) || /【🤖[:：]/.test(firstLine)) {
     return text;
   }
-  return `【模型：${modelName}】\n${text}`;
+  return `【🤖：${modelName}】\n${text}`;
 }
