@@ -5,7 +5,7 @@
 
 ---
 
-AetherWeaver isn’t just another LangChain deployment template. It lives up to its name: in the feather-light **Serverless Edge** runtime, a precise **Weaver** routes and intertwines complex user intents to the most suitable AI capability chains via an embedded **intelligent routing core**. [1][2][3]
+AetherWeaver isn’t just another LangChain deployment template. It lives up to its name: in the feather-light **Serverless Edge** runtime, a precise **Weaver** routes and intertwines complex user intents to the most suitable AI capability chains via an embedded **intelligent routing core**.
 
 This project gives you a three-in-one solution:
 - **Intelligent Routing**: A configurable, weighted routing model that understands intent and dispatches tasks to the most effective expert model or toolchain.
