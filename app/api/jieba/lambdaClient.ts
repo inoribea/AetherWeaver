@@ -1,40 +1,16 @@
-export interface JiebaLambdaRequest {
-  text: string;
-}
+import { localSegment } from "./segment/tokenizer";
 
-export interface JiebaLambdaResponse {
-  result?: string[];
-  error?: string;
-}
-
-const NEXT_PUBLIC_APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-const JIEBA_LAMBDA_URL = `${NEXT_PUBLIC_APP_URL}/api/jieba/segment`;
+// We are now directly calling the local segmentation function.
+// The fetch-based lambda invocation is no longer needed for Vercel deployment.
 
 export async function segmentViaLambda(text: string): Promise<string[]> {
-  const payload: JiebaLambdaRequest = { text };
-
-  console.log(`Making request to: ${JIEBA_LAMBDA_URL}`);
-  const response = await fetch(JIEBA_LAMBDA_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(payload),
-  });
-
-  if (!response.ok) {
-    throw new Error(`Lambda request failed: ${response.statusText}`);
+  // Directly use the imported local segmentation logic
+  try {
+    const tokens = localSegment(text);
+    return Promise.resolve(tokens);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown segmentation error';
+    console.error(`Segmentation error: ${message}`);
+    return Promise.reject(new Error(message));
   }
-
-  const data: JiebaLambdaResponse = await response.json();
-
-  if (data.error) {
-    throw new Error(`Lambda response error: ${data.error}`);
-  }
-
-  if (!data.result) {
-    throw new Error('Lambda response missing result');
-  }
-
-  return data.result;
 }

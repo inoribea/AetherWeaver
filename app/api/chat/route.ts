@@ -55,11 +55,19 @@ const openAIApiBaseUrl = process.env.OPENAI_BASE_URL;
  * @param model 模型名称
  */
 function createChatOpenAIInstance(apiKey: string, model: string) {
+  const finalApiKey = apiKey;
+  const finalBaseUrl = openAIApiBaseUrl;
+
+  console.log(`[ChatOpenAI] Initializing with:`);
+  console.log(`  - Model: ${model || "gpt-5"}`);
+  console.log(`  - API Key Set: ${!!finalApiKey}`);
+  console.log(`  - Base URL: ${finalBaseUrl || 'Default (OpenAI Official)'}`);
+
   return new ChatOpenAI({
     model: model || "gpt-5",
     temperature: 0,
-    apiKey: apiKey,
-    ...(openAIApiBaseUrl ? { configuration: { baseURL: openAIApiBaseUrl } } : {}),
+    apiKey: finalApiKey,
+    ...(finalBaseUrl ? { configuration: { baseURL: finalBaseUrl } } : {}),
   });
 }
 /**
