@@ -86,26 +86,7 @@ function extractTextFromResult(result: any): string {
  * @returns 美化后的字符串
  */
 function beautifyRouteName(route: string): string {
-// 删除重复的 extractTextFromResult 函数，保留第一个定义
-/**
- * 从结果中提取文本内容，兼容字符串、对象或数组
- * @param result 调用链返回结果
- * @returns 文本字符串
- */
-function extractTextFromResult(result: any): string {
-  if (!result) return "";
-  if (typeof result === "string") return result;
-  if (typeof result === "object") {
-    if ("content" in result && typeof result.content === "string") {
-      return result.content;
-    }
-    if (Array.isArray(result)) {
-      return result.map(item => typeof item === "string" ? item : JSON.stringify(item)).join("\n");
-    }
-    return JSON.stringify(result);
-  }
-  return String(result);
-}
+
   switch (route) {
     case "basic":
       return "🟢 Basic";
@@ -285,16 +266,9 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const formattedResponse = formatResponseMainContent(
-      extractTextFromResult(result),
-      routingResult.route,
-      routingResult.confidence ?? 1,
-      modelManager.model
-    );
-
     return new Response(
       JSON.stringify({
-        response: formattedResponse,
+        response: extractTextFromResult(result),
         routing: {
           route: beautifyRouteName(routingResult.route),
           confidence: beautifyConfidence(routingResult.confidence ?? 1),
