@@ -56,7 +56,7 @@ function createChatOpenAIInstance(apiKey: string, model: string) {
   return new ChatOpenAI({
     model: model || "gpt-4o",
     temperature: 0,
-    openAIApiKey: apiKey,
+    apiKey: apiKey,
     ...(openAIApiBaseUrl ? { configuration: { baseURL: openAIApiBaseUrl } } : {}),
   });
 }
