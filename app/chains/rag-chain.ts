@@ -2,8 +2,9 @@ import { RunnableSequence } from "@langchain/core/runnables";
 import { ChatOpenAI } from "@langchain/openai";
 import { ChatPromptTemplate } from "@langchain/core/prompts";
 import { getBestEmbeddingProvider } from "../../utils/embeddings";
+import { BaseMessage } from "@langchain/core/messages";
 
-export function createRAGChain() {
+export function createRAGChain(): RunnableSequence<{ input: string, context_documents: string }, BaseMessage> {
   const prompt = ChatPromptTemplate.fromTemplate(`
 你是一个智能AI助手。
 
