@@ -17,6 +17,11 @@ interface SmartRoutingResult {
   routing_is_chinese: boolean;
   langchain_ready: boolean;
   matchedModelKey?: string;
+  segmentedWords?: string[];
+  joinedSeg?: string;
+  keywordMatchCounts?: Record<string, number>;
+  totalMatches?: number;
+  hasImageHint?: boolean;
 }
 
 export class SmartRouterComponent extends Runnable<BaseMessage> {
