@@ -24,6 +24,7 @@ v1 版本采用统一的智能路由请求构造机制，结合多维度模型�
 | LANGFUSE_API_URL     | LangFuse 监控服务地址         | 否       | https://api.langfuse.com        |
 | LANGFUSE_API_KEY     | LangFuse API 密钥             | 否       | your-langfuse-api-key           |
 | TAVILY_API_KEY       | 网络搜索服务 API 密钥         | 否       | your-tavily-api-key             |
+| ENABLE_API_AUTH      | 是否为v1兼容路由启用API密钥验证 | 否       | true                            |
 | SUPABASE_URL        | RAG 检索数据库地址            | 否       | your-supabase-url               |
 
 ## 使用建议

@@ -139,87 +139,54 @@ export async function POST(req: NextRequest) {
         }
       );
     }
+    
+    // 预先解析内部响应，以便同时获取模型信息和响应内容
+    const internalJson = await internalResponse.json();
 
-    // 获取模型信息 - 使用统一路由器选择的模型
-    const actualModel = routingDecision.selectedModel;
-    console.log(`🎯 Final model used: ${actualModel}`);
+    // 优先使用内部路由决策的模型，如果不存在则回退到v1路由器的初步决策
+    const finalModel = internalJson.routing?.model || routingDecision.selectedModel;
+    console.log(`🎯 Final model used: ${finalModel}`);
+
 
     // 处理流式响应
     if (body.stream !== false) {
       console.log('Streaming OpenAI compatible response');
+      const coreResponse = internalJson.response || JSON.stringify(internalJson);
       
       const encoder = new TextEncoder();
-      const reader = internalResponse.body?.getReader();
       
-      if (!reader) {
-        console.error('Failed to get response reader');
-        return new Response(
-          JSON.stringify({
-            error: {
-              message: 'Failed to get response reader',
-              type: 'server_error',
-              code: 'internal_error'
-            }
-          }),
-          {
-            status: 500,
-            headers: { 'Content-Type': 'application/json' }
-          }
-        );
-      }
-
       const readableStream = new ReadableStream({
         async start(controller) {
           try {
-            let buffer = '';
-            
-            while (true) {
-              const { done, value } = await reader.read();
-              
-              if (done) {
-                // 处理剩余的buffer
-                if (buffer.trim()) {
-                  const openaiChunk = createOpenAIResponse(buffer, actualModel, false, true);
-                  controller.enqueue(encoder.encode(formatStreamChunk(openaiChunk)));
-                }
-                
-                // 发送最后的完成块
-                const finalChunk = createOpenAIResponse('', actualModel, true, true);
-                controller.enqueue(encoder.encode(formatStreamChunk(finalChunk)));
-                controller.enqueue(encoder.encode(createStreamEnd()));
-                break;
-              }
-              
-              // 解码数据块
-              const chunk = new TextDecoder().decode(value);
-              buffer += chunk;
-              
-              // 处理可能的部分数据
-              const lines = buffer.split('\n');
-              buffer = lines.pop() || ''; // 保留最后一个可能不完整的行
-              
-              for (const line of lines) {
-                if (line.trim()) {
-                  // 统一处理所有模型的流式响应
-                  const openaiChunk = createOpenAIResponse(line + '\n', actualModel, false, true);
-                  controller.enqueue(encoder.encode(formatStreamChunk(openaiChunk)));
-                }
-              }
-            }
+            const decisionInfo = `🎯 统一路由器决策:
+  - 选择模型: ${finalModel}
+  - 置信度: ${routingDecision.confidence}
+  - 策略: ${routingDecision.metadata.routingStrategy}
+  - 推理: ${routingDecision.reasoning}
+  - 路由: ${targetEndpoint}
+
+---
+
+`;
+            const initialChunk = createOpenAIResponse(decisionInfo, finalModel, false, true);
+            controller.enqueue(encoder.encode(formatStreamChunk(initialChunk)));
+
+            // 模拟流式输出核心响应内容
+            const finalContentChunk = createOpenAIResponse(coreResponse, finalModel, false, true);
+            controller.enqueue(encoder.encode(formatStreamChunk(finalContentChunk)));
+
+            // 发送结束标志
+            const finalChunk = createOpenAIResponse('', finalModel, true, true);
+            controller.enqueue(encoder.encode(formatStreamChunk(finalChunk)));
+            controller.enqueue(encoder.encode(createStreamEnd()));
             
             controller.close();
           } catch (error) {
             console.error('Streaming error:', error);
-            // 明确类型处理 unknown 错误
             let errorMessage = 'Unknown error';
-            if (error instanceof Error) {
-              errorMessage = error.message;
-            } else if (typeof error === 'string') {
-              errorMessage = error;
-            } else if (error && typeof error === 'object' && 'message' in error && typeof (error as any).message === 'string') {
-              errorMessage = (error as any).message;
-            }
-            // 优雅降级：发送错误信息块，避免中断流
+            if (error instanceof Error) errorMessage = error.message;
+            else if (typeof error === 'string') errorMessage = error;
+            
             const errorChunk = createOpenAIResponse(
               JSON.stringify({
                 error: {
@@ -228,7 +195,7 @@ export async function POST(req: NextRequest) {
                   code: 'streaming_error'
                 }
               }),
-              actualModel,
+              finalModel,
               false,
               true
             );
@@ -253,9 +220,19 @@ export async function POST(req: NextRequest) {
       // 非流式响应
       console.log('Non-streaming OpenAI compatible response');
       
-      const internalJson = await internalResponse.json();
-      const responseText = internalJson.response || JSON.stringify(internalJson);
-      const openaiResponse = createOpenAIResponse(responseText, actualModel, true, false);
+      const coreResponse = internalJson.response || JSON.stringify(internalJson);
+      const decisionInfo = `🎯 统一路由器决策:
+  - 选择模型: ${finalModel}
+  - 置信度: ${routingDecision.confidence}
+  - 策略: ${routingDecision.metadata.routingStrategy}
+  - 推理: ${routingDecision.reasoning}
+  - 路由: ${targetEndpoint}
+
+---
+
+`;
+      const responseText = decisionInfo + coreResponse;
+      const openaiResponse = createOpenAIResponse(responseText, finalModel, true, false);
       
       return new Response(JSON.stringify(openaiResponse), {
         headers: {
