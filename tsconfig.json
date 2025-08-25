@@ -2,7 +2,7 @@
   "compilerOptions": {
     "target": "ESNext",
     "module": "Nodenext",
-    "moduleResolution": "nodenext",
+    "moduleResolution": "bundler",
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
     "strict": true,
