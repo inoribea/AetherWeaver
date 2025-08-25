@@ -320,12 +320,12 @@
       "speed_rating": 8,
       "quality_rating": 9
     },
-    "gpt4.1": {
+    "gpt": {
       "type": "openai_compatible",
       "config": {
         "apiKey": "NEKO_API_KEY",
         "baseURL": "NEKO_BASE_URL",
-        "model": "gpt4.1",
+        "model": "gpt",
         "temperature": 0.7
       },
       "capabilities": {

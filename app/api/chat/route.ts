@@ -4,6 +4,7 @@ import { HumanMessage } from "@langchain/core/messages";
 import { OptimizedEnhancedRouter } from "../../components/routing/optimizedEnhancedRouter";
 import { createBasicChain } from "../../../src/chains/basic-chain";
 import { createRAGChain } from "../../../src/chains/rag-chain";
+import { createVisionChain } from "../../../src/chains/vision-chain";
 import { ChatOpenAI, OpenAIEmbeddings } from "@langchain/openai";
 
 import { SmartRouterComponent } from "../../components/routing/smart-router";
@@ -229,7 +230,6 @@ export async function POST(req: NextRequest) {
 
     // 智能路由决策
     const router = new SmartRouterComponent({
-      analysis_mode: "hybrid",
       confidence_threshold: 0.6,
     });
 
@@ -266,6 +266,15 @@ export async function POST(req: NextRequest) {
         console.log(`Overriding models for route ${routingResult.route} with env var ${routeEnvVarName}:`, preferredModels);
       }
     }
+ // If the router explicitly matched a model key, prioritize it by placing it at the front of preferredModels
+ // Fix: correctly type matchedModelKey to avoid implicit any when indexing modelsConfig.models
+ type ModelsMap = typeof modelsConfig.models;
+ const matchedModelKey = (routingResult as any).matchedModelKey as keyof ModelsMap | undefined;
+ if (matchedModelKey && modelsConfig.models[matchedModelKey]) {
+   // cast to string for arrays that expect string entries (preferredModels is string[])
+   preferredModels = [matchedModelKey as string, ...preferredModels.filter(m => m !== (matchedModelKey as string))];
+   console.log(`Prioritizing explicitly matched model ${String(matchedModelKey)} for route ${routingResult.route}`);
+ }
 
     if (preferredModels.length > 0) {
       const preferredModelId = preferredModels[0]; // 选择第一个首选模型
@@ -295,6 +304,8 @@ export async function POST(req: NextRequest) {
       selectedApiKey = getEffectiveApiKey();
     }
 
+    // 临时诊断日志（只记录是否存在，不打印密钥值）
+    console.log(`Diagnostics: selectedModelName=${selectedModelName}, selectedApiKeySet=${!!selectedApiKey}`);
     const llm = createChatOpenAIInstance(selectedApiKey || "", selectedModelName);
 
     const embeddings = new OpenAIEmbeddings({
@@ -324,6 +335,11 @@ export async function POST(req: NextRequest) {
     switch (route) {
       case "basic":
       case "agent":
+      case "vision_tasks": {
+        const chain = createVisionChain();
+        result = await chain.invoke({ input: safeMessageContent });
+        break;
+      }
       case "vision_tasks":
       case "reasoning_tasks":
       case "chinese_tasks":

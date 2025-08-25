@@ -253,7 +253,8 @@ export async function POST(req: NextRequest) {
       // 非流式响应
       console.log('Non-streaming OpenAI compatible response');
       
-      const responseText = await internalResponse.text();
+      const internalJson = await internalResponse.json();
+      const responseText = internalJson.response || JSON.stringify(internalJson);
       const openaiResponse = createOpenAIResponse(responseText, actualModel, true, false);
       
       return new Response(JSON.stringify(openaiResponse), {

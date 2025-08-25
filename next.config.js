@@ -17,8 +17,14 @@ const nextConfig = {
   }
 };
 
-const withBundleAnalyzer = require('@next/bundle-analyzer')({
-  enabled: process.env.ANALYZE === 'true',
-});
+let withBundleAnalyzer;
+try {
+  withBundleAnalyzer = require('@next/bundle-analyzer')({
+    enabled: process.env.ANALYZE === 'true',
+  });
+} catch (e) {
+  // If @next/bundle-analyzer isn't installed, fall back to identity.
+  withBundleAnalyzer = (config) => config;
+}
 
 module.exports = withBundleAnalyzer(nextConfig);

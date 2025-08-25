@@ -13,6 +13,7 @@ const JIEBA_LAMBDA_URL = `${NEXT_PUBLIC_APP_URL}/api/jieba/segment`;
 export async function segmentViaLambda(text: string): Promise<string[]> {
   const payload: JiebaLambdaRequest = { text };
 
+  console.log(`Making request to: ${JIEBA_LAMBDA_URL}`);
   const response = await fetch(JIEBA_LAMBDA_URL, {
     method: 'POST',
     headers: {

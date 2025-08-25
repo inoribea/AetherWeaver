@@ -169,7 +169,7 @@ await intelligentRouter.reloadConfiguration();
 - `hunyuan-turbos-latest`: 腾讯混元标准模型
 
 ### 🔍 搜索增强模型
-- `gpt4.1`: 支持网络搜索的增强模型
+- `gpt`: 支持网络搜索的增强模型
 - `gemini-flash`: Google Gemini 快速模型
 
 ## 🔧 配置说明
@@ -234,7 +234,7 @@ node verify-config.js
 🎯 配置验证结果
 ================
 默认模型: gemini-flash-lite
-降级链: gemini-flash-lite -> gpt4.1 -> qwen-turbo -> deepseek-reasoner -> claude-sonnet-4-all
+降级链: gemini-flash-lite -> gpt -> qwen-turbo -> deepseek-reasoner -> claude-sonnet-4-all
 速度优化: true
 质量优化: false
 

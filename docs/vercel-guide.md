@@ -92,6 +92,22 @@
 - `ENABLE_BUNDLE_ANALYZER`  
 - `ENABLE_PERFORMANCE_PROFILING`  
 
+## 6. 智能路由详细配置
+
+除了简单的功能开关，智能路由 (`SmartRouterComponent`) 支持更细粒度的配置：
+
+- `ANALYSIS_MODE`
+  控制路由决策的分析模式。
+  - **`rule_based`** (默认): 仅使用基于关键字和规则的快速分析。性能高，但可能不够智能。
+  - **`llm_enhanced`**: 在规则分析的基础上，会调用一个指定的语言模型（`ROUTING_MODEL_NAME`）来进一步增强决策的准确性。这会带来额外的延迟和成本。
+  **示例：** `ANALYSIS_MODE=llm_enhanced`
+
+- `LANGFLOW_ROUTER_MEMORY_SUPPORT`
+  控制路由是否考虑对话历史（内存）。
+  - 可以是简单的布尔值: `true` 或 `false`。
+  - 也可以是JSON字符串以支持更复杂的配置，例如: `{"enabled": true}`。
+  **示例：** `LANGFLOW_ROUTER_MEMORY_SUPPORT=true`
+
 ## 5. 安全及注意事项
 
 - 严格保密所有密钥，不要硬编码到代码库。  

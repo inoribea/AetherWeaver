@@ -1,4 +1,3 @@
-import fetch from 'node-fetch';
 
 const LANGFUSE_API_URL = process.env.LANGFUSE_API_URL || '';
 const LANGFUSE_API_KEY = process.env.LANGFUSE_API_KEY || '';

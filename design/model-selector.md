@@ -520,7 +520,7 @@ class ModelSelectorComponent(Component, Runnable):
             # 返回降级配置
             fallback_config = {
                 "provider": "OpenAI",
-                "model": "gpt-4.1",
+                "model": "gpt-5",
                 "selection_strategy": "fallback",
                 "error": str(e)
             }

@@ -17,12 +17,12 @@ export function getAvailableAgentModel() {
   if (process.env.OPENAI_API_KEY) {
     return {
       model: new ChatOpenAI({
-        modelName: "gpt-4.1",
+        modelName: "gpt-5",
         temperature: 0,
         apiKey: process.env.OPENAI_API_KEY,
         ...(process.env.OPENAI_BASE_URL && { configuration: { baseURL: process.env.OPENAI_BASE_URL } }),
       }),
-      modelName: "gpt-4.1"
+      modelName: "gpt-5"
     };
   } else if (process.env.DEEPSEEK_API_KEY) {
     return {
@@ -55,11 +55,11 @@ export function getAvailableAgentModel() {
   
   return {
     model: new ChatOpenAI({
-      modelName: "gpt-4.1",
+      modelName: "gpt-5",
       temperature: 0,
       ...(process.env.OPENAI_BASE_URL && { configuration: { baseURL: process.env.OPENAI_BASE_URL } }),
     }),
-    modelName: "gpt-4.1"
+    modelName: "gpt-5"
   };
 }
 

@@ -61,7 +61,7 @@
             DropdownInput(
                 name="model_name",
                 display_name="Model Name",
-                options=["gpt-image-1", "gpt-5", "gpt-4.1", "gpt-4.1-mini", "gpt-4.1-nano","o4-mini","o3-pro-all","text-embedding-3-small",  "claude-sonnet-4-all", "claude-opus-4-thinking-all", "gemini-2.5-pro", "gemini-2.5-flash", "gemini-2.5-flash-lite-preview-06-17", "deepseek-chat", "deepseek-reasoner"],
+                options=["gpt-image-1", "gpt-5", "gpt-5-mini", "gpt-5-nano", "o4-mini", "o3-pro-all","text-embedding-3-small",  "claude-sonnet-4-all", "claude-opus-4-thinking-all", "gemini-2.5-pro", "gemini-2.5-flash", "gemini-2.5-flash-lite-preview-06-17", "deepseek-chat", "deepseek-reasoner"],
                 value="gpt-5",
                 info="Select the model to use",
                 real_time_refresh=True,
@@ -224,7 +224,7 @@
                 "model_configurations": {
                     "openai": {
                         "api_key_env": "OPENAI_API_KEY",
-                        "default_models": ["gpt-image-1", "gpt-5", "gpt-4.1", "gpt-4.1-mini", "gpt-4.1-nano","o4-mini","o3-pro-all","text-embedding-3-small"],
+                        "default_models": ["gpt-image-1", "gpt-5", "gpt-5-mini", "gpt-5-nano", "o4-mini","o3-pro-all", "text-embedding-3-small"],
                         "supports_json_mode": True,
                         "supports_tools": True
                     },
@@ -1006,7 +1006,7 @@
             elif field_name == "provider":
                 # 根据提供商更新模型选项
                 if field_value == "OpenAI":
-                    build_config["model_name"]["options"] = ["gpt-image-1", "gpt-5", "gpt-4.1", "gpt-4.1-mini", "gpt-4.1-nano","o4-mini","o3-pro-all","text-embedding-3-small"]
+                    build_config["model_name"]["options"] = ["gpt-image-1", "gpt-5", "gpt-5-mini", "gpt-5-nano","o4-mini","o3-pro-all","text-embedding-3-small"]
                     build_config["openai_api_key"]["show"] = True
                     build_config["anthropic_api_key"]["show"] = False
                     build_config["google_api_key"]["show"] = False

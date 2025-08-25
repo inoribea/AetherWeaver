@@ -8,7 +8,7 @@ export class OptimizedEnhancedRouter {
   name = "OptimizedEnhancedRouter";
 
   routingMessage?: Message;
-  matchRoute: string = "gpt-4.1-nano"; 
+  matchRoute: string = "gpt-5-nano"; 
   matchingStrategy: string = "smart_flexible";
   vercelMode: boolean = false;
   langchainjsExport: boolean = false;

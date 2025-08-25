@@ -84,7 +84,7 @@ export const MODEL_DISPLAY_NAME: Record<string, string> = {
   'hunyuan-turbos-latest': 'Hunyuan Turbo',
   'hunyuan-t1-latest': 'Hunyuan T1',
   'gpt-5-search': 'GPT-5 Search',
-  'gpt4.1': 'GPT-4.1',
+  'gpt': 'gpt-5',
   'Qwen/Qwen3-235B-A22B-search': 'Qwen3-235B-Search',
   'deepseek-ai/DeepSeek-V3-search': 'DeepSeek-V3-Search',
 };
@@ -101,7 +101,7 @@ export const MODEL_MAPPING: Record<string, string> = {
   'hunyuan-turbos-latest': 'hunyuan-turbos-latest',
   'hunyuan-t1-latest': 'hunyuan-t1-latest',
   'gpt-5-search': 'gpt-5-search',
-  'gpt4.1': 'gpt4.1',
+  'gpt': 'gpt-5',
   'Qwen/Qwen3-235B-A22B-search': 'Qwen/Qwen3-235B-A22B-search',
   'deepseek-ai/DeepSeek-V3-search': 'deepseek-ai/DeepSeek-V3-search',
 };
@@ -481,7 +481,7 @@ export function getSupportedModels() {
       description: '集成联网搜索能力，适合需要实时信息检索和知识增强的高级对话场景。'
     },
     {
-      id: 'gpt4.1',
+      id: 'gpt',
       object: 'model',
       created: Math.floor(Date.now() / 1000),
       owned_by: 'openai',
@@ -498,7 +498,7 @@ export function getSupportedModels() {
         creative_writing: true,
         mathematical_computation: true
       },
-      display_name: MODEL_DISPLAY_NAME['gpt4.1'],
+      display_name: MODEL_DISPLAY_NAME['gpt'],
       description: '与官方GPT-4功能一致，web search首选'
     }
   ];
@@ -573,12 +573,12 @@ export function createStreamEnd(): string {
  */
 export function detectModelSwitchRequest(userContent: string): string | undefined {
   if (!userContent || typeof userContent !== 'string') return undefined;
-  // 支持常见“切换到xxx模型”/“用xxx”/“gpt4.1回答”等表达
+  // 支持常见“切换到xxx模型”/“用xxx”/“gpt回答”等表达
   const match = userContent.match(/(?:切换到|用|换成|改用|要|希望|switch to|use)\s*([a-zA-Z0-9\-.\/]+)/i);
   if (match && match[1]) {
     return match[1].trim();
   }
-  // 兼容“gpt4.1回答”等
+  // 兼容“gpt回答”等
   const match2 = userContent.match(/([a-zA-Z0-9\-.\/]+)\s*(模型)?(回答|处理|分析)?/i);
   if (match2 && match2[1]) {
     // 排除无意义短词
