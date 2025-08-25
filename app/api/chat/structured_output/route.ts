@@ -33,6 +33,7 @@ async function getAvailableStructuredOutputModel(messages: any[]): Promise<{ mod
         temperature: 0.8,
         model: selectedModel,
         apiKey: process.env.OPENAI_API_KEY,
+        ...(process.env.OPENAI_BASE_URL && { configuration: { baseURL: process.env.OPENAI_BASE_URL } }),
       });
     } else if (selectedModel.includes("hunyuan")) {
       model = new ChatTencentHunyuan({
@@ -64,6 +65,7 @@ async function getAvailableStructuredOutputModel(messages: any[]): Promise<{ mod
         temperature: 0.8,
         model: "gpt-4o-mini",
         apiKey: process.env.OPENAI_API_KEY,
+        ...(process.env.OPENAI_BASE_URL && { configuration: { baseURL: process.env.OPENAI_BASE_URL } }),
       });
     }
 
