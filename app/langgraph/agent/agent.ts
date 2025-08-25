@@ -3,8 +3,10 @@ import {
   MessagesAnnotation,
   START,
   Annotation,
+  CompiledStateGraph,
 } from "@langchain/langgraph";
 import { ChatOpenAI } from "@langchain/openai";
+import { BaseMessage } from "@langchain/core/messages";
 
 const llm = new ChatOpenAI({ model: "gpt-5-mini", temperature: 0 });
 
@@ -29,4 +31,4 @@ const builder = new StateGraph(
   })
   .addEdge(START, "agent");
 
-export const graph = builder.compile();
+export const graph: CompiledStateGraph<{ messages: BaseMessage[], timestamp: number }, { messages: BaseMessage, timestamp: number }> = builder.compile();
