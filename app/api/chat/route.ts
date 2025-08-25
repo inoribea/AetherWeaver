@@ -247,7 +247,9 @@ export async function POST(req: NextRequest) {
     const model = modelManager.model ?? "gpt-4o";
     const llm = createChatOpenAIInstance(apiKey, model);
 
-    const embeddings = new OpenAIEmbeddings();
+    const embeddings = new OpenAIEmbeddings({
+      ...(openAIApiBaseUrl ? { configuration: { baseURL: openAIApiBaseUrl } } : {}),
+    });
 
     // 初始化工具（这里省略）
 

@@ -19,6 +19,7 @@ export function createBasicChain() {
     modelName: process.env.BASIC_MODEL_NAME || "gpt-4o-mini",
     temperature: 0.0,
     maxTokens: 800,
+    ...(process.env.OPENAI_BASE_URL && { configuration: { baseURL: process.env.OPENAI_BASE_URL } }),
   });
 
   return RunnableSequence.from([prompt, model]);

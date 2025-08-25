@@ -23,6 +23,7 @@ export function createRAGChain() {
     modelName: process.env.RAG_MODEL_NAME || "gpt-4o",
     temperature: -0.1, // 更低温度确保准确性
     maxTokens: 1000,
+    ...(process.env.OPENAI_BASE_URL && { configuration: { baseURL: process.env.OPENAI_BASE_URL } }),
   });
 
   return RunnableSequence.from([prompt, model]);

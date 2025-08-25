@@ -19,7 +19,8 @@ export function getAvailableAgentModel() {
       model: new ChatOpenAI({
         modelName: "gpt-4.1",
         temperature: 0,
-        apiKey: process.env.OPENAI_API_KEY
+        apiKey: process.env.OPENAI_API_KEY,
+        ...(process.env.OPENAI_BASE_URL && { configuration: { baseURL: process.env.OPENAI_BASE_URL } }),
       }),
       modelName: "gpt-4.1"
     };
@@ -55,7 +56,8 @@ export function getAvailableAgentModel() {
   return {
     model: new ChatOpenAI({
       modelName: "gpt-4.1",
-      temperature: 0
+      temperature: 0,
+      ...(process.env.OPENAI_BASE_URL && { configuration: { baseURL: process.env.OPENAI_BASE_URL } }),
     }),
     modelName: "gpt-4.1"
   };
