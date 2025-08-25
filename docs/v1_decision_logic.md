@@ -1,36 +1,41 @@
-# v1 版本决策逻辑说明
+# v1 智能路由决策逻辑
 
-本文档详细介绍了项目 v1 版本中的智能决策逻辑及相关环境变量配置，帮助用户理解和配置系统的智能路由和模型选择机制。
-
-## 决策逻辑概述
-
-v1 版本采用统一的智能路由请求构造机制，结合多维度模型切换意图检测和统一路由器决策，实现高效、准确的模型选择：
-
-- **模型切换意图检测**：通过解析用户输入，自动识别是否存在模型切换请求，支持用户显式或隐式指定模型。
-- **统一路由请求构造**：将用户请求转换为统一格式，包含消息、用户意图、上下文信息、工具列表等。
-- **智能路由器决策**：调用统一路由器，根据任务类型、复杂度、模型能力等多维度评分，选择最合适的模型。
-- **置信度与策略反馈**：路由器返回模型选择结果、置信度及决策策略，供后续调用和监控使用。
-- **流式响应支持**：支持OpenAI兼容的流式响应，提升交互体验。
-
-## 相关环境变量
-
-| 变量名              | 说明                         | 是否必需 | 示例值                          |
-|---------------------|------------------------------|----------|--------------------------------|
-| GOOGLE_API_KEY       | Google Gemini API 密钥        | 是       | your-google-api-key             |
-| OPENAI_API_KEY       | OpenAI API 密钥               | 是       | your-openai-api-key             |
-| DEEPSEEK_API_KEY     | DeepSeek API 密钥（中文友好） | 是       | your-deepseek-api-key           |
-| CLAUDE_API_KEY       | Claude API 密钥               | 是       | your-claude-api-key             |
-| CLAUDE_BASE_URL      | Claude API 基础 URL           | 是       | https://api.anthropic.com       |
-| LANGFUSE_API_URL     | LangFuse 监控服务地址         | 否       | https://api.langfuse.com        |
-| LANGFUSE_API_KEY     | LangFuse API 密钥             | 否       | your-langfuse-api-key           |
-| TAVILY_API_KEY       | 网络搜索服务 API 密钥         | 否       | your-tavily-api-key             |
-| ENABLE_API_AUTH      | 是否为v1兼容路由启用API密钥验证 | 否       | true                            |
-| SUPABASE_URL        | RAG 检索数据库地址            | 否       | your-supabase-url               |
-
-## 使用建议
-
-- 确保至少配置一个主要模型的API密钥，保证系统正常运行。
-- 根据业务需求配置可选环境变量，启用监控、检索和搜索功能。
-- 结合统一路由器的日志和监控，调整模型配置和路由策略，优化性能和成本。
+## 概述
+本文档详细介绍 v1 版本中的智能路由决策逻辑及相关环境变量配置，帮助用户理解和配置系统的路由和模型选择机制。
 
 ---
+
+## 决策流程
+1.  **意图检测**: 解析用户输入，识别模型切换、工具调用等特殊意图。
+2.  **统一请求构造**: 将请求标准化，送入智能路由器。
+3.  **智能路由决策**:
+    - **`rule_based` 模式**: 基于关键字和正则表达式的快速规则匹配。
+    - **`llm_enhanced` 模式**: 在规则分析后，调用一个轻量级 LLM 对请求进行二次分析，以实现更精准的路由。
+4.  **模型选择**: 根据路由结果，从预设的模型池 (`models-config.json` 或环境变量) 中选择最优模型。
+5.  **响应生成**: 调用目标模型并返回结果。
+
+---
+
+## 关键环境变量
+
+### 路由模式配置
+- **`ANALYSIS_MODE`**: 控制路由分析模式。
+  - `rule_based` (默认): 高性能的规则匹配。
+  - `llm_enhanced`: 更智能但有额外开销的 LLM 增强模式。
+
+- **`ROUTING_MODEL_NAME`**: 当 `ANALYSIS_MODE` 设置为 `llm_enhanced` 时，用于路由决策的 LLM 名称。
+
+- **`ROUTING_PROMPT`**: 当 `ANALYSIS_MODE` 设置为 `llm_enhanced` 时，用于路由决策的 Prompt 模板。
+
+### 对话历史支持
+- **`LANGFLOW_ROUTER_MEMORY_SUPPORT`**: 控制路由是否考虑对话历史。
+  - `true` (默认): 启用。
+  - `false`: 禁用。
+  - 也可配置为 JSON 字符串以支持更复杂的内存策略。
+
+---
+
+## 模型支持
+系统支持多种 LLM，包括 OpenAI、Deepseek、Google Gemini、Claude 等，通过相应的 API Key 环境变量启用。
+
+确保至少配置一个模型的 API Key 以保证系统正常运行。

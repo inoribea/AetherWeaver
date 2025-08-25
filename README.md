@@ -1,144 +1,65 @@
-# AetherWeaver 🧶
-[简体中文](README-CN.md)
+# AetherWeaver: Unified LLM Routing & Orchestration Platform
 
-**An Intelligent AI Gateway & Orchestrator for the Serverless Edge**
+AetherWeaver is a powerful, extensible platform for building advanced LLM applications. It provides a unified interface for multiple model providers, intelligent routing, RAG capabilities, and OpenAI-compatible endpoints.
 
----
+## ✨ Key Features
 
-AetherWeaver isn’t just another LangChain deployment template. It lives up to its name: in the feather-light **Serverless Edge** runtime, a precise **Weaver** routes and intertwines complex user intents to the most suitable AI capability chains via an embedded **intelligent routing core**.
-
-This project gives you a three-in-one solution:
-- **Intelligent Routing**: A configurable, weighted routing model that understands intent and dispatches tasks to the most effective expert model or toolchain.
-- **Serverless Native**: Built entirely on Vercel Edge Functions for global, millisecond latency, zero ops, and elastic scale.
-- **LangChain Native**: Rooted in the LangChain.js ecosystem so you can reuse, extend, and compose any existing Chains, Agents, and Tools seamlessly.
-
----
-
-## Core Features
-
-- **Routing Core** – Beyond simple conditionals, AetherWeaver introduces a configurable, weighted decision model for precise dispatch.
-- **Serverless-Native Architecture** – Deployed on Vercel Edge with no cold starts; pay-per-request economics handle high concurrency at minimal cost.
-- **LangChain Ecosystem Compatibility** – Plug in your existing LangChain.js modules (Chains, Agents, Tools) like LEGO pieces.
-- **LCEL First** – Fully embraces the LangChain Expression Language for modern, declarative composition of AI chains.
-- **End-to-End Streaming** – From routing decisions to final answer, everything streams for a snappy UX.
-- **Minimal Extension API** – Register a new “expert” chain in just a few lines and join the routing fabric.
-- **Edge-Optimized Chinese Tokenization** – Jieba is decoupled into static assets for efficient segmentation on Edge runtimes like Vercel Edge.
-
----
-
-## 🗺️ Architecture
-
-At the heart of AetherWeaver is a **Multi-Expert Routing System**. It analyzes user intent and dispatches each request to one of four expert pools, then selects the most suitable expert within that pool.
-
-```mermaid
-graph LR
-    %% --- 1. User Input ---
-    A["User Request"]
-
-    %% --- 2. Core Routing Decision ---
-    subgraph "AetherWeaver Gateway (Vercel Edge)"
-        B["Intelligent Routing Model (Router)"]
-        C{"Intent Analysis & Decision"}
-    end
-
-    %% --- 3. Four Expert Pools ---
-    subgraph "Pool: Basic Conversation"
-        direction LR
-        S1["Expert S1"]
-    end
-
-    subgraph "Pool: Enhanced Conversation"
-        direction LR
-        E1["Expert E1"]
-    end
-
-    subgraph "Pool: RAG Retrieval"
-        direction LR
-        R1["Expert R1"]
-    end
-
-    subgraph "Pool: Agent Tool Use"
-        direction LR
-        A1["Expert A1"]
-    end
-
-    %% --- 4. External Services & Capabilities ---
-    subgraph "Capabilities & Services"
-        LLM["LLM (with Memory)"]
-        RAG_DB["Vector DB / Search"]
-        TOOLS["General Tooling (Any LangChain Tool)"]
-    end
-
-    %% --- 5. Routing & Execution Paths ---
-    A --> B
-    B --> C
-    C -- "Decision: Basic Conversation" --> S1
-    C -- "Decision: Enhanced Conversation" --> E1
-    C -- "Decision: RAG" --> R1
-    C -- "Decision: Agent" --> A1
-
-    S1 --> LLM
-    E1  --> LLM
-    R1  --> RAG_DB --> LLM
-    A1  --> TOOLS --> LLM
-
-    %% --- 6. Unified Streaming Response ---
-    LLM --> Z["Streaming Response"]
-    Z --> A
-```
-
----
+- **Multi-Model Support**: Integrates with OpenAI, Google Gemini, Deepseek, Claude, and more.
+- **Intelligent Routing**: Dynamically routes requests to the best-suited model based on task complexity and type (e.g., code, vision, reasoning).
+- **Retrieval-Augmented Generation (RAG)**: Supports multiple embedding models (OpenAI, Cloudflare) and vector databases (Qdrant, Upstash, Pinecone).
+- **OpenAI-Compatible API**: Drop-in replacement for OpenAI's API, allowing seamless integration with existing tools.
+- **Observability**: Built-in integration with Langfuse for detailed tracing and monitoring.
+- **Extensible Agents**: Build powerful agents with custom tools like web search.
 
 ## 🚀 Quick Start
 
-### 1) Clone
-```bash
-git clone https://github.com/inoribea/AetherWeaver.git
-cd AetherWeaver
-```
+1.  **Clone the repository**:
+    ```bash
+    git clone https://github.com/inoribea/AetherWeaver.git
+    cd AetherWeaver
+    ```
 
-### 2) Install
-```bash
-pnpm install
-```
+2.  **Install dependencies**:
+    ```bash
+    yarn install
+    ```
 
-### 3) Configure Environment
-Copy `.env.example` to `.env.local` and fill in your API keys:
-```env
-OPENAI_API_KEY=sk-...
-TAVILY_API_KEY=tvly-...
-# any other keys you need
-```
+3.  **Configure environment variables**:
+    ```bash
+    cp .env.example .env.local
+    ```
+    Fill in your API keys in `.env.local`. At a minimum, you need one model provider API key (e.g., `OPENAI_API_KEY`).
 
-### 4) Dev
-```bash
-pnpm dev
-```
+4.  **Run the development server**:
+    ```bash
+    yarn dev
+    ```
 
-### 5) One-Click Deploy to Vercel
-[
-![Deploy to Vercel](https://vercel.com/button)
-](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Finoribea%2FAetherWeaver&project-name=aetherweaver&repository-name=aetherweaver)
+5.  **Open your browser** and navigate to `http://localhost:3000`.
 
-#### Reference Docs
+## 🛠️ Configuration
 
-- [Vercel Deployment Guide](docs/vercel_deployment_guide.md)
-- [Environment Variables Example](.env.example)
-- [Unified Router Implementation](utils/unified-router.ts)
-- [Chat Route Implementation](/api/chat/route.ts)
-- [v1 Route Implementation](app/api/v1/chat/completions/route.ts)
+The application is configured through environment variables. Key options include:
 
----
+- `ANALYSIS_MODE`: Set to `rule_based` (default) for fast routing or `llm_enhanced` for more accurate, AI-powered routing.
+- `EMBEDDING_PROVIDER`: Choose between `OpenAI` and `Cloudflare` for document embeddings.
+- `QDRANT_URL` / `UPSTASH_VECTOR_REST_URL`: Configure your vector database connection.
+- `LANGFUSE_SECRET_KEY`: Enable monitoring by providing your Langfuse secret key.
 
-## 🔧 Extending Your “Weave”
+For a complete list of variables, see [docs/vercel-guide.md](docs/vercel-guide.md).
 
-Adding a new expert chain is straightforward:
+## 📚 Documentation
 
-1. **Create an Expert**: Add a new `Chain` or `Agent` under `app/lib/experts/`.
-2. **Register the Expert**: In your router config (e.g., `app/api/chat/router.ts`), import the expert and give it a unique `name` plus a clear `description`.
-3. **Done**: The intelligent routing model will automatically “weave” matching requests into your new expert.
+- **[Project Overview](docs/SUMMARY.md)**: High-level summary of features and configuration.
+- **[API Usage](docs/chat_api_usage.md)**: How to use the different chat APIs.
+- **[RAG & Embeddings](docs/retrieval_interface.md)**: Details on configuring RAG.
+- **[Smart Routing](docs/v1_decision_logic.md)**: In-depth explanation of the routing logic.
+- **[Deployment Guide](docs/vercel-guide.md)**: Guide for deploying on Vercel.
 
----
+## 🤝 Contributing
 
-## 📜 License
-MIT License
+Contributions are welcome! Please open an issue or submit a pull request.
+
+## 📄 License
+
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.

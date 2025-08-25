@@ -1,119 +1,72 @@
 # Vercel 部署与环境变量配置指南
 
-本指南专注于在 Vercel 平台上部署本项目时，环境变量的细节配置和管理。
-
-## 1. 重要环境变量
-
-- `VERCEL_FUNCTION_TIMEOUT`  
-  函数最大执行时间，单位秒，默认30秒  
-  **示例：** `VERCEL_FUNCTION_TIMEOUT=30`
-
-- `VERCEL_ENV`  
-  当前部署环境标识，如：`production` / `preview` / `development`  
-  **示例：** `VERCEL_ENV=production`
-
-- `VERCEL_APP_URL`  
-  Vercel 部署后应用的 URL，用于前端访问和回调  
-  **示例：** `VERCEL_APP_URL="https://your-app-name.vercel.app"`
-
-- `NEXT_PUBLIC_APP_URL`  
-  前端公开的应用 URL，通常与 `VERCEL_APP_URL` 相同  
-  **示例：** `NEXT_PUBLIC_APP_URL="https://your-app-name.vercel.app"`
-
-- `VERCEL_PROJECT_ID`  
-  Vercel 项目ID，用于API调用和项目识别  
-  **示例：** `VERCEL_PROJECT_ID=prj_xxxxxxxxxxxxxxxxx`
-
-- `VERCEL_ORG_ID`  
-  Vercel 组织ID，用于API调用和组织识别  
-  **示例：** `VERCEL_ORG_ID=org_xxxxxxxxxxxxxxxxx`
-
-## 2. API Key管理
-
-建议通过 Vercel Dashboard 的 Environment Variables 页面统一设置所有 API Keys。以下是一些常见的 API Keys：
-
-- `OPENAI_API_KEY`  
-- `DEEPSEEK_API_KEY`  
-- `GOOGLE_API_KEY`  
-- `CLOUDFLARE_API_TOKEN`  
-- `SERPAPI_API_KEY`  
-- `TAVILY_API_KEY`  
-- `BING_SEARCH_API_KEY`  
-- `CLAUDE_API_KEY`  
-- `OPENROUTER_API_KEY`  
-- `LANGCHAIN_API_KEY`  
-- `LANGFUSE_API_KEY`  
-- `LANGFUSE_PUBLIC_KEY`  
-- `LANGFUSE_SECRET_KEY`  
-- `QDRANT_API_KEY` (如果 Qdrant 是远程服务)  
-- `PINECONE_API_KEY`  
-- `SUPABASE_SERVICE_ROLE_KEY`  
-- `API_SECRET_KEY` (用于自定义API认证)
-
-## 3. 数据库及存储配置
-
-- `DATABASE_URL`  
-  数据库连接字符串，例如 PostgreSQL, MongoDB 等  
-  **示例：** `DATABASE_URL="postgresql://user:password@host:port/database"`
-
-- `UPSTASH_VECTOR_REST_URL`  
-- `UPSTASH_VECTOR_REST_TOKEN`  
-- `REDIS_URL`  
-- `REDIS_TOKEN`  
-- `QDRANT_URL`  
-- `PINECONE_ENVIRONMENT`  
-- `SUPABASE_URL`  
-
-## 4. 功能开关与配置
-
-本项目包含多个功能开关，可以通过环境变量控制其启用或禁用：
-
-- `ENABLE_API_AUTH`  
-- `ENABLE_UNIFIED_ROUTING`  
-- `ENABLE_INTELLIGENT_ROUTING`  
-- `ENABLE_MODEL_SWITCHING`  
-- `ENABLE_PERFORMANCE_MONITORING`  
-- `ENABLE_VISION_PROCESSING`  
-- `ENABLE_WEB_SEARCH`  
-- `ENABLE_DOCUMENT_RETRIEVAL`  
-- `ENABLE_STRUCTURED_OUTPUT`  
-- `ENABLE_AGENT_TOOLS`  
-- `ENABLE_COMPLEX_REASONING`  
-- `ENABLE_CHINESE_OPTIMIZATION`  
-- `ENABLE_MULTILINGUAL_SUPPORT`  
-- `ENABLE_MODEL_FALLBACK`  
-- `ENABLE_AUTOMATIC_RETRIES`  
-- `ENABLE_CONTEXT_AWARENESS`  
-- `ENABLE_MEMORY`  
-- `ENABLE_RESPONSE_CACHE`  
-- `ENABLE_CORS`  
-- `ENABLE_HEALTH_CHECK`  
-- `MOCK_API_RESPONSES`  
-- `ENABLE_BUNDLE_ANALYZER`  
-- `ENABLE_PERFORMANCE_PROFILING`  
-
-## 6. 智能路由详细配置
-
-除了简单的功能开关，智能路由 (`SmartRouterComponent`) 支持更细粒度的配置：
-
-- `ANALYSIS_MODE`
-  控制路由决策的分析模式。
-  - **`rule_based`** (默认): 仅使用基于关键字和规则的快速分析。性能高，但可能不够智能。
-  - **`llm_enhanced`**: 在规则分析的基础上，会调用一个指定的语言模型（`ROUTING_MODEL_NAME`）来进一步增强决策的准确性。这会带来额外的延迟和成本。
-  **示例：** `ANALYSIS_MODE=llm_enhanced`
-
-- `LANGFLOW_ROUTER_MEMORY_SUPPORT`
-  控制路由是否考虑对话历史（内存）。
-  - 可以是简单的布尔值: `true` 或 `false`。
-  - 也可以是JSON字符串以支持更复杂的配置，例如: `{"enabled": true}`。
-  **示例：** `LANGFLOW_ROUTER_MEMORY_SUPPORT=true`
-
-## 5. 安全及注意事项
-
-- 严格保密所有密钥，不要硬编码到代码库。  
-- 使用 Vercel 的加密存储功能。  
-- 确保配置的变量与本地`.env`文件保持同步，避免部署异常。
+## 1. Vercel 平台变量
+- `VERCEL_FUNCTION_TIMEOUT`: 函数最大执行时间 (默认 30s)。
+- `VERCEL_ENV`: 部署环境 (`production`, `preview`, `development`)。
+- `VERCEL_APP_URL`: Vercel 部署的应用 URL。
+- `NEXT_PUBLIC_APP_URL`: 前端公开的应用 URL。
 
 ---
 
-请根据本指南配置环境变量，确保项目部署运行稳定。
+## 2. API Keys
+- **模型服务**:
+  - `OPENAI_API_KEY`, `OPENAI_BASE_URL`
+  - `DEEPSEEK_API_KEY`
+  - `GOOGLE_API_KEY`, `GOOGLE_BASE_URL`
+  - `CLAUDE_API_KEY`, `CLAUDE_BASE_URL`
+  - `TENCENT_HUNYUAN_SECRET_ID`, `TENCENT_HUNYUAN_SECRET_KEY`
+  - `DASHSCOPE_API_KEY`
+  - `OPENROUTER_BASE_URL`
+- **工具服务**:
+  - `SERPAPI_API_KEY`
+  - `TAVILY_API_KEY`
+- **访问控制**:
+  - `ENABLE_API_AUTH`: 是否启用 API 密钥验证 (默认 `true`)。
+  - `LANGCHAIN_API_KEYS`: 允许访问的 API Key 列表 (逗号分隔)。
+  - `LANGCHAIN_ADMIN_KEY`: 管理员 API Key。
+
+---
+
+## 3. 向量数据库与存储
+- **Qdrant**: `QDRANT_URL`
+- **Upstash**: `UPSTASH_VECTOR_REST_URL`, `UPSTASH_VECTOR_REST_TOKEN`
+- **Pinecone**: `PINECONE_API_KEY`, `PINECONE_ENVIRONMENT`
+- **PostgreSQL**: `DATABASE_URL` (用于其他数据存储)
+
+---
+
+## 4. 模型与 Embedding 配置
+- `EMBEDDING_PROVIDER`: `OpenAI` 或 `Cloudflare`。
+- `OPENAI_EMBEDDINGS_MODEL`, `OPENAI_EMBEDDINGS_DIMENSIONS`
+- `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_EMBEDDING_MODEL`
+- **任务模型池** (可选, 覆盖 `models-config.json`):
+  - `ENHANCED_TASKS_MODELS`
+  - `VISION_TASKS_MODELS`
+  - `REASONING_TASKS_MODELS`
+  - `CHINESE_TASKS_MODELS`
+  - `SEARCH_TASKS_MODELS`
+  - `CODE_TASKS_MODELS`
+  - `CREATIVE_TASKS_MODELS`
+  - `STRUCTURED_OUTPUT_TASKS_MODELS`
+
+---
+
+## 5. 智能路由配置
+- `ANALYSIS_MODE`: `rule_based` (默认) 或 `llm_enhanced`。
+- `ROUTING_MODEL_NAME`: `llm_enhanced` 模式下使用的模型。
+- `ROUTING_PROMPT`: `llm_enhanced` 模式下使用的 Prompt。
+- `LANGFLOW_ROUTER_MEMORY_SUPPORT`: 是否启用路由记忆 (`true`/`false`)。
+
+---
+
+## 6. 可观测性
+- **Langfuse**:
+  - `LANGFUSE_API_URL`
+  - `LANGFUSE_PUBLIC_KEY`
+  - `LANGFUSE_SECRET_KEY`
+
+---
+
+## 7. 文档处理
+- `DOCUMENT_CHUNK_SIZE`: 文档分块大小 (默认 1000)。
+- `DOCUMENT_CHUNK_OVERLAP`: 分块重叠大小 (默认 200)。
