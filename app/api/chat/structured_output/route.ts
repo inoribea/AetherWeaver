@@ -63,7 +63,7 @@ async function getAvailableStructuredOutputModel(messages: any[]): Promise<{ mod
     } else {
       model = new ChatOpenAI({
         temperature: 0.8,
-        model: "gpt-4o-mini",
+        model: "gpt-5-mini",
         apiKey: process.env.OPENAI_API_KEY,
         ...(process.env.OPENAI_BASE_URL && { configuration: { baseURL: process.env.OPENAI_BASE_URL } }),
       });
@@ -76,10 +76,10 @@ async function getAvailableStructuredOutputModel(messages: any[]): Promise<{ mod
       return {
         model: new ChatOpenAI({
           temperature: 0.8,
-          model: "gpt-4o-mini",
+          model: "gpt-5-mini",
           apiKey: process.env.OPENAI_API_KEY,
         }),
-        modelName: "gpt-4o-mini",
+        modelName: "gpt-5-mini",
       };
     }
     throw new Error("No API keys configured for structured output models.");
@@ -144,7 +144,16 @@ Input: ${currentMessage.content.trim()}`
       }
     ]);
 
-    return NextResponse.json(result, {
+    let jsonResult = result;
+    if (typeof result === 'string') {
+      try {
+        jsonResult = JSON.parse(result);
+      } catch (parseError) {
+        console.error('Failed to parse model output as JSON:', parseError);
+        return NextResponse.json({ error: 'Model returned invalid JSON format' }, { status: 500 });
+      }
+    }
+    return NextResponse.json(jsonResult, {
       status: 200,
       headers: {
         "X-Model-Used": modelName,

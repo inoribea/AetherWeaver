@@ -74,7 +74,7 @@ curl -X POST http://localhost:3000/api/v1/chat/completions \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer your_api_key" \
   -d '{
-    "model": "gpt-4o-mini",
+    "model": "gpt-5-mini",
     "messages": [
       {"role": "user", "content": "你好，帮我写个测试示例。"}
     ],

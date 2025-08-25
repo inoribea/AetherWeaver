@@ -7,7 +7,8 @@ import { createRAGChain } from "../../../src/chains/rag-chain";
 import { ChatOpenAI, OpenAIEmbeddings } from "@langchain/openai";
 
 import { SmartRouterComponent } from "../../components/routing/smart-router";
-import { ModelManager } from "../../admin/models/ModelManager";
+import { ModelManager, getEffectiveApiKey } from "../../admin/models/ModelManager"; // 导入 getEffectiveApiKey
+import modelsConfig from "../../../models-config.json"; // 导入 models-config.json
 
 /**
  * 请求体缓存包装函数，保证Body只读取一次
@@ -54,7 +55,7 @@ const openAIApiBaseUrl = process.env.OPENAI_BASE_URL;
  */
 function createChatOpenAIInstance(apiKey: string, model: string) {
   return new ChatOpenAI({
-    model: model || "gpt-4o",
+    model: model || "gpt-5",
     temperature: 0,
     apiKey: apiKey,
     ...(openAIApiBaseUrl ? { configuration: { baseURL: openAIApiBaseUrl } } : {}),
@@ -90,7 +91,7 @@ function beautifyRouteName(route: string): string {
   switch (route) {
     case "basic":
       return "🟢 Basic";
-    case "enhanced":
+    case "enhanced_tasks":
       return "✨ Enhanced";
     case "rag":
       return "📚 RAG";
@@ -100,6 +101,20 @@ function beautifyRouteName(route: string): string {
       return "🔮 Tavily";
     case "webbrowser":
       return "🌐 WebBrowser";
+    case "vision_tasks":
+      return "👁️ Vision";
+    case "reasoning_tasks":
+      return "🧠 Reasoning";
+    case "chinese_tasks":
+      return "🇨🇳 Chinese";
+    case "search_tasks":
+      return "🔍 Search";
+    case "code_tasks":
+      return "💻 Code";
+    case "creative_tasks":
+      return "✍️ Creative";
+    case "structured_output":
+      return "📊 Structured";
     default:
       return "❓ Unknown";
   }
@@ -171,10 +186,10 @@ export async function POST(req: NextRequest) {
           }
         );
       }
-      // 这里取 messages 数组第一个消息内容作为后续处理
-      const firstMessage = messages[0];
+      // 这里取 messages 数组最后一个消息内容作为后续处理
+      const lastMessage = messages[messages.length - 1];
       safeMessageContent =
-        typeof firstMessage === "string" ? firstMessage.trim() : firstMessage.content.trim();
+        typeof lastMessage === "string" ? lastMessage.trim() : lastMessage.content.trim();
     } else if (message !== undefined) {
       if (!isValidMessage(message)) {
         console.error("Invalid message format in /api/chat POST:", message);
@@ -219,14 +234,68 @@ export async function POST(req: NextRequest) {
     });
 
     const routingResult = await router.invoke(new HumanMessage(safeMessageContent));
+    console.log("Routing result:", JSON.stringify(routingResult, null, 2));
 
     // 模型选择
     const modelManager = await ModelManager.getCurrentModel();
+    let selectedModelName: string = modelManager.model ?? "gpt-5";
+    let selectedApiKey: string | undefined = modelManager.apiKey;
 
-    // 创建 ChatOpenAI 实例，支持环境变量 OPENAI_BASE_URL 自定义请求URL
-    const apiKey = modelManager.apiKey ?? "";
-    const model = modelManager.model ?? "gpt-4o";
-    const llm = createChatOpenAIInstance(apiKey, model);
+    const routeRule = modelsConfig.routing_rules[routingResult.route as keyof typeof modelsConfig.routing_rules];
+    let preferredModels = routeRule?.preferred_models || [];
+
+    // 从环境变量中读取并覆盖模型池
+    const routeEnvVarName = `${routingResult.route.toUpperCase()}_MODELS`;
+    const envModels = process.env[routeEnvVarName];
+    if (envModels) {
+      const realModelNames = envModels.split(',').map(m => m.trim());
+      const modelKeys = realModelNames.map(realModelName => {
+        const key = Object.keys(modelsConfig.models).find(k => {
+          const modelConfig = modelsConfig.models[k as keyof typeof modelsConfig.models];
+          return modelConfig.config.model === realModelName;
+        });
+        if (key) {
+          return key;
+        }
+        console.warn(`Model with real name "${realModelName}" not found in models-config.json. Ignoring.`);
+        return null;
+      }).filter((k): k is string => k !== null);
+
+      if (modelKeys.length > 0) {
+        preferredModels = modelKeys;
+        console.log(`Overriding models for route ${routingResult.route} with env var ${routeEnvVarName}:`, preferredModels);
+      }
+    }
+
+    if (preferredModels.length > 0) {
+      const preferredModelId = preferredModels[0]; // 选择第一个首选模型
+      const modelDetails = modelsConfig.models[preferredModelId as keyof typeof modelsConfig.models];
+
+      if (modelDetails) {
+        selectedModelName = modelDetails.config.model;
+        // 根据模型类型获取对应的API Key
+        if (modelDetails.type === "openai_compatible") {
+          selectedApiKey = process.env[(modelDetails.config as any).apiKey as keyof NodeJS.ProcessEnv] as string;
+        } else if (modelDetails.type === "deepseek") {
+          selectedApiKey = process.env.DEEPSEEK_API_KEY as string;
+        } else if (modelDetails.type === "alibaba_tongyi") {
+          selectedApiKey = process.env.DASHSCOPE_API_KEY as string;
+        } else if (modelDetails.type === "tencent_hunyuan") {
+          selectedApiKey = process.env.TENCENT_HUNYUAN_SECRET_KEY as string; // 或者 SECRET_ID
+        } else if (modelDetails.type === "google_gemini") {
+          selectedApiKey = process.env.GOOGLE_API_KEY as string;
+        } else if (modelDetails.type === "o3_provider") {
+          selectedApiKey = process.env.O3_API_KEY as string;
+        }
+      }
+    }
+
+    // 如果没有从路由规则中获取到API Key，则回退到默认获取方式
+    if (!selectedApiKey) {
+      selectedApiKey = getEffectiveApiKey();
+    }
+
+    const llm = createChatOpenAIInstance(selectedApiKey || "", selectedModelName);
 
     const embeddings = new OpenAIEmbeddings({
       ...(openAIApiBaseUrl ? { configuration: { baseURL: openAIApiBaseUrl } } : {}),
@@ -237,23 +306,43 @@ export async function POST(req: NextRequest) {
     // 选择对应的链或工具
     const route = routingResult.route as
       | "basic"
-      | "enhanced"
+      | "enhanced_tasks" // 添加 enhanced_tasks 路由类型
       | "rag"
       | "agent"
       | "tavily"
-      | "webbrowser";
+      | "webbrowser"
+      | "vision_tasks"
+      | "reasoning_tasks"
+      | "chinese_tasks"
+      | "search_tasks"
+      | "code_tasks"
+      | "creative_tasks"
+      | "structured_output";
 
     let result;
 
     switch (route) {
       case "basic":
-      case "enhanced":
-      case "agent": {
+      case "agent":
+      case "vision_tasks":
+      case "reasoning_tasks":
+      case "chinese_tasks":
+      case "code_tasks":
+      case "creative_tasks":
+      case "structured_output": {
         const chain = createBasicChain();
         result = await chain.invoke({ input: safeMessageContent });
         break;
       }
-      case "rag": {
+      case "enhanced_tasks": {
+        // 这里可以实现 enhanced 路由的增强逻辑
+        // 例如，可以调用 OptimizedEnhancedRouter 进行更复杂的路由决策，
+        // 或者调用一个专门的 enhanced chain
+        result = { content: `您已进入增强模式。您的输入是: ${safeMessageContent}` };
+        break;
+      }
+      case "rag":
+      case "search_tasks": {
         const chain = createRAGChain();
         result = await chain.invoke({ input: safeMessageContent, context_documents: [] });
         break;
@@ -272,7 +361,7 @@ export async function POST(req: NextRequest) {
         routing: {
           route: beautifyRouteName(routingResult.route),
           confidence: beautifyConfidence(routingResult.confidence ?? 1),
-          model: modelManager.model,
+          model: selectedModelName, // 使用实际选择的模型名称
         },
         metadata: {
           langchainjs_compatible: true,
@@ -304,4 +393,3 @@ export async function POST(req: NextRequest) {
     );
   }
 }
-

@@ -384,7 +384,7 @@ export default function ModelsAdminPage() {
                   <Input
                     value={newModelName}
                     onChange={(e) => setNewModelName(e.target.value)}
-                    placeholder="例如: gpt-4o-mini"
+                    placeholder="例如: gpt-5-mini"
                   />
                 </div>
                 <div>
@@ -431,7 +431,7 @@ export default function ModelsAdminPage() {
                         model: e.target.value
                       }
                     })}
-                    placeholder="例如: gpt-4o-mini"
+                    placeholder="例如: gpt-5-mini"
                   />
                 </div>
               </div>

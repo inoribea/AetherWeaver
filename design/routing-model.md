@@ -80,7 +80,7 @@
                 name="model_name",
                 display_name="Model Name",
                 options=OPENAI_CHAT_MODEL_NAMES,
-                value="gpt-4o-mini",
+                value="gpt-5-mini",
                 info="Select the model to use from predefined list",
                 real_time_refresh=True,
                 show=True,
@@ -91,7 +91,7 @@
                 info="Enter custom model name",
                 show=False,
                 advanced=False,
-                placeholder="gpt-4o, claude-3-5-sonnet-20241022, gemini-pro, etc.",
+                placeholder="gpt-5, claude-3-5-sonnet-20241022, gemini-pro, etc.",
             ),
             BoolInput(
                 name="use_custom_url",
@@ -155,7 +155,7 @@
                 },
                 "model_fallbacks": {
                     "primary": self.get_effective_model_name(),
-                    "secondary": "gpt-4o-mini"
+                    "secondary": "gpt-5-mini"
                 },
                 "response_format": {
                     "force_json": self.enable_json_mode,
@@ -398,8 +398,8 @@
             """动态配置更新，支持LCEL和LangChain.js模式"""
             if field_name == "provider":
                 if field_value == "OpenAI":
-                    build_config["model_name"]["options"] = ["gpt-4o-mini", "gpt-4.1", "gpt-4o"]
-                    build_config["model_name"]["value"] = "gpt-4o-mini"
+                    build_config["model_name"]["options"] = ["gpt-5-mini", "gpt-4.1", "gpt-5"]
+                    build_config["model_name"]["value"] = "gpt-5-mini"
                     build_config["api_key"]["display_name"] = "OpenAI API Key"
                     
                 elif field_value == "Anthropic":

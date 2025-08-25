@@ -29,7 +29,7 @@ function convertV1ToChatRouteRequest(v1RequestBody) {
 
 // 示例测试
 const exampleV1Request = {
-  model: 'gpt-4o-mini',
+  model: 'gpt-5-mini',
   messages: [
     { role: 'user', content: '你好，帮我写个测试示例。' }
   ],

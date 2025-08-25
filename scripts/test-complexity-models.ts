@@ -124,9 +124,9 @@ export async function testComplexityModels(): Promise<void> {
   console.log('\n💡 环境变量配置建议:');
   console.log('请在 .env.local 文件中添加以下配置:');
   console.log('```');
-  console.log('COMPLEXITY_HIGH_MODELS="claude-sonnet-4-all,gpt-4o-all,deepseek-reasoner,hunyuan-t1-latest"');
-  console.log('COMPLEXITY_MEDIUM_MODELS="gpt-4o-all,gemini-flash,qwen-turbo,hunyuan-turbos-latest,claude-sonnet-4-all"');
-  console.log('COMPLEXITY_LOW_MODELS="gemini-flash,qwen-turbo,hunyuan-turbos-latest,gpt-4o-all"');
+  console.log('COMPLEXITY_HIGH_MODELS="claude-sonnet-4-all,gpt-5-all,deepseek-reasoner,hunyuan-t1-latest"');
+  console.log('COMPLEXITY_MEDIUM_MODELS="gpt-5-all,gemini-flash,qwen-turbo,hunyuan-turbos-latest,claude-sonnet-4-all"');
+  console.log('COMPLEXITY_LOW_MODELS="gemini-flash,qwen-turbo,hunyuan-turbos-latest,gpt-5-all"');
   console.log('```');
 }
 

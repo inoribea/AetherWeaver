@@ -60,7 +60,7 @@ class ModelSelectorComponent(Component, Runnable):
         StrInput(
             name="model_1_name",
             display_name="Model 1 Name",
-            value="gpt-4o-mini",
+            value="gpt-5-mini",
             info="Name of model 1",
             real_time_refresh=True,
         ),

@@ -74,7 +74,7 @@ export interface OpenAIChoice {
 
 // 真实模型友好名映射（仅保留 models-config.json 中实际存在的模型）
 export const MODEL_DISPLAY_NAME: Record<string, string> = {
-  'gpt-4o-all': 'GPT-4o',
+  'gpt-5-all': 'GPT-5',
   'claude-sonnet-4-all': 'Claude 4 Sonnet',
   'deepseek-reasoner': 'DeepSeek Reasoner',
   'gemini-flash': 'Gemini Flash',
@@ -83,7 +83,7 @@ export const MODEL_DISPLAY_NAME: Record<string, string> = {
   'qvq-plus': 'Qwen Vision Plus',
   'hunyuan-turbos-latest': 'Hunyuan Turbo',
   'hunyuan-t1-latest': 'Hunyuan T1',
-  'gpt-4o-search': 'GPT-4o Search',
+  'gpt-5-search': 'GPT-5 Search',
   'gpt4.1': 'GPT-4.1',
   'Qwen/Qwen3-235B-A22B-search': 'Qwen3-235B-Search',
   'deepseek-ai/DeepSeek-V3-search': 'DeepSeek-V3-Search',
@@ -91,7 +91,7 @@ export const MODEL_DISPLAY_NAME: Record<string, string> = {
 
 // 真实模型映射（仅保留实际存在的模型，o3 -search 模型直接用真实 id）
 export const MODEL_MAPPING: Record<string, string> = {
-  'gpt-4o-all': 'gpt-4o-all',
+  'gpt-5-all': 'gpt-5-all',
   'claude-sonnet-4-all': 'claude-sonnet-4-all',
   'deepseek-reasoner': 'deepseek-reasoner',
   'gemini-flash': 'gemini-flash',
@@ -100,7 +100,7 @@ export const MODEL_MAPPING: Record<string, string> = {
   'qvq-plus': 'qvq-plus',
   'hunyuan-turbos-latest': 'hunyuan-turbos-latest',
   'hunyuan-t1-latest': 'hunyuan-t1-latest',
-  'gpt-4o-search': 'gpt-4o-search',
+  'gpt-5-search': 'gpt-5-search',
   'gpt4.1': 'gpt4.1',
   'Qwen/Qwen3-235B-A22B-search': 'Qwen/Qwen3-235B-A22B-search',
   'deepseek-ai/DeepSeek-V3-search': 'deepseek-ai/DeepSeek-V3-search',
@@ -121,7 +121,7 @@ export function selectBestModelForAuto(request: OpenAICompletionRequest): string
     msg.content.some(c => c.type === 'image_url')
   );
   if (hasImage) {
-    return 'gpt-4o-all';
+    return 'gpt-5-all';
   }
 
   // 检查 search 关键词，优先 o3 search
@@ -271,7 +271,7 @@ export function getSupportedModels() {
       description: 'DeepSeek联网版模型'
     },
     {
-      id: 'gpt-4o-all',
+      id: 'gpt-5-all',
       object: 'model',
       created: Math.floor(Date.now() / 1000),
       owned_by: 'openai',
@@ -288,8 +288,8 @@ export function getSupportedModels() {
         creative_writing: true,
         mathematical_computation: true
       },
-      display_name: MODEL_DISPLAY_NAME['gpt-4o-all'],
-      description: 'OpenAI GPT-4o 支持多模态输入，强于复杂推理、代码、创意写作，适合通用对话和企业级应用。'
+      display_name: MODEL_DISPLAY_NAME['gpt-5-all'],
+      description: 'OpenAI GPT-5 支持多模态输入，强于复杂推理、代码、创意写作，适合通用对话和企业级应用。'
     },
     {
       id: 'claude-sonnet-4-all',
@@ -460,7 +460,7 @@ export function getSupportedModels() {
       description: '面向高复杂度推理、长文本分析和多任务场景，支持中文创作、代码和数学计算。'
     },
     {
-      id: 'gpt-4o-search',
+      id: 'gpt-5-search',
       object: 'model',
       created: Math.floor(Date.now() / 1000),
       owned_by: 'openai',
@@ -477,7 +477,7 @@ export function getSupportedModels() {
         creative_writing: true,
         mathematical_computation: true
       },
-      display_name: MODEL_DISPLAY_NAME['gpt-4o-search'],
+      display_name: MODEL_DISPLAY_NAME['gpt-5-search'],
       description: '集成联网搜索能力，适合需要实时信息检索和知识增强的高级对话场景。'
     },
     {

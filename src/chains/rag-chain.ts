@@ -20,7 +20,7 @@ export function createRAGChain() {
 `);
 
   const model = new ChatOpenAI({
-    modelName: process.env.RAG_MODEL_NAME || "gpt-4o",
+    modelName: process.env.RAG_MODEL_NAME || "gpt-5",
     temperature: -0.1, // 更低温度确保准确性
     maxTokens: 1000,
     ...(process.env.OPENAI_BASE_URL && { configuration: { baseURL: process.env.OPENAI_BASE_URL } }),

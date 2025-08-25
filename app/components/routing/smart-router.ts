@@ -1,8 +1,13 @@
 import { Runnable } from "@langchain/core/runnables";
 import { BaseMessage } from "@langchain/core/messages";
+import { ChatOpenAI } from "@langchain/openai"; // 导入 ChatOpenAI
+import modelsConfig from "../../../models-config.json";
+import { segmentViaLambda } from "../../../app/api/jieba/lambdaClient"; // 导入 Jieba 分词客户端
+
+type RouteType = "basic" | keyof typeof modelsConfig.routing_rules;
 
 interface SmartRoutingResult {
-  route: "basic" | "enhanced" | "rag" | "agent";
+  route: RouteType;
   confidence: number;
   analysis_method: string;
   has_memory: boolean;
@@ -44,85 +49,64 @@ export class SmartRouterComponent extends Runnable<BaseMessage> {
     return chineseChars ? chineseChars.length > text.length * 0.3 : false;
   }
 
-  private analyzeByRules(
+  private async analyzeByRules( // 修改为异步函数
     text: string,
     isChinese: boolean
-  ): Partial<SmartRoutingResult> {
+  ): Promise<Partial<SmartRoutingResult>> { // 修改返回类型为 Promise
     const lower = text.toLowerCase();
+    let segmentedWords: string[] = [];
 
-    const keywords = {
-      agent: [
-        "计算",
-        "执行",
-        "调用",
-        "运行",
-        "查询",
-        "上传",
-        "下载",
-        "api",
-        "工具",
-        "action",
-      ],
-      rag: [
-        "查找",
-        "搜索",
-        "资料",
-        "文档",
-        "数据库",
-        "知识库",
-        "记录",
-        "历史",
-      ],
-      enhanced: [
-        "写",
-        "创作",
-        "生成",
-        "分析",
-        "解释",
-        "详细",
-        "专业",
-        "复杂",
-        "方案",
-        "设计",
-        "优化",
-      ],
-    };
-
-    const counts = {
-      agent: keywords.agent.reduce((acc, kw) => acc + (lower.includes(kw) ? 1 : 0), 0),
-      rag: keywords.rag.reduce((acc, kw) => acc + (lower.includes(kw) ? 1 : 0), 0),
-      enhanced: keywords.enhanced.reduce(
-        (acc, kw) => acc + (lower.includes(kw) ? 1 : 0),
-        0
-      ),
-    };
-
-    if (counts.agent >= 2) {
-      return { route: "agent", confidence: 0.9, analysis_method: "rule_based" };
-    } else if (counts.rag >= 2) {
-      return { route: "rag", confidence: 0.85, analysis_method: "rule_based" };
-    } else if (counts.enhanced >= 2) {
-      return {
-        route: "enhanced",
-        confidence: 0.8,
-        analysis_method: "rule_based",
-      };
-    } else {
-      return { route: "basic", confidence: 0.6, analysis_method: "rule_based" };
+    if (isChinese) {
+      try {
+        segmentedWords = await segmentViaLambda(text);
+        console.log("Jieba segmented words:", segmentedWords);
+      } catch (error) {
+        console.error("Jieba segmentation failed:", error);
+        // 如果分词失败，仍然使用原始文本进行匹配
+      }
     }
+
+    let bestRoute: RouteType = "basic";
+    let maxConfidence = 0.6; // Default confidence for basic
+
+    for (const routeName in modelsConfig.routing_rules) {
+      const rule = modelsConfig.routing_rules[routeName as keyof typeof modelsConfig.routing_rules];
+      let score = 0;
+
+      const keywordName = routeName.replace('_tasks', '');
+      const relevantKeywords = modelsConfig.keywords[keywordName as keyof typeof modelsConfig.keywords];
+      if (relevantKeywords) {
+        // 优先匹配分词结果，如果分词结果为空或非中文，则回退到原始文本匹配
+        if (segmentedWords.length > 0) {
+          score += relevantKeywords.reduce((acc, kw) => acc + (segmentedWords.some(word => word.toLowerCase() === kw.toLowerCase()) ? 1 : 0), 0);
+        } else {
+          score += relevantKeywords.reduce((acc, kw) => acc + (lower.includes(kw.toLowerCase()) ? 1 : 0), 0);
+        }
+      }
+
+      if (score > 0) {
+        let currentConfidence = 0.5 + (score * 0.1);
+        if (currentConfidence > 1) currentConfidence = 1;
+
+        if (currentConfidence > maxConfidence || (currentConfidence === maxConfidence && bestRoute === "basic" && routeName !== "basic")) {
+          maxConfidence = currentConfidence;
+          bestRoute = routeName as RouteType;
+        }
+      }
+    }
+
+    return { route: bestRoute, confidence: maxConfidence, analysis_method: "rule_based" };
   }
 
   private async enhanceWithLLM(
     ruleResult: Partial<SmartRoutingResult>,
     text: string
   ): Promise<Partial<SmartRoutingResult>> {
-    if (!this.llm) {
-      return ruleResult;
-    }
-    const prompt = `
-请基于以下用户输入和规则分析结果，判断最合适的路由模式（basic, enhanced, rag, agent），并给出置信度（0-1）：
-用户输入：${text}
-规则分析结果：${JSON.stringify(ruleResult)}
+    const routingModelName = process.env.ROUTING_MODEL_NAME;
+    const routingPromptTemplate = process.env.ROUTING_PROMPT || `
+请基于以下用户输入和规则分析结果，判断最合适的路由模式（${Object.keys(modelsConfig.routing_rules).join(", ")}, basic），并给出置信度（0-1）：
+用户输入：{text}
+规则分析结果：{ruleResult}
 
 请仅返回JSON格式：
 {
@@ -131,8 +115,30 @@ export class SmartRouterComponent extends Runnable<BaseMessage> {
   "analysis_method": "llm_enhanced"
 }
 `;
+    const routingTemperature = parseFloat(process.env.ROUTING_TEMPERATURE || "0");
+    const routingTopP = parseFloat(process.env.ROUTING_TOP_P || "1");
+
+    let llm = this.llm;
+    if (routingModelName) {
+      llm = new ChatOpenAI({
+        model: routingModelName,
+        temperature: routingTemperature,
+        modelKwargs: {
+          top_p: routingTopP,
+        },
+      });
+    }
+
+    if (!llm) {
+      return ruleResult;
+    }
+
+    const prompt = routingPromptTemplate
+      .replace("{text}", text)
+      .replace("{ruleResult}", JSON.stringify(ruleResult));
+
     try {
-      const response = await this.llm.invoke({ content: prompt });
+      const response = await llm.invoke({ content: prompt });
       const content = response.content;
       const start = content.indexOf("{");
       const end = content.lastIndexOf("}");
@@ -159,10 +165,10 @@ export class SmartRouterComponent extends Runnable<BaseMessage> {
   ): Promise<SmartRoutingResult> {
     let attempt = 0;
     let lastResult: Partial<SmartRoutingResult> | null = null;
-    const threshold = 0.6;
+    const threshold = this.config.confidence_threshold || 0.6;
 
     while (attempt < maxRetries) {
-      const ruleRes = this.analyzeByRules(
+      const ruleRes = await this.analyzeByRules( // 调用异步函数
         input.content.toString(),
         this.detectChinese(input.content.toString())
       );
@@ -183,17 +189,6 @@ export class SmartRouterComponent extends Runnable<BaseMessage> {
           routing_is_chinese: this.detectChinese(input.content.toString()),
           langchain_ready: true,
         };
-      } else {
-        if (enhancedRes.route === "basic") {
-          enhancedRes.route = "enhanced";
-          enhancedRes.confidence = (enhancedRes.confidence || 0.5) + 0.1;
-        } else if (enhancedRes.route === "enhanced") {
-          enhancedRes.route = "rag";
-          enhancedRes.confidence = (enhancedRes.confidence || 0.5) + 0.1;
-        } else if (enhancedRes.route === "rag") {
-          enhancedRes.route = "agent";
-          enhancedRes.confidence = (enhancedRes.confidence || 0.5) + 0.1;
-        }
       }
       lastResult = enhancedRes;
       attempt++;

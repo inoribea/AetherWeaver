@@ -154,9 +154,9 @@ class OptimizedRoutingChatOutput(ChatComponent):
             },
             "model_fallback": {
                 "basic": "gpt-4.1",
-                "enhanced": "gpt-4o-mini",
-                "rag": "gpt-4o-mini",
-                "agent": "gpt-4o"
+                "enhanced": "gpt-5-mini",
+                "rag": "gpt-5-mini",
+                "agent": "gpt-5"
             }
         }
         
@@ -353,7 +353,7 @@ class OptimizedRoutingChatOutput(ChatComponent):
                 "runnable_interface": True,
                 
                 # 模型配置
-                "model_preference": env_config.get("model_fallback", {}).get(routing_analysis.get("routing_decision", "basic"), "gpt-4o-mini"),
+                "model_preference": env_config.get("model_fallback", {}).get(routing_analysis.get("routing_decision", "basic"), "gpt-5-mini"),
                 "pipeline_step": "routing_output"
             }
             

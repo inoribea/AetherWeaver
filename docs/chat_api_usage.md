@@ -66,7 +66,7 @@ curl -X POST https://yourdomain/api/chat \
   "routing": {
     "route": "basic",
     "confidence": 0.9,
-    "model": "gpt-4o"
+    "model": "gpt-5"
   },
   "metadata": {
     "langchainjs_compatible": true,

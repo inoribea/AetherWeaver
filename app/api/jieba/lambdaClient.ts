@@ -7,7 +7,8 @@ export interface JiebaLambdaResponse {
   error?: string;
 }
 
-const JIEBA_LAMBDA_URL = '/api/jieba/segment';
+const NEXT_PUBLIC_APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+const JIEBA_LAMBDA_URL = `${NEXT_PUBLIC_APP_URL}/api/jieba/segment`;
 
 export async function segmentViaLambda(text: string): Promise<string[]> {
   const payload: JiebaLambdaRequest = { text };

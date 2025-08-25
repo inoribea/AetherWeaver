@@ -61,7 +61,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 动态模型选择
-    const modelName = process.env.OPENAI_MODEL_NAME || "gpt-4o-mini";
+    const modelName = process.env.OPENAI_MODEL_NAME || "gpt-5-mini";
 
     const chatModel = new ChatOpenAI({
       temperature: 0,

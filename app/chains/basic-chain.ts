@@ -16,7 +16,7 @@ export function createBasicChain() {
 `);
 
   const model = new ChatOpenAI({
-    modelName: process.env.BASIC_MODEL_NAME || "gpt-4o-mini",
+    modelName: process.env.BASIC_MODEL_NAME || "gpt-5-mini",
     temperature: 0.0,
     maxTokens: 800,
   });

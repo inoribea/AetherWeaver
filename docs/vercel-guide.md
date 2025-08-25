@@ -4,10 +4,6 @@
 
 ## 1. 重要环境变量
 
-- `VERCEL_REGION`  
-  指定部署区域，常见区域如 `iad`（弗吉尼亚），`sfo`（旧金山）等  
-  **示例：** `VERCEL_REGION=iad`
-
 - `VERCEL_FUNCTION_TIMEOUT`  
   函数最大执行时间，单位秒，默认30秒  
   **示例：** `VERCEL_FUNCTION_TIMEOUT=30`
@@ -16,24 +12,87 @@
   当前部署环境标识，如：`production` / `preview` / `development`  
   **示例：** `VERCEL_ENV=production`
 
-- `VERCEL_APP_NAME`  
-  应用命名，有助于环境区分和日志识别  
-  **示例：** `VERCEL_APP_NAME=langchain-vercel-app`
+- `VERCEL_APP_URL`  
+  Vercel 部署后应用的 URL，用于前端访问和回调  
+  **示例：** `VERCEL_APP_URL="https://your-app-name.vercel.app"`
+
+- `NEXT_PUBLIC_APP_URL`  
+  前端公开的应用 URL，通常与 `VERCEL_APP_URL` 相同  
+  **示例：** `NEXT_PUBLIC_APP_URL="https://your-app-name.vercel.app"`
+
+- `VERCEL_PROJECT_ID`  
+  Vercel 项目ID，用于API调用和项目识别  
+  **示例：** `VERCEL_PROJECT_ID=prj_xxxxxxxxxxxxxxxxx`
+
+- `VERCEL_ORG_ID`  
+  Vercel 组织ID，用于API调用和组织识别  
+  **示例：** `VERCEL_ORG_ID=org_xxxxxxxxxxxxxxxxx`
 
 ## 2. API Key管理
 
-建议通过 Vercel Dashboard 的 Environment Variables 页面统一设置所有 API Keys，比如：
+建议通过 Vercel Dashboard 的 Environment Variables 页面统一设置所有 API Keys。以下是一些常见的 API Keys：
 
 - `OPENAI_API_KEY`  
-- `LANGCHAIN_API_KEY`  
+- `DEEPSEEK_API_KEY`  
+- `GOOGLE_API_KEY`  
+- `CLOUDFLARE_API_TOKEN`  
+- `SERPAPI_API_KEY`  
 - `TAVILY_API_KEY`  
-- 其他第三方服务API Key
+- `BING_SEARCH_API_KEY`  
+- `CLAUDE_API_KEY`  
+- `OPENROUTER_API_KEY`  
+- `LANGCHAIN_API_KEY`  
+- `LANGFUSE_API_KEY`  
+- `LANGFUSE_PUBLIC_KEY`  
+- `LANGFUSE_SECRET_KEY`  
+- `QDRANT_API_KEY` (如果 Qdrant 是远程服务)  
+- `PINECONE_API_KEY`  
+- `SUPABASE_SERVICE_ROLE_KEY`  
+- `API_SECRET_KEY` (用于自定义API认证)
 
-## 3. JSON 配置字符串环境变量
+## 3. 数据库及存储配置
 
-复杂配置，比如智能路由配置`LANGFLOW_SMART_ROUTING_CONFIG`等，建议以字符串形式上传，保持JSON格式正确。
+- `DATABASE_URL`  
+  数据库连接字符串，例如 PostgreSQL, MongoDB 等  
+  **示例：** `DATABASE_URL="postgresql://user:password@host:port/database"`
 
-## 4. 安全及注意事项
+- `UPSTASH_VECTOR_REST_URL`  
+- `UPSTASH_VECTOR_REST_TOKEN`  
+- `REDIS_URL`  
+- `REDIS_TOKEN`  
+- `QDRANT_URL`  
+- `PINECONE_ENVIRONMENT`  
+- `SUPABASE_URL`  
+
+## 4. 功能开关与配置
+
+本项目包含多个功能开关，可以通过环境变量控制其启用或禁用：
+
+- `ENABLE_API_AUTH`  
+- `ENABLE_UNIFIED_ROUTING`  
+- `ENABLE_INTELLIGENT_ROUTING`  
+- `ENABLE_MODEL_SWITCHING`  
+- `ENABLE_PERFORMANCE_MONITORING`  
+- `ENABLE_VISION_PROCESSING`  
+- `ENABLE_WEB_SEARCH`  
+- `ENABLE_DOCUMENT_RETRIEVAL`  
+- `ENABLE_STRUCTURED_OUTPUT`  
+- `ENABLE_AGENT_TOOLS`  
+- `ENABLE_COMPLEX_REASONING`  
+- `ENABLE_CHINESE_OPTIMIZATION`  
+- `ENABLE_MULTILINGUAL_SUPPORT`  
+- `ENABLE_MODEL_FALLBACK`  
+- `ENABLE_AUTOMATIC_RETRIES`  
+- `ENABLE_CONTEXT_AWARENESS`  
+- `ENABLE_MEMORY`  
+- `ENABLE_RESPONSE_CACHE`  
+- `ENABLE_CORS`  
+- `ENABLE_HEALTH_CHECK`  
+- `MOCK_API_RESPONSES`  
+- `ENABLE_BUNDLE_ANALYZER`  
+- `ENABLE_PERFORMANCE_PROFILING`  
+
+## 5. 安全及注意事项
 
 - 严格保密所有密钥，不要硬编码到代码库。  
 - 使用 Vercel 的加密存储功能。  

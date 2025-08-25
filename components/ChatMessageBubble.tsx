@@ -38,7 +38,28 @@ export function ChatMessageBubble(props: {
           </div>
         )}
 
-        <span>{props.message.content}</span>
+        {(() => {
+          try {
+            const parsedContent = JSON.parse(props.message.content);
+            if (parsedContent && parsedContent.response) {
+              return (
+                <>
+                  <span>{parsedContent.response}</span>
+                  {parsedContent.routing && (
+                    <div className="mt-2 text-xs text-muted-foreground p-2 bg-muted rounded-lg">
+                      <p><strong>路由:</strong> {parsedContent.routing.route}</p>
+                      <p><strong>置信度:</strong> {parsedContent.routing.confidence}</p>
+                      <p><strong>模型:</strong> {parsedContent.routing.model}</p>
+                    </div>
+                  )}
+                </>
+              );
+            }
+          } catch (e) {
+            // Not a JSON object, render as plain text
+          }
+          return <span>{props.message.content}</span>;
+        })()}
 
         {/* Model details and token info - only for AI messages */}
         {props.message.role === "assistant" && props.modelInfo && (

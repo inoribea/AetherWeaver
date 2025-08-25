@@ -63,14 +63,14 @@ function getAvailableModel(): { model: BaseChatModel<BaseChatModelCallOptions, A
   if (process.env.OPENAI_API_KEY || process.env.NEKO_API_KEY) {
     return {
       model: new ChatOpenAI({
-        model: "gpt-4o-mini",
+        model: "gpt-5-mini",
         temperature: 0.2,
         streaming: true,
         apiKey: process.env.NEKO_API_KEY || process.env.OPENAI_API_KEY,
         configuration: { baseURL: process.env.NEKO_BASE_URL || process.env.OPENAI_BASE_URL },
         callbacks: tokenCountingCallbacks,
       }),
-      modelName: "gpt-4o-mini"
+      modelName: "gpt-5-mini"
     };
   } else if (process.env.GOOGLE_API_KEY) {
     return {

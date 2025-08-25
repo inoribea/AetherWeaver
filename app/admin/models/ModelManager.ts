@@ -10,7 +10,7 @@ type ModelConfig = {
  * - 支持多个常见环境变量回退（OPENAI_API_KEY, NEKO_API_KEY, LANGCHAIN_API_KEY,
  *   LANGCHAIN_API_KEYS, LANGCHAIN_API_KEY_1..10, DEFAULT_API_KEY 等）。
  */
-function getEffectiveApiKey(): string | undefined {
+export function getEffectiveApiKey(): string | undefined {
   const candidates: string[] = [];
 
   // 常见单一 key
@@ -32,7 +32,7 @@ function getEffectiveApiKey(): string | undefined {
   }
 
   // 返回第一个非空候选或 undefined
-  return candidates.length > 0 ? candidates[0] : undefined;
+  return candidates[0];
 }
 
 /**
@@ -42,7 +42,7 @@ function getEffectiveApiKey(): string | undefined {
  */
 export class ModelManager {
   private static currentModel: ModelConfig = {
-    model: process.env.DEFAULT_MODEL_NAME || "gpt-4o",
+    model: process.env.DEFAULT_MODEL_NAME || "gpt-5",
     apiKey: undefined,
   };
 

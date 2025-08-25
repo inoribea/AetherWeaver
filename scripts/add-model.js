@@ -33,7 +33,7 @@ async function addModel() {
     // 收集模型信息
     console.log('\n📝 请输入模型信息:');
     
-    const modelName = await question('模型名称 (例如: gpt-4o-mini): ');
+    const modelName = await question('模型名称 (例如: gpt-5-mini): ');
     if (!modelName) {
       console.log('❌ 模型名称不能为空');
       process.exit(1);
@@ -68,7 +68,7 @@ async function addModel() {
     }
     
     const apiKey = await question('API Key 环境变量名 (例如: OPENAI_API_KEY): ');
-    const modelId = await question('模型ID (例如: gpt-4o-mini): ');
+    const modelId = await question('模型ID (例如: gpt-5-mini): ');
     const baseURL = await question('Base URL (可选，直接回车跳过): ');
     
     console.log('\n⚙️  模型参数:');

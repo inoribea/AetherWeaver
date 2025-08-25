@@ -122,8 +122,8 @@ await intelligentRouter.reloadConfiguration();
 ```
 任务类型: 图片分析
 需要能力: vision
-候选模型: gpt-4o-all, qvq-plus, claude-sonnet-4-all
-选择结果: gpt-4o-all (视觉任务首选)
+候选模型: gpt-5-all, qvq-plus, claude-sonnet-4-all
+选择结果: gpt-5-all (视觉任务首选)
 
 任务类型: 一般对话
 需要能力: 无特殊要求
@@ -146,8 +146,8 @@ await intelligentRouter.reloadConfiguration();
 
 ```
 首选模型: qvq-plus (不可用)
-降级链: gpt-4o-all -> claude-sonnet-4-all -> gemini-flash
-最终选择: gpt-4o-all
+降级链: gpt-5-all -> claude-sonnet-4-all -> gemini-flash
+最终选择: gpt-5-all
 ```
 
 ## 📊 支持的模型类型
@@ -156,7 +156,7 @@ await intelligentRouter.reloadConfiguration();
 - `gemini-flash-lite`: **默认首选模型**，速度最快(10/10)，成本最低，适合大多数场景
 
 ### 🎯 视觉处理模型 (优先级排序)
-1. `gpt-4o-all`: 视觉任务首选，全能模型
+1. `gpt-5-all`: 视觉任务首选，全能模型
 2. `qvq-plus`: 阿里通义视觉问答模型
 3. `claude-sonnet-4-all`: 高质量视觉分析兜底
 
@@ -212,8 +212,8 @@ await intelligentRouter.reloadConfiguration();
   "routing_rules": {
     "vision_tasks": {
       "conditions": ["has_image", "vision_keywords"],
-      "preferred_models": ["qvq-plus", "gpt-4o-all"],
-      "fallback_models": ["gpt-4o-all"]
+      "preferred_models": ["qvq-plus", "gpt-5-all"],
+      "fallback_models": ["gpt-5-all"]
     }
   }
 }
@@ -244,7 +244,7 @@ gemini-flash-lite 配置:
 - 成本 (per 1k tokens): 0.00005
 
 各任务的首选模型:
-- vision_tasks: gpt-4o-all
+- vision_tasks: gpt-5-all
 - reasoning_tasks: gemini-flash-lite
 - chinese_tasks: gemini-flash-lite
 - search_tasks: gemini-flash-lite
@@ -309,7 +309,7 @@ curl -X GET http://localhost:3000/api/admin/models \
 ### 错误日志
 ```
 ❌ 路由决策失败: 模型 xyz 不可用
-🔄 降级到模型: gpt-4o-all
+🔄 降级到模型: gpt-5-all
 ✅ 请求处理成功
 ```
 
