@@ -68,7 +68,7 @@
       "cost_per_1k_tokens": 0.015,
       "speed_rating": 6,
       "quality_rating": 10,
-      "description": "顶尖AI模型，专门处理最复杂的推理和创作任务",
+      "description": "",
       "complexity_threshold": "high"
     },
     "deepseek-reasoner": {
@@ -355,7 +355,7 @@
       "cost_per_1k_tokens": 0.008,
       "speed_rating": 7,
       "quality_rating": 10,
-      "description": "Neko提供商的顶级模型，与官方GPT-4功能一致，web search首选"
+      "description": ""
     },
     "Qwen/Qwen3-235B-A22B-search": {
       "type": "o3_provider",
@@ -392,7 +392,7 @@
       "cost_per_1k_tokens": 0.001,
       "speed_rating": 8,
       "quality_rating": 9,
-      "description": "本地部署的Qwen联网版模型"
+      "description": ""
     },
     "deepseek-ai/DeepSeek-V3-search": {
       "type": "o3_provider",
@@ -428,7 +428,7 @@
       "cost_per_1k_tokens": 0.001,
       "speed_rating": 8,
       "quality_rating": 9,
-      "description": "本地部署的DeepSeek联网版模型"
+      "description": ""
     }
   },
   "routing_rules": {
