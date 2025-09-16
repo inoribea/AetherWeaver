@@ -24,15 +24,22 @@ export interface RetrievalRequest {
 ## Embedding 模型配置
 本项目支持多种 Embedding 模型，用于文本向量化。
 
-- **`EMBEDDING_PROVIDER`**: 指定提供商，支持 `OpenAI` 或 `Cloudflare`。
-- **OpenAI**:
-  - `OPENAI_API_KEY`: API 密钥。
-  - `OPENAI_EMBEDDINGS_MODEL`: 模型名称 (e.g., `text-embedding-3-small`)。
-  - `OPENAI_EMBEDDINGS_DIMENSIONS`: 向量维度。
-- **Cloudflare**:
-  - `CLOUDFLARE_API_TOKEN`: API Token。
-  - `CLOUDFLARE_ACCOUNT_ID`: 账户 ID。
-  - `CLOUDFLARE_EMBEDDING_MODEL`: 模型名称。
+- **通用 OpenAI 兼容提供商（推荐）**
+  - 若已按 `.env.example` 配置了默认 OpenAI 兼容提供商（例如 `OPENAI_COMPAT_PROVIDER=O3` 与其配套 `O3_API_KEY/O3_BASE_URL`），向量存储会自动优先使用该提供商的 OpenAI Embeddings。
+  - 可选调优：
+    - `OPENAI_EMBEDDINGS_MODEL`: 模型名称（如 `text-embedding-3-small`）
+    - `OPENAI_EMBEDDINGS_DIMENSIONS`: 向量维度（默认 1536）
+
+- **仅 OpenAI 官方**
+  - `OPENAI_API_KEY`: API 密钥（可不设 `OPENAI_BASE_URL`）
+  - `OPENAI_EMBEDDINGS_MODEL`: 模型名称
+  - `OPENAI_EMBEDDINGS_DIMENSIONS`: 向量维度
+
+- **Cloudflare Workers AI**
+  - `CLOUDFLARE_API_TOKEN`: API Token
+  - `CLOUDFLARE_ACCOUNT_ID`: 账户 ID
+  - `CLOUDFLARE_EMBEDDING_MODEL`: 模型名称（默认 `@cf/baai/bge-base-en-v1.5`）
+  - 设置 `EMBEDDING_PROVIDER=Cloudflare` 可强制优先使用 Cloudflare
 
 ---
 
