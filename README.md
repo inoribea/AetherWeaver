@@ -1,4 +1,5 @@
 # AetherWeaver: Unified LLM Routing & Orchestration Platform
+[简体中文](README-CN.md)
 
 AetherWeaver is a powerful, extensible platform for building advanced LLM applications. It provides a unified interface for multiple model providers, intelligent routing, RAG capabilities, and OpenAI-compatible endpoints.
 
