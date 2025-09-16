@@ -1,5 +1,6 @@
 import { RunnableSequence } from "@langchain/core/runnables";
 import { ChatOpenAI } from "@langchain/openai";
+import { createChatOpenAIConfig } from "@/utils/openaiProvider";
 import { ChatPromptTemplate } from "@langchain/core/prompts";
 
 export function createRAGChain() {
@@ -19,11 +20,13 @@ export function createRAGChain() {
 用户请求：{input}
 `);
 
+  const compat = createChatOpenAIConfig({ model: process.env.RAG_MODEL_NAME || "gpt-5", fallbackBaseURL: process.env.OPENAI_BASE_URL });
   const model = new ChatOpenAI({
-    modelName: process.env.RAG_MODEL_NAME || "gpt-5",
+    modelName: compat.model,
     temperature: -0.1, // 更低温度确保准确性
     maxTokens: 1000,
-    ...(process.env.OPENAI_BASE_URL && { configuration: { baseURL: process.env.OPENAI_BASE_URL } }),
+    apiKey: compat.apiKey,
+    ...(compat.configuration ? { configuration: compat.configuration } : {}),
   });
 
   return RunnableSequence.from([prompt, model]);

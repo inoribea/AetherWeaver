@@ -8,7 +8,8 @@ import { createVisionChain } from "../../../src/chains/vision-chain";
 import { ChatOpenAI, OpenAIEmbeddings } from "@langchain/openai";
 
 import { SmartRouterComponent } from "../../components/routing/smart-router";
-import { ModelManager, getEffectiveApiKey } from "../../admin/models/ModelManager"; // 导入 getEffectiveApiKey
+import { ModelManager } from "../../admin/models/ModelManager";
+import { getDefaultOpenAICompatProvider, resolveProviderFromModelConfig } from "@/utils/openaiProvider";
 import modelsConfig from "../../../models-config.json"; // 导入 models-config.json
 
 /**
@@ -46,17 +47,17 @@ function isValidMessagesArray(messages: any): messages is Array<string | { conte
   );
 }
 
-// 只声明一次环境变量与函数，避免重复声明错误
-const openAIApiBaseUrl = process.env.OPENAI_BASE_URL;
+// 只声明一次全局备用 Base URL（若未从模型或提供商解析到 Base URL 时使用）
+const fallbackOpenAIBaseUrl = process.env.OPENAI_BASE_URL;
 
 /**
  * 创建 ChatOpenAI 实例，支持自定义 OpenAI Base URL
  * @param apiKey OpenAI API Key
  * @param model 模型名称
  */
-function createChatOpenAIInstance(apiKey: string, model: string) {
+function createChatOpenAIInstance(apiKey: string, model: string, baseURL?: string) {
   const finalApiKey = apiKey;
-  const finalBaseUrl = openAIApiBaseUrl;
+  const finalBaseUrl = baseURL ?? fallbackOpenAIBaseUrl;
 
   console.log(`[ChatOpenAI] Initializing with:`);
   console.log(`  - Model: ${model || "gpt-5"}`);
@@ -248,6 +249,7 @@ export async function POST(req: NextRequest) {
     const modelManager = await ModelManager.getCurrentModel();
     let selectedModelName: string = modelManager.model ?? "gpt-5";
     let selectedApiKey: string | undefined = modelManager.apiKey;
+    let selectedBaseURL: string | undefined = undefined;
 
     const routeRule = modelsConfig.routing_rules[routingResult.route as keyof typeof modelsConfig.routing_rules];
     let preferredModels = routeRule?.preferred_models || [];
@@ -290,9 +292,11 @@ export async function POST(req: NextRequest) {
 
       if (modelDetails) {
         selectedModelName = modelDetails.config.model;
-        // 根据模型类型获取对应的API Key
-        if (modelDetails.type === "openai_compatible") {
-          selectedApiKey = process.env[(modelDetails.config as any).apiKey as keyof NodeJS.ProcessEnv] as string;
+        // 根据模型类型获取对应的API Key / BaseURL
+        if (modelDetails.type === "openai_compatible" || modelDetails.type === "o3_provider") {
+          const provider = resolveProviderFromModelConfig(modelDetails);
+          if (provider?.apiKey) selectedApiKey = provider.apiKey;
+          if (provider?.baseURL) selectedBaseURL = provider.baseURL;
         } else if (modelDetails.type === "deepseek") {
           selectedApiKey = process.env.DEEPSEEK_API_KEY as string;
         } else if (modelDetails.type === "alibaba_tongyi") {
@@ -301,23 +305,28 @@ export async function POST(req: NextRequest) {
           selectedApiKey = process.env.TENCENT_HUNYUAN_SECRET_KEY as string; // 或者 SECRET_ID
         } else if (modelDetails.type === "google_gemini") {
           selectedApiKey = process.env.GOOGLE_API_KEY as string;
-        } else if (modelDetails.type === "o3_provider") {
-          selectedApiKey = process.env.O3_API_KEY as string;
         }
       }
     }
 
-    // 如果没有从路由规则中获取到API Key，则回退到默认获取方式
+    // 如果没有从路由规则中获取到API Key/BaseURL，则回退到默认提供商
     if (!selectedApiKey) {
-      selectedApiKey = getEffectiveApiKey();
+      const def = getDefaultOpenAICompatProvider();
+      if (def?.apiKey) selectedApiKey = def.apiKey;
+      if (def?.baseURL) selectedBaseURL = def.baseURL;
+    } else if (!selectedBaseURL) {
+      // 有 key 没有 baseURL 时，尝试从默认提供商补全（支持 OPENAI 官方无 baseURL 的情况）
+      const def = getDefaultOpenAICompatProvider();
+      if (def?.baseURL) selectedBaseURL = def.baseURL;
     }
 
     // 临时诊断日志（只记录是否存在，不打印密钥值）
-    console.log(`Diagnostics: selectedModelName=${selectedModelName}, selectedApiKeySet=${!!selectedApiKey}`);
-    const llm = createChatOpenAIInstance(selectedApiKey || "", selectedModelName);
+    console.log(`Diagnostics: selectedModelName=${selectedModelName}, selectedApiKeySet=${!!selectedApiKey}, baseURL=${selectedBaseURL || fallbackOpenAIBaseUrl || 'Default(OpenAI)'}`);
+    const llm = createChatOpenAIInstance(selectedApiKey || "", selectedModelName, selectedBaseURL);
 
     const embeddings = new OpenAIEmbeddings({
-      ...(openAIApiBaseUrl ? { configuration: { baseURL: openAIApiBaseUrl } } : {}),
+      apiKey: selectedApiKey,
+      ...(selectedBaseURL ? { configuration: { baseURL: selectedBaseURL } } : fallbackOpenAIBaseUrl ? { configuration: { baseURL: fallbackOpenAIBaseUrl } } : {}),
     });
 
     // 初始化工具（这里省略）

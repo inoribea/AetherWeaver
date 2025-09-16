@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { Message as VercelMessage, StreamingTextResponse } from 'ai';
 import { createReactAgent } from '@langchain/langgraph/prebuilt';
 import { ChatOpenAI } from '@langchain/openai';
+import { getDefaultOpenAICompatProvider } from '@/utils/openaiProvider';
 import { ChatDeepSeek } from '@langchain/deepseek';
 import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
 import { AlibabaTongyiEmbeddings } from '@langchain/community/embeddings/alibaba_tongyi';
@@ -56,17 +57,18 @@ export async function POST(req: NextRequest) {
 
     tools.push(new Calculator());
 
-    if (!process.env.OPENAI_API_KEY) {
-      return NextResponse.json({ error: "OpenAI API key is not configured." }, { status: 500 });
+    const compat = getDefaultOpenAICompatProvider();
+    if (!compat?.apiKey) {
+      return NextResponse.json({ error: "OpenAI-compatible API key is not configured." }, { status: 500 });
     }
 
-    // 动态模型选择
     const modelName = process.env.OPENAI_MODEL_NAME || "gpt-5-mini";
 
     const chatModel = new ChatOpenAI({
       temperature: 0,
       modelName,
-      openAIApiKey: process.env.OPENAI_API_KEY,
+      apiKey: compat.apiKey,
+      ...(compat.baseURL ? { configuration: { baseURL: compat.baseURL } } : {}),
     });
 
     const agent = createReactAgent({

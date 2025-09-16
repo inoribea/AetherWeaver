@@ -48,6 +48,40 @@ The application is configured through environment variables. Key options include
 
 For a complete list of variables, see [docs/vercel-guide.md](docs/vercel-guide.md).
 
+### OpenAI-compatible Providers (Generic)
+
+This project supports any OpenAI-compatible provider using the pattern `<PREFIX>_API_KEY` + `<PREFIX>_BASE_URL` (e.g., `OPENAI`, `NEKO`, `O3`, `OPENROUTER`).
+
+- Select default provider via `OPENAI_COMPAT_PROVIDER=<prefix>` (case-insensitive).
+- If not set, the resolver tries: `OPENAI` → `NEKO` → `O3` → `OPENROUTER` → the first discovered pair in env.
+- Official OpenAI does not require `OPENAI_BASE_URL`.
+- You can also override per-route model pools with real model IDs defined in `models-config.json` (e.g., `BASIC_MODELS`, `STRUCTURED_OUTPUT_MODELS`).
+
+Example:
+
+```
+# Choose default provider
+OPENAI_COMPAT_PROVIDER=O3
+
+# O3 provider
+O3_API_KEY=your_o3_key
+O3_BASE_URL=https://api.o3.fan/v1
+
+# Route overrides (real model IDs from models-config.json)
+BASIC_MODELS=Qwen/Qwen3-235B-A22B-search
+STRUCTURED_OUTPUT_MODELS=Qwen/Qwen3-235B-A22B-search
+```
+
+OpenAI-compatible v1 endpoint auth (optional):
+
+```
+ENABLE_API_AUTH=true
+LANGCHAIN_API_KEYS=user_key_1,user_key_2
+# Callers must send: Authorization: Bearer <user_key>
+```
+
+See `.env.example` and [docs/vercel-guide.md](docs/vercel-guide.md) for more details.
+
 ## 📚 Documentation
 
 - **[Project Overview](docs/SUMMARY.md)**: High-level summary of features and configuration.

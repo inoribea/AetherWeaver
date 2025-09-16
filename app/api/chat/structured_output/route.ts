@@ -9,6 +9,7 @@ import { ChatTencentHunyuan } from '@langchain/community/chat_models/tencent_hun
 import { PromptTemplate } from '@langchain/core/prompts';
 import { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { routeRequest, RoutingRequest } from '@/utils/unified-router';
+import { getDefaultOpenAICompatProvider } from '@/utils/openaiProvider';
 
 async function getAvailableStructuredOutputModel(messages: any[]): Promise<{ model: BaseChatModel; modelName: string }> {
   try {
@@ -29,11 +30,12 @@ async function getAvailableStructuredOutputModel(messages: any[]): Promise<{ mod
     let model: BaseChatModel;
 
     if (selectedModel.includes("gpt") || selectedModel.includes("openai")) {
+      const compat = getDefaultOpenAICompatProvider();
       model = new ChatOpenAI({
         temperature: 0.8,
         model: selectedModel,
-        apiKey: process.env.OPENAI_API_KEY,
-        ...(process.env.OPENAI_BASE_URL && { configuration: { baseURL: process.env.OPENAI_BASE_URL } }),
+        apiKey: compat?.apiKey,
+        ...(compat?.baseURL ? { configuration: { baseURL: compat.baseURL } } : process.env.OPENAI_BASE_URL ? { configuration: { baseURL: process.env.OPENAI_BASE_URL } } : {}),
       });
     } else if (selectedModel.includes("hunyuan")) {
       model = new ChatTencentHunyuan({
@@ -61,23 +63,26 @@ async function getAvailableStructuredOutputModel(messages: any[]): Promise<{ mod
         apiKey: process.env.DEEPSEEK_API_KEY,
       });
     } else {
+      const compat = getDefaultOpenAICompatProvider();
       model = new ChatOpenAI({
         temperature: 0.8,
         model: "gpt-5-mini",
-        apiKey: process.env.OPENAI_API_KEY,
-        ...(process.env.OPENAI_BASE_URL && { configuration: { baseURL: process.env.OPENAI_BASE_URL } }),
+        apiKey: compat?.apiKey || process.env.OPENAI_API_KEY,
+        ...(compat?.baseURL ? { configuration: { baseURL: compat.baseURL } } : process.env.OPENAI_BASE_URL ? { configuration: { baseURL: process.env.OPENAI_BASE_URL } } : {}),
       });
     }
 
     return { model, modelName: selectedModel };
   } catch (error) {
     console.error("Routing failed, using fallback model", error);
-    if (process.env.OPENAI_API_KEY) {
+    const compat = getDefaultOpenAICompatProvider();
+    if (compat?.apiKey || process.env.OPENAI_API_KEY) {
       return {
         model: new ChatOpenAI({
           temperature: 0.8,
           model: "gpt-5-mini",
-          apiKey: process.env.OPENAI_API_KEY,
+          apiKey: compat?.apiKey || process.env.OPENAI_API_KEY,
+          ...(compat?.baseURL ? { configuration: { baseURL: compat.baseURL } } : process.env.OPENAI_BASE_URL ? { configuration: { baseURL: process.env.OPENAI_BASE_URL } } : {}),
         }),
         modelName: "gpt-5-mini",
       };

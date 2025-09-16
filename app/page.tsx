@@ -1,7 +1,58 @@
 import { ChatWindow } from "@/components/ChatWindow";
 import { GuideInfoBox } from "@/components/guide/GuideInfoBox";
+import { getDefaultOpenAICompatProvider } from "@/utils/openaiProvider";
 
 export default function Home() {
+  const provider = getDefaultOpenAICompatProvider();
+
+  const EnvNotice = !provider ? (
+    <div className="mb-6">
+      <GuideInfoBox>
+        <ul>
+          <li className="text-l">
+            ⚠️
+            <span className="ml-2">
+              未检测到可用的 OpenAI 兼容提供商。请按 <code>.env.example</code> 配置环境变量，或在 Vercel 控制台添加：
+            </span>
+          </li>
+          <li className="text-l">
+            <span className="ml-7 block">
+              方式一（推荐，通用前缀法）：
+            </span>
+            <pre className="ml-7 mt-2 bg-secondary/50 p-3 rounded text-sm overflow-auto">
+{`OPENAI_COMPAT_PROVIDER=O3
+O3_API_KEY=your_o3_key
+O3_BASE_URL=https://api.o3.fan/v1`}
+            </pre>
+          </li>
+          <li className="text-l">
+            <span className="ml-7 block">
+              方式二（官方 OpenAI）：
+            </span>
+            <pre className="ml-7 mt-2 bg-secondary/50 p-3 rounded text-sm overflow-auto">
+{`OPENAI_API_KEY=sk-xxxxxxxx
+# OPENAI_BASE_URL 可省略（默认官方域名）`}
+            </pre>
+          </li>
+          <li className="text-l">
+            <span className="ml-7">
+              也可通过路由覆盖仅让部分路由使用第三方真实模型名（见 models-config.json）：
+            </span>
+            <pre className="ml-7 mt-2 bg-secondary/50 p-3 rounded text-sm overflow-auto">
+{`BASIC_MODELS=Qwen/Qwen3-235B-A22B-search
+STRUCTURED_OUTPUT_MODELS=Qwen/Qwen3-235B-A22B-search`}
+            </pre>
+          </li>
+          <li className="text-l">
+            <span className="ml-7">
+              详情见 <code>docs/vercel-guide.md</code> 与 <code>.env.example</code>。
+            </span>
+          </li>
+        </ul>
+      </GuideInfoBox>
+    </div>
+  ) : null;
+
   const InfoCard = (
     <GuideInfoBox>
       <ul>
@@ -53,11 +104,14 @@ export default function Home() {
     </GuideInfoBox>
   );
   return (
-    <ChatWindow
-      endpoint="api/chat"
-      emoji="🏴‍☠️"
-      placeholder="I'm an LLM pretending to be a pirate! Ask me about the pirate life!"
-      emptyStateComponent={InfoCard}
-    />
+    <>
+      {EnvNotice}
+      <ChatWindow
+        endpoint="api/chat"
+        emoji="🏴‍☠️"
+        placeholder="I'm an LLM pretending to be a pirate! Ask me about the pirate life!"
+        emptyStateComponent={InfoCard}
+      />
+    </>
   );
 }

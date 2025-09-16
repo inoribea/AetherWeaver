@@ -19,6 +19,7 @@ import {
 } from "../../../../utils/vectorstore";
 import { CloudflareEmbeddings } from "../../../../utils/embeddings";
 import { wrapWithErrorHandling } from "@/utils/errorHandler";
+import { getDefaultOpenAICompatProvider } from "@/utils/openaiProvider";
 
 // Helper function to create Alibaba Tongyi model
 function createAlibabaTongyiModel(config: {
@@ -60,14 +61,15 @@ function getAvailableModel(): { model: BaseChatModel<BaseChatModelCallOptions, A
   ];
 
   // Try different models in order of preference
-  if (process.env.OPENAI_API_KEY || process.env.NEKO_API_KEY) {
+  const compat = getDefaultOpenAICompatProvider();
+  if (compat?.apiKey) {
     return {
       model: new ChatOpenAI({
         model: "gpt-5-mini",
         temperature: 0.2,
         streaming: true,
-        apiKey: process.env.NEKO_API_KEY || process.env.OPENAI_API_KEY,
-        configuration: { baseURL: process.env.NEKO_BASE_URL || process.env.OPENAI_BASE_URL },
+        apiKey: compat.apiKey,
+        ...(compat.baseURL ? { configuration: { baseURL: compat.baseURL } } : {}),
         callbacks: tokenCountingCallbacks,
       }),
       modelName: "gpt-5-mini"

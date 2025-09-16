@@ -1,6 +1,7 @@
 "use server";
 
 import { ChatOpenAI } from "@langchain/openai";
+import { createChatOpenAIConfig } from "@/utils/openaiProvider";
 import { ChatPromptTemplate } from "@langchain/core/prompts";
 import { createStreamableValue } from "ai/rsc";
 import { z } from "zod";
@@ -35,9 +36,12 @@ export async function executeTool(
       ["human", "{input}"],
     ]);
 
+    const compat = createChatOpenAIConfig({ model: "gpt-5-mini", fallbackBaseURL: process.env.OPENAI_BASE_URL });
     const llm = new ChatOpenAI({
-      model: "gpt-5-mini",
+      model: compat.model,
       temperature: 0,
+      apiKey: compat.apiKey,
+      ...(compat.configuration ? { configuration: compat.configuration } : {}),
     });
 
     let chain: Runnable;

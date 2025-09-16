@@ -7,6 +7,7 @@ import { Document } from "@langchain/core/documents";
 import { Embeddings } from "@langchain/core/embeddings";
 import { VectorStore } from "@langchain/core/vectorstores";
 import { OpenAIEmbeddings } from "@langchain/openai";
+import { getDefaultOpenAICompatProvider } from "@/utils/openaiProvider";
 import { CloudflareEmbeddings, createCloudflareEmbeddings, CLOUDFLARE_EMBEDDING_MODELS } from "./embeddings";
 
 export interface EmbeddingProvider {
@@ -116,13 +117,14 @@ export function getAvailableEmbeddingProviders(): EmbeddingProvider[] {
   const providers: EmbeddingProvider[] = [];
 
   // OpenAI Embeddings
-  if (process.env.OPENAI_API_KEY || process.env.NEKO_API_KEY) {
+  if (process.env.OPENAI_API_KEY || process.env.NEKO_API_KEY || process.env.O3_API_KEY || process.env.OPENROUTER_API_KEY) {
     try {
+      const compat = getDefaultOpenAICompatProvider();
       const openaiEmbeddings = new OpenAIEmbeddings({
-        apiKey: process.env.NEKO_API_KEY || process.env.OPENAI_API_KEY,
-        configuration: {
-          baseURL: process.env.NEKO_BASE_URL || process.env.OPENAI_BASE_URL,
-        },
+        apiKey: compat?.apiKey || process.env.OPENAI_API_KEY,
+        ...(compat?.baseURL || process.env.OPENAI_BASE_URL || process.env.NEKO_BASE_URL
+          ? { configuration: { baseURL: compat?.baseURL || process.env.OPENAI_BASE_URL || process.env.NEKO_BASE_URL } }
+          : {}),
         model: process.env.OPENAI_EMBEDDINGS_MODEL || "text-embedding-3-small",
       });
       

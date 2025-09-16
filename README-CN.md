@@ -48,6 +48,40 @@ AetherWeaver 是一个功能强大、可扩展的平台，用于构建先进的 
 
 完整的变量列表，请参阅 [docs/vercel-guide.md](docs/vercel-guide.md)。
 
+### OpenAI 兼容提供商（通用）
+
+本项目支持任意 OpenAI 格式的兼容提供商，按照 `<PREFIX>_API_KEY` + `<PREFIX>_BASE_URL` 的规则配置（例如：`OPENAI`、`NEKO`、`O3`、`OPENROUTER`）。
+
+- 通过 `OPENAI_COMPAT_PROVIDER=<prefix>` 指定默认提供商（不区分大小写）。
+- 未指定时，将按顺序尝试：`OPENAI` → `NEKO` → `O3` → `OPENROUTER` → 自动扫描环境中的第一对 `*_API_KEY/_BASE_URL`。
+- 官方 OpenAI 可不设置 `OPENAI_BASE_URL`（使用官方默认域名）。
+- 可用“路由模型池覆盖”变量将特定路由切换到第三方真实模型名（需在 `models-config.json` 中存在），如：`BASIC_MODELS`、`STRUCTURED_OUTPUT_MODELS`。
+
+示例：
+
+```
+# 选择默认提供商
+OPENAI_COMPAT_PROVIDER=O3
+
+# O3 提供商
+O3_API_KEY=your_o3_key
+O3_BASE_URL=https://api.o3.fan/v1
+
+# 路由覆盖（使用 models-config.json 中的真实模型名）
+BASIC_MODELS=Qwen/Qwen3-235B-A22B-search
+STRUCTURED_OUTPUT_MODELS=Qwen/Qwen3-235B-A22B-search
+```
+
+OpenAI 兼容 v1 端点鉴权（可选）：
+
+```
+ENABLE_API_AUTH=true
+LANGCHAIN_API_KEYS=user_key_1,user_key_2
+# 调用方需在请求头携带：Authorization: Bearer <user_key>
+```
+
+详细示例请参考 `.env.example` 与 [docs/vercel-guide.md](docs/vercel-guide.md)。
+
 ## 📚 文档
 
 - **[项目总览](docs/SUMMARY.md)**: 功能和配置的高级摘要。

@@ -1,5 +1,6 @@
 import { RunnableSequence } from "@langchain/core/runnables";
 import { ChatOpenAI } from "@langchain/openai";
+import { createChatOpenAIConfig } from "@/utils/openaiProvider";
 import { ChatPromptTemplate } from "@langchain/core/prompts";
 
 export function createBasicChain() {
@@ -15,11 +16,13 @@ export function createBasicChain() {
 用户请求：{input}
 `);
 
+  const compat = createChatOpenAIConfig({ model: process.env.BASIC_MODEL_NAME || "gpt-5-mini", fallbackBaseURL: process.env.OPENAI_BASE_URL });
   const model = new ChatOpenAI({
-    modelName: process.env.BASIC_MODEL_NAME || "gpt-5-mini",
+    modelName: compat.model,
     temperature: 0.0,
     maxTokens: 800,
-    ...(process.env.OPENAI_BASE_URL && { configuration: { baseURL: process.env.OPENAI_BASE_URL } }),
+    apiKey: compat.apiKey,
+    ...(compat.configuration ? { configuration: compat.configuration } : {}),
   });
 
   return RunnableSequence.from([prompt, model]);

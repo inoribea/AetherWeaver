@@ -7,6 +7,7 @@ import { TavilySearch } from '@langchain/tavily';
 import { Calculator } from '@langchain/community/tools/calculator';
 import { Tool } from '@langchain/core/tools';
 import { getBestEmbeddingProvider } from '../../../../utils/embeddings';
+import { getDefaultOpenAICompatProvider } from '@/utils/openaiProvider';
 
 function createTavilySearchWrapper(): Tool {
   return new TavilySearch({ maxResults: 5 }) as any; // 使用 any 类型断言绕过 schema 不兼容问题
@@ -14,13 +15,14 @@ function createTavilySearchWrapper(): Tool {
 
 // 添加缺失的导出函数
 export function getAvailableAgentModel() {
-  if (process.env.OPENAI_API_KEY) {
+  const compat = getDefaultOpenAICompatProvider();
+  if (compat?.apiKey) {
     return {
       model: new ChatOpenAI({
         modelName: "gpt-5",
         temperature: 0,
-        apiKey: process.env.OPENAI_API_KEY,
-        ...(process.env.OPENAI_BASE_URL && { configuration: { baseURL: process.env.OPENAI_BASE_URL } }),
+        apiKey: compat.apiKey,
+        ...(compat.baseURL ? { configuration: { baseURL: compat.baseURL } } : {}),
       }),
       modelName: "gpt-5"
     };

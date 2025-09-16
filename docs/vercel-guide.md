@@ -75,9 +75,12 @@
 
 ---
 
-## 8. 兼容第三方 OpenAI 提供商（如 O3）
-- 使用第三方兼容服务时，必须保证 `OPENAI_BASE_URL` 与所用密钥同源。例如 O3：
-  - `O3_API_KEY`
-  - `O3_BASE_URL`（如 `https://api.o3.fan/v1`）
-  - 建议将 `OPENAI_BASE_URL` 指向 `O3_BASE_URL`，或改用“路由模型池覆盖”仅对特定路由切换至 O3 的真实模型名（如 `Qwen/Qwen3-235B-A22B-search`）。
-  - 若 `OPENAI_BASE_URL` 指向第三方而 `OPENAI_API_KEY` 使用官方 OpenAI key，将导致 401 鉴权错误。
+## 8. OpenAI 兼容提供商（通用）
+- 项目支持任意前缀的 OpenAI 格式提供商环境变量对：`<PREFIX>_API_KEY` + `<PREFIX>_BASE_URL`。
+- 选择默认提供商的方式：
+  - 设置 `OPENAI_COMPAT_PROVIDER=<prefix>`（如 `OPENAI` / `NEKO` / `O3` / `OPENROUTER`）。
+  - 未设置时，按顺序尝试：`OPENAI` → `NEKO` → `O3` → `OPENROUTER` → 动态扫描所有 `*_API_KEY`/`*_BASE_URL` 成对变量。
+- 注意：
+  - 官方 OpenAI 允许不设置 `OPENAI_BASE_URL`（使用默认官方域名）。
+  - 第三方提供商必须保证 `PREFIX_API_KEY` 与 `PREFIX_BASE_URL` 同源，否则会返回 401。
+  - 也可通过“路由模型池覆盖”仅对特定路由切换第三方真实模型名（如 `Qwen/Qwen3-235B-A22B-search`）。
