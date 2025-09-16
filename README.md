@@ -62,11 +62,11 @@ Example:
 
 ```
 # Choose default provider
-OPENAI_COMPAT_PROVIDER=O3
+OPENAI_COMPAT_PROVIDER=
 
 # O3 provider
 O3_API_KEY=your_o3_key
-O3_BASE_URL=https://api.o3.fan/v1
+O3_BASE_URL=
 
 # Route overrides (real model IDs from models-config.json)
 BASIC_MODELS=Qwen/Qwen3-235B-A22B-search

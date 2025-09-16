@@ -61,11 +61,11 @@ AetherWeaver 是一个功能强大、可扩展的平台，用于构建先进的 
 
 ```
 # 选择默认提供商
-OPENAI_COMPAT_PROVIDER=O3
+OPENAI_COMPAT_PROVIDER=
 
 # O3 提供商
 O3_API_KEY=your_o3_key
-O3_BASE_URL=https://api.o3.fan/v1
+O3_BASE_URL=
 
 # 路由覆盖（使用 models-config.json 中的真实模型名）
 BASIC_MODELS=Qwen/Qwen3-235B-A22B-search
