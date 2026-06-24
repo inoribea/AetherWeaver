@@ -1,6 +1,7 @@
 import fs from 'fs/promises';
 import path from 'path';
 import { detectIntentFromRequest } from './openai-compat';
+import { sendEvent } from './langfuseClient';
 
 export interface IntentAnalysis {
   type: 'explicit_model' | 'semantic' | 'capability_based';
@@ -91,7 +92,8 @@ export class IntelligentRouterUnified implements UnifiedRouter {
   analyzeCapabilities(capabilities: string[]): string[] {
     return this.getAvailableModels().filter(model => {
       const config = this.models.get(model);
-      return config?.capabilities?.some((cap: string) => capabilities.includes(cap));
+      if (!config?.capabilities) return false;
+      return capabilities.some(cap => config.capabilities[cap] === true);
     });
   }
 
@@ -105,6 +107,7 @@ export class IntelligentRouterUnified implements UnifiedRouter {
     if (this.models.size === 0) {
       await this.loadModelsConfig();
     }
+    const routeStart = Date.now();
     const key = JSON.stringify(request.messages);
     let intent = this.intentCache.get(key);
     if (!intent) {
@@ -150,6 +153,20 @@ export class IntelligentRouterUnified implements UnifiedRouter {
     const capabilityMatch = intent.detectedCapabilities ? intent.detectedCapabilities.length : 0;
     const reasoning = `Selected model ${selected} using strategy ${strategy}`;
 
+    // Fire-and-forget routing trace
+    const duration = Date.now() - routeStart;
+    sendEvent({
+      event: 'router.decision',
+      properties: {
+        selectedModel: selected || 'unknown',
+        strategy,
+        confidence: intent.confidence || 0.5,
+        durationMs: duration,
+        capabilityMatch,
+      },
+      timestamp: new Date().toISOString(),
+    }).catch(() => {});
+
     return {
       selectedModel: selected,
       confidence: intent.confidence || 0.5,
@@ -167,12 +184,46 @@ export class IntelligentRouterUnified implements UnifiedRouter {
 
   private semantic = {
     analyze: async (messages: any[]): Promise<IntentAnalysis> => {
-      // 这里放置简单语义分析，返回默认值，项目可按需扩展
+      const text = messages.map(m => {
+        if (typeof m.content === 'string') return m.content.toLowerCase();
+        if (Array.isArray(m.content)) {
+          return m.content
+            .filter((c: any) => c.type === 'text')
+            .map((c: any) => c.text || '')
+            .join(' ')
+            .toLowerCase();
+        }
+        return '';
+      }).join(' ');
+
+      const keywords = (this.modelsConfig as any)?.keywords || {};
+      const detectedCapabilities: string[] = [];
+      const intents: Array<{ intent: string; score: number }> = [];
+
+      for (const [category, words] of Object.entries<string[]>(keywords)) {
+        const matchCount = words.filter(w => text.includes(w.toLowerCase())).length;
+        if (matchCount > 0) {
+          detectedCapabilities.push(category);
+          intents.push({ intent: category, score: Math.min(matchCount / words.length, 0.95) });
+        }
+      }
+
+      if (/[\u4e00-\u9fff]/.test(text)) {
+        if (!detectedCapabilities.includes('chinese')) {
+          detectedCapabilities.push('chinese');
+          intents.push({ intent: 'chinese', score: 0.8 });
+        }
+      }
+
+      const confidence = detectedCapabilities.length > 0
+        ? intents.reduce((max, i) => Math.max(max, i.score), 0)
+        : 0.3;
+
       return {
         type: 'semantic',
-        confidence: 0.5,
-        detectedCapabilities: [],
-        intents: [],
+        confidence,
+        detectedCapabilities,
+        intents,
       };
     }
   };

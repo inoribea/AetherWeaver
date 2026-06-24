@@ -19,11 +19,14 @@ import { routeRequest as route } from '@/utils/unified-router';
 import { handleApiKeyValidation } from './helpers';
 import { routeRequest, RoutingRequest } from '@/utils/unified-router';
 import { wrapWithErrorHandling } from '@/utils/errorHandler';
-import { sendEvent } from '@/utils/langfuseClient';
+import { sendEvent, LangfuseTracer } from '@/utils/langfuseClient';
 
 // OpenAI兼容的聊天完成端点
 export async function POST(req: NextRequest) {
   return wrapWithErrorHandling("v1_chat_completions_POST", async () => {
+    const requestId = crypto.randomUUID();
+    const tracer = new LangfuseTracer(requestId);
+
     sendEvent({ event: 'request_start', properties: { endpoint: 'v1_chat_completions_POST' }, timestamp: new Date().toISOString() });
 
     // API密钥验证
@@ -80,7 +83,13 @@ export async function POST(req: NextRequest) {
     console.log(`📦 路由请求 userIntent: ${routingRequest.userIntent}`);
 
     // 调用统一路由器进行智能选择
+    const routeSpan = tracer.startSpan('router.decision', { model: body.model });
     const routingDecision = await routeRequest(routingRequest);
+    tracer.endSpan(routeSpan, {
+      selectedModel: routingDecision.selectedModel,
+      confidence: routingDecision.confidence,
+      strategy: routingDecision.metadata.routingStrategy,
+    });
 
     sendEvent({ event: 'model_selected', properties: { model: routingDecision.selectedModel, confidence: routingDecision.confidence }, timestamp: new Date().toISOString() });
 
@@ -118,7 +127,9 @@ export async function POST(req: NextRequest) {
 
     const startTime = Date.now();
     // 调用内部API
+    const fetchSpan = tracer.startSpan('internal_api_call', { endpoint: targetEndpoint });
     const internalResponse = await fetch(internalRequest);
+    tracer.endSpan(fetchSpan, { status: internalResponse.status, model: body.model });
     const durationMs = Date.now() - startTime;
     sendEvent({ event: 'internal_api_call', properties: { status: internalResponse.status, durationMs }, timestamp: new Date().toISOString() });
     
@@ -147,6 +158,7 @@ export async function POST(req: NextRequest) {
     const finalModel = internalJson.routing?.model || routingDecision.selectedModel;
     console.log(`🎯 Final model used: ${finalModel}`);
 
+    tracer.flush().catch(err => console.warn('[Langfuse] flush error:', err));
 
     // 处理流式响应
     if (body.stream !== false) {
