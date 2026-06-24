@@ -429,6 +429,20 @@
       "speed_rating": 8,
       "quality_rating": 9,
       "description": ""
+    },
+    "claude-sonnet-4-native": {
+      "type": "anthropic",
+      "config": { "apiKey": "ANTHROPIC_API_KEY", "model": "claude-sonnet-4-20250514", "temperature": 0.7 },
+      "capabilities": { "vision": true, "reasoning": true, "tool_calling": true, "structured_output": true, "agents": false, "chinese": false, "search": false, "web_search": false, "code_generation": true, "creative_writing": true, "mathematical_computation": true },
+      "priority": { "complex_reasoning": 1, "creative_writing": 1, "code_generation": 2, "mathematical_computation": 2, "structured_analysis": 2, "vision_processing": 3 },
+      "cost_per_1k_tokens": 0.015, "speed_rating": 6, "quality_rating": 10
+    },
+    "command-r-plus": {
+      "type": "cohere",
+      "config": { "apiKey": "COHERE_API_KEY", "model": "command-r-plus", "temperature": 0.7 },
+      "capabilities": { "vision": false, "reasoning": true, "tool_calling": true, "structured_output": true, "agents": false, "chinese": false, "search": false, "web_search": false, "code_generation": true, "creative_writing": false, "mathematical_computation": true },
+      "priority": { "complex_reasoning": 3, "code_generation": 3, "mathematical_computation": 3, "structured_analysis": 3 },
+      "cost_per_1k_tokens": 0.003, "speed_rating": 8, "quality_rating": 7
     }
   },
   "routing_rules": {

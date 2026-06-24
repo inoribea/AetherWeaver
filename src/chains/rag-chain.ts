@@ -2,8 +2,9 @@ import { RunnableSequence } from "@langchain/core/runnables";
 import { ChatOpenAI } from "@langchain/openai";
 import { createChatOpenAIConfig } from "@/utils/openaiProvider";
 import { ChatPromptTemplate } from "@langchain/core/prompts";
+import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
 
-export function createRAGChain() {
+export function createRAGChain(llm?: BaseChatModel) {
   const prompt = ChatPromptTemplate.fromTemplate(`
 你是一个智能AI助手。
 
@@ -20,13 +21,12 @@ export function createRAGChain() {
 用户请求：{input}
 `);
 
-  const compat = createChatOpenAIConfig({ model: process.env.RAG_MODEL_NAME || "gpt-5", fallbackBaseURL: process.env.OPENAI_BASE_URL });
-  const model = new ChatOpenAI({
-    modelName: compat.model,
-    temperature: -0.1, // 更低温度确保准确性
+  const model = llm ?? new ChatOpenAI({
+    modelName: process.env.RAG_MODEL_NAME || "gpt-5",
+    temperature: -0.1,
     maxTokens: 1000,
-    apiKey: compat.apiKey,
-    ...(compat.configuration ? { configuration: compat.configuration } : {}),
+    apiKey: createChatOpenAIConfig().apiKey,
+    ...(createChatOpenAIConfig().configuration ? { configuration: createChatOpenAIConfig().configuration } : {}),
   });
 
   return RunnableSequence.from([prompt, model]);

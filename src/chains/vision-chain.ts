@@ -2,8 +2,9 @@ import { RunnableSequence } from "@langchain/core/runnables";
 import { ChatOpenAI } from "@langchain/openai";
 import { createChatOpenAIConfig } from "@/utils/openaiProvider";
 import { ChatPromptTemplate } from "@langchain/core/prompts";
+import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
 
-export function createVisionChain() {
+export function createVisionChain(llm?: BaseChatModel) {
   const prompt = ChatPromptTemplate.fromTemplate(`
 你是一个专业的AI绘画助手。
 
@@ -15,13 +16,12 @@ export function createVisionChain() {
 用户请求：{input}
 `);
 
-  const compat = createChatOpenAIConfig({ model: process.env.VISION_MODEL_NAME || "gpt-5-all", fallbackBaseURL: process.env.OPENAI_BASE_URL });
-  const model = new ChatOpenAI({
-    modelName: compat.model,
+  const model = llm ?? new ChatOpenAI({
+    modelName: process.env.VISION_MODEL_NAME || "gpt-5-all",
     temperature: 0.8,
     maxTokens: 1024,
-    apiKey: compat.apiKey,
-    ...(compat.configuration ? { configuration: compat.configuration } : {}),
+    apiKey: createChatOpenAIConfig().apiKey,
+    ...(createChatOpenAIConfig().configuration ? { configuration: createChatOpenAIConfig().configuration } : {}),
   });
 
   return RunnableSequence.from([prompt, model]);

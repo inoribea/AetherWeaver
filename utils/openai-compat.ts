@@ -87,6 +87,8 @@ export const MODEL_DISPLAY_NAME: Record<string, string> = {
   'gpt': 'gpt-5',
   'Qwen/Qwen3-235B-A22B-search': 'Qwen3-235B-Search',
   'deepseek-ai/DeepSeek-V3-search': 'DeepSeek-V3-Search',
+  'claude-sonnet-4-native': 'Claude Sonnet 4 (Native)',
+  'command-r-plus': 'Command R+',
 };
 
 // 真实模型映射（仅保留实际存在的模型，o3 -search 模型直接用真实 id）
@@ -104,6 +106,8 @@ export const MODEL_MAPPING: Record<string, string> = {
   'gpt': 'gpt-5',
   'Qwen/Qwen3-235B-A22B-search': 'Qwen/Qwen3-235B-A22B-search',
   'deepseek-ai/DeepSeek-V3-search': 'deepseek-ai/DeepSeek-V3-search',
+  'claude-sonnet-4-native': 'claude-sonnet-4-native',
+  'command-r-plus': 'command-r-plus',
 };
 
 // 智能选择模型（优先按 search 能力和优先级，严格按 models-config.json 路由规则）
@@ -500,7 +504,9 @@ export function getSupportedModels() {
       },
       display_name: MODEL_DISPLAY_NAME['gpt'],
       description: '与官方GPT-4功能一致，web search首选'
-    }
+    },
+    { id: 'claude-sonnet-4-native', object: 'model', created: Math.floor(Date.now() / 1000), owned_by: 'anthropic', capabilities: { vision: true, reasoning: true, tool_calling: true, structured_output: true, agents: false, chinese: false, search: false, web_search: false, code_generation: true, creative_writing: true, mathematical_computation: true }, display_name: 'Claude Sonnet 4 (Native)', description: 'Direct Anthropic API access for Claude Sonnet 4. No proxy required.' },
+    { id: 'command-r-plus', object: 'model', created: Math.floor(Date.now() / 1000), owned_by: 'cohere', capabilities: { vision: false, reasoning: true, tool_calling: true, structured_output: true, agents: false, chinese: false, search: false, web_search: false, code_generation: true, creative_writing: false, mathematical_computation: true }, display_name: 'Command R+', description: 'Direct Cohere API access for Command R+. Optimized for reasoning and code.' }
   ];
 }
 
