@@ -24,6 +24,11 @@ interface SmartRoutingResult {
   hasImageHint?: boolean;
 }
 
+/**
+ * @deprecated Use IntelligentRouterUnified from utils/unified-router.ts instead.
+ * This router is kept only as a fallback. Model selection should use IntelligentRouterUnified.
+ * See Trinity Roadmap Task 0 for migration details.
+ */
 export class SmartRouterComponent extends Runnable<BaseMessage> {
   lc_namespace = ["langchain", "custom", "smart_router"];
   private llm: any;

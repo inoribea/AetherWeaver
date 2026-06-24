@@ -8,8 +8,10 @@ import { createVisionChain } from "../../../src/chains/vision-chain";
 import { ChatOpenAI, OpenAIEmbeddings } from "@langchain/openai";
 
 import { SmartRouterComponent } from "../../components/routing/smart-router";
+import { intelligentRouter } from '@/utils/unified-router';
 import { ModelManager } from "../../admin/models/ModelManager";
 import { getDefaultOpenAICompatProvider, resolveProviderFromModelConfig } from "@/utils/openaiProvider";
+import { createChatModelInstance } from "@/utils/chatModelFactory";
 import modelsConfig from "../../../models-config.json"; // 导入 models-config.json
 
 /**
@@ -238,91 +240,76 @@ export async function POST(req: NextRequest) {
     }
 
     // 智能路由决策
-    const router = new SmartRouterComponent({
-      confidence_threshold: 0.6,
-    });
-
-    const routingResult = await router.invoke(new HumanMessage(safeMessageContent));
+    // Use IntelligentRouterUnified for model selection (Trinity Task 0)
+    const routingRequest = {
+      messages: [{ role: 'user', content: safeMessageContent }],
+    };
+    const routingResult = await intelligentRouter.route(routingRequest);
     console.log("Routing result:", JSON.stringify(routingResult, null, 2));
+
+    // Determine route type from model capabilities (for chain selection)
+    const selectedModelConfig = modelsConfig.models[routingResult.selectedModel as keyof typeof modelsConfig.models];
+    const capabilities = selectedModelConfig?.capabilities || {};
 
     // 模型选择
     const modelManager = await ModelManager.getCurrentModel();
     let selectedModelName: string = modelManager.model ?? "gpt-5";
     let selectedApiKey: string | undefined = modelManager.apiKey;
     let selectedBaseURL: string | undefined = undefined;
+    let selectedModelType: string = 'openai_compatible';
 
-    const routeRule = modelsConfig.routing_rules[routingResult.route as keyof typeof modelsConfig.routing_rules];
-    let preferredModels = routeRule?.preferred_models || [];
-
-    // 从环境变量中读取并覆盖模型池
-    const routeEnvVarName = `${routingResult.route.toUpperCase()}_MODELS`;
-    const envModels = process.env[routeEnvVarName];
-    if (envModels) {
-      const realModelNames = envModels.split(',').map(m => m.trim());
-      const modelKeys = realModelNames.map(realModelName => {
-        const key = Object.keys(modelsConfig.models).find(k => {
-          const modelConfig = modelsConfig.models[k as keyof typeof modelsConfig.models];
-          return modelConfig.config.model === realModelName;
-        });
-        if (key) {
-          return key;
-        }
-        console.warn(`Model with real name "${realModelName}" not found in models-config.json. Ignoring.`);
-        return null;
-      }).filter((k): k is string => k !== null);
-
-      if (modelKeys.length > 0) {
-        preferredModels = modelKeys;
-        console.log(`Overriding models for route ${routingResult.route} with env var ${routeEnvVarName}:`, preferredModels);
-      }
-    }
- // If the router explicitly matched a model key, prioritize it by placing it at the front of preferredModels
- // Fix: correctly type matchedModelKey to avoid implicit any when indexing modelsConfig.models
- type ModelsMap = typeof modelsConfig.models;
- const matchedModelKey = (routingResult as any).matchedModelKey as keyof ModelsMap | undefined;
- if (matchedModelKey && modelsConfig.models[matchedModelKey]) {
-   // cast to string for arrays that expect string entries (preferredModels is string[])
-   preferredModels = [matchedModelKey as string, ...preferredModels.filter(m => m !== (matchedModelKey as string))];
-   console.log(`Prioritizing explicitly matched model ${String(matchedModelKey)} for route ${routingResult.route}`);
- }
-
-    if (preferredModels.length > 0) {
-      const preferredModelId = preferredModels[0]; // 选择第一个首选模型
-      const modelDetails = modelsConfig.models[preferredModelId as keyof typeof modelsConfig.models];
-
-      if (modelDetails) {
-        selectedModelName = modelDetails.config.model;
-        // 根据模型类型获取对应的API Key / BaseURL
-        if (modelDetails.type === "openai_compatible" || modelDetails.type === "o3_provider") {
-          const provider = resolveProviderFromModelConfig(modelDetails);
-          if (provider?.apiKey) selectedApiKey = provider.apiKey;
-          if (provider?.baseURL) selectedBaseURL = provider.baseURL;
-        } else if (modelDetails.type === "deepseek") {
-          selectedApiKey = process.env.DEEPSEEK_API_KEY as string;
-        } else if (modelDetails.type === "alibaba_tongyi") {
-          selectedApiKey = process.env.DASHSCOPE_API_KEY as string;
-        } else if (modelDetails.type === "tencent_hunyuan") {
-          selectedApiKey = process.env.TENCENT_HUNYUAN_SECRET_KEY as string; // 或者 SECRET_ID
-        } else if (modelDetails.type === "google_gemini") {
-          selectedApiKey = process.env.GOOGLE_API_KEY as string;
+    // Use the model selected by IntelligentRouterUnified directly (Trinity Task 0)
+    let detectedRoute = 'basic';
+    if (selectedModelConfig) {
+      selectedModelName = selectedModelConfig.config.model;
+      selectedModelType = selectedModelConfig.type;
+      // Determine route type from model capabilities for chain selection
+      // Map first available capability to route type
+      const capToRoute: Record<string, string> = {
+        vision: 'vision_tasks',
+        reasoning: 'reasoning_tasks',
+        chinese: 'chinese_tasks',
+        code_generation: 'code_tasks',
+        creative_writing: 'creative_tasks',
+        search: 'search_tasks',
+        web_search: 'search_tasks',
+        structured_output: 'structured_output',
+        mathematical_computation: 'reasoning_tasks',
+      };
+      for (const [cap, route] of Object.entries(capToRoute)) {
+        if (capabilities[cap as keyof typeof capabilities] === true) {
+          detectedRoute = route;
+          break;
         }
       }
-    }
 
-    // 如果没有从路由规则中获取到API Key/BaseURL，则回退到默认提供商
-    if (!selectedApiKey) {
-      const def = getDefaultOpenAICompatProvider();
-      if (def?.apiKey) selectedApiKey = def.apiKey;
-      if (def?.baseURL) selectedBaseURL = def.baseURL;
-    } else if (!selectedBaseURL) {
-      // 有 key 没有 baseURL 时，尝试从默认提供商补全（支持 OPENAI 官方无 baseURL 的情况）
-      const def = getDefaultOpenAICompatProvider();
-      if (def?.baseURL) selectedBaseURL = def.baseURL;
+      if (selectedModelConfig.type === "openai_compatible" || selectedModelConfig.type === "o3_provider") {
+        const provider = resolveProviderFromModelConfig(selectedModelConfig);
+        if (provider?.apiKey) selectedApiKey = provider.apiKey;
+        if (provider?.baseURL) selectedBaseURL = provider.baseURL;
+      } else if (selectedModelConfig.type === "deepseek") {
+        selectedApiKey = process.env.DEEPSEEK_API_KEY as string;
+      } else if (selectedModelConfig.type === "alibaba_tongyi") {
+        selectedApiKey = process.env.DASHSCOPE_API_KEY as string;
+      } else if (selectedModelConfig.type === "tencent_hunyuan") {
+        selectedApiKey = process.env.TENCENT_HUNYUAN_SECRET_KEY as string;
+      } else if (selectedModelConfig.type === "google_gemini") {
+        selectedApiKey = process.env.GOOGLE_API_KEY as string;
+      } else if (selectedModelConfig.type === "anthropic") {
+        selectedApiKey = process.env.ANTHROPIC_API_KEY as string;
+      } else if (selectedModelConfig.type === "cohere") {
+        selectedApiKey = process.env.COHERE_API_KEY as string;
+      }
     }
 
     // 临时诊断日志（只记录是否存在，不打印密钥值）
     console.log(`Diagnostics: selectedModelName=${selectedModelName}, selectedApiKeySet=${!!selectedApiKey}, baseURL=${selectedBaseURL || fallbackOpenAIBaseUrl || 'Default(OpenAI)'}`);
-    const llm = createChatOpenAIInstance(selectedApiKey || "", selectedModelName, selectedBaseURL);
+    const llm = createChatModelInstance(
+      selectedModelType,
+      selectedApiKey || "",
+      selectedModelName,
+      selectedBaseURL,
+    );
 
     const embeddings = new OpenAIEmbeddings({
       apiKey: selectedApiKey,
@@ -332,9 +319,9 @@ export async function POST(req: NextRequest) {
     // 初始化工具（这里省略）
 
     // 选择对应的链或工具
-    const route = routingResult.route as
+    const route = detectedRoute as
       | "basic"
-      | "enhanced_tasks" // 添加 enhanced_tasks 路由类型
+      | "enhanced_tasks"
       | "rag"
       | "agent"
       | "tavily"
@@ -353,17 +340,16 @@ export async function POST(req: NextRequest) {
       case "basic":
       case "agent":
       case "vision_tasks": {
-        const chain = createVisionChain();
+        const chain = createVisionChain(llm);
         result = await chain.invoke({ input: safeMessageContent });
         break;
       }
-      case "vision_tasks":
       case "reasoning_tasks":
       case "chinese_tasks":
       case "code_tasks":
       case "creative_tasks":
       case "structured_output": {
-        const chain = createBasicChain();
+        const chain = createBasicChain(llm);
         result = await chain.invoke({ input: safeMessageContent });
         break;
       }
@@ -376,13 +362,13 @@ export async function POST(req: NextRequest) {
       }
       case "rag":
       case "search_tasks": {
-        const chain = createRAGChain();
+        const chain = createRAGChain(llm);
         result = await chain.invoke({ input: safeMessageContent, context_documents: [] });
         break;
       }
       // 其他情况省略
       default: {
-        const chain = createBasicChain();
+        const chain = createBasicChain(llm);
         result = await chain.invoke({ input: safeMessageContent });
         break;
       }
@@ -392,7 +378,7 @@ export async function POST(req: NextRequest) {
       JSON.stringify({
         response: extractTextFromResult(result),
         routing: {
-          route: beautifyRouteName(routingResult.route),
+          route: beautifyRouteName(detectedRoute),
           confidence: beautifyConfidence(routingResult.confidence ?? 1),
           model: selectedModelName, // 使用实际选择的模型名称
         },
