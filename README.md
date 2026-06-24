@@ -1,100 +1,161 @@
-# AetherWeaver: Unified LLM Routing & Orchestration Platform
+# AetherWeaver — Open-Source Learned Multi-Turn LLM Orchestration
+
 [简体中文](README-CN.md)
 
-AetherWeaver is a powerful, extensible platform for building advanced LLM applications. It provides a unified interface for multiple model providers, intelligent routing, RAG capabilities, and OpenAI-compatible endpoints.
+**AetherWeaver is an orchestration platform that learns.** Send it a message. It decides whether to answer directly or coordinate Thinker → Worker → Verifier across multiple models. It learns from every success and failure, improving weekly. Open-source, free to deploy on Vercel, uses your own API keys.
 
-## ✨ Key Features
+---
 
-- **Multi-Model Support**: Integrates with OpenAI, Google Gemini, Deepseek, Claude, and more.
-- **Intelligent Routing**: Dynamically routes requests to the best-suited model based on task complexity and type (e.g., code, vision, reasoning).
-- **Retrieval-Augmented Generation (RAG)**: Supports multiple embedding models (OpenAI, Cloudflare) and vector databases (Qdrant, Upstash, Pinecone).
-- **OpenAI-Compatible API**: Drop-in replacement for OpenAI's API, allowing seamless integration with existing tools.
-- **Observability**: Built-in integration with Langfuse for detailed tracing and monitoring.
-- **Extensible Agents**: Build powerful agents with custom tools like web search.
+## What It Does
 
-## 🚀 Quick Start
+### Multi-Turn Orchestration
 
-1.  **Clone the repository**:
-    ```bash
-    git clone https://github.com/inoribea/AetherWeaver.git
-    cd AetherWeaver
-    ```
-
-2.  **Install dependencies**:
-    ```bash
-    yarn install
-    ```
-
-3.  **Configure environment variables**:
-    ```bash
-    cp .env.example .env.local
-    ```
-    Fill in your API keys in `.env.local`. At a minimum, you need one model provider API key (e.g., `OPENAI_API_KEY`).
-
-4.  **Run the development server**:
-    ```bash
-    yarn dev
-    ```
-
-5.  **Open your browser** and navigate to `http://localhost:3000`.
-
-## 🛠️ Configuration
-
-The application is configured through environment variables. Key options include:
-
-- `ANALYSIS_MODE`: Set to `rule_based` (default) for fast routing or `llm_enhanced` for more accurate, AI-powered routing.
-- `EMBEDDING_PROVIDER`: Choose between `OpenAI` and `Cloudflare` for document embeddings.
-- `QDRANT_URL` / `UPSTASH_VECTOR_REST_URL`: Configure your vector database connection.
-- `LANGFUSE_SECRET_KEY`: Enable monitoring by providing your Langfuse secret key.
-
-For a complete list of variables, see [docs/vercel-guide.md](docs/vercel-guide.md).
-
-### OpenAI-compatible Providers (Generic)
-
-This project supports any OpenAI-compatible provider using the pattern `<PREFIX>_API_KEY` + `<PREFIX>_BASE_URL` (e.g., `OPENAI`, `NEKO`, `O3`, `OPENROUTER`).
-
-- Select default provider via `OPENAI_COMPAT_PROVIDER=<prefix>` (case-insensitive).
-- If not set, the resolver tries: `OPENAI` → `NEKO` → `O3` → `OPENROUTER` → the first discovered pair in env.
-- Official OpenAI does not require `OPENAI_BASE_URL`.
-- You can also override per-route model pools with real model IDs defined in `models-config.json` (e.g., `BASIC_MODELS`, `STRUCTURED_OUTPUT_MODELS`).
-
-Example:
+AetherWeaver doesn't pick one model and call it done. For complex tasks, it runs a coordinated multi-turn pipeline:
 
 ```
-# Choose default provider
-OPENAI_COMPAT_PROVIDER=
-
-# O3 provider
-O3_API_KEY=your_o3_key
-O3_BASE_URL=
-
-# Route overrides (real model IDs from models-config.json)
-BASIC_MODELS=Qwen/Qwen3-235B-A22B-search
-STRUCTURED_OUTPUT_MODELS=Qwen/Qwen3-235B-A22B-search
+Request → Thinker (analyze & plan) → Worker (execute) → Verifier (check & accept/retry)
 ```
 
-OpenAI-compatible v1 endpoint auth (optional):
+- **Adaptive depth**: simple queries = 1 turn. Complex code/math/reasoning = 2-4 turns.
+- **Budget protection**: token, cost, and latency caps per request. Degrades gracefully on timeout — skips Verifier and returns Worker output rather than failing.
+- **Single endpoint**: `model: "auto"` — the coordinator handles the rest.
+
+### Self-Evolution
+
+AetherWeaver improves from usage. Every request generates a reward signal — code execution results, math answer matching, or explicit 👍/👎 feedback:
 
 ```
-ENABLE_API_AUTH=true
-LANGCHAIN_API_KEYS=user_key_1,user_key_2
-# Callers must send: Authorization: Bearer <user_key>
+Feedback → Failure Diagnosis (4-dimension analysis) → Weekly Retraining (sep-CMA-ES, CPU-runnable) → updated coordinator weights (<100KB JSON)
 ```
 
-See `.env.example` and [docs/vercel-guide.md](docs/vercel-guide.md) for more details.
+The coordinator learns to route better over time. No labeled dataset needed — verifiable tasks provide ground truth automatically.
 
-## 📚 Documentation
+### Intelligent Context Management
 
-- **[Project Overview](docs/SUMMARY.md)**: High-level summary of features and configuration.
-- **[API Usage](docs/chat_api_usage.md)**: How to use the different chat APIs.
-- **[RAG & Embeddings](docs/retrieval_interface.md)**: Details on configuring RAG.
-- **[Smart Routing](docs/v1_decision_logic.md)**: In-depth explanation of the routing logic.
-- **[Deployment Guide](docs/vercel-guide.md)**: Guide for deploying on Vercel.
+Multi-turn orchestration bloats context. AetherWeaver's context builder assembles role-optimized prompts instead of passing the full history to every model:
 
-## 🤝 Contributing
+- **Sensory filter**: drops irrelevant turns
+- **Topic grouper**: semantic clustering per conversation phase
+- **Per-role assembly**: Thinker sees problem + plan. Worker sees plan + evidence. Verifier sees output + requirements.
 
-Contributions are welcome! Please open an issue or submit a pull request.
+4-turn context overhead = ~1.5-2x single call, not 4x.
 
-## 📄 License
+### Deploy Anywhere, Bring Your Own Keys
 
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+```bash
+git clone https://github.com/inoribea/AetherWeaver.git && cd AetherWeaver
+yarn install && cp .env.example .env.local
+yarn dev   # localhost:3000
+yarn deploy  # Vercel (free Hobby tier)
+```
+
+One command to production. Your OpenAI / Anthropic / Google / DeepSeek / Qwen / Hunyuan keys. Your infrastructure. Your data never touches a third-party orchestration service.
+
+---
+
+## Key Advantages
+
+**Learned routing, not static rules.** The coordinator trains via gradient-free evolution (sep-CMA-ES) on actual usage outcomes. It gets smarter without human tuning.
+
+**Multi-turn without multi-endpoint complexity.** One `model: "auto"` call triggers Thinker → Worker → Verifier coordination. No workflow DSL, no agent framework to configure.
+
+**Full transparency.** Routing decisions, model choices, confidence scores, and per-turn traces are all logged to Langfuse. Coordinator weights are a <100KB JSON file — inspectable, versioned, auditable.
+
+**Self-improving without data annotation.** Code execution pass/fail and math answer matching provide clean reward signals automatically. User feedback is optional, additive.
+
+**Free and open.** MIT license. Vercel Hobby tier. No seat licenses, no output-token pricing, no vendor lock-in.
+
+---
+
+## Quick Start
+
+```bash
+git clone https://github.com/inoribea/AetherWeaver.git
+cd AetherWeaver
+yarn install
+cp .env.example .env.local
+```
+
+Minimum config:
+
+```env
+OPENAI_API_KEY=sk-...
+# or GOOGLE_API_KEY=...
+# or NEKO_API_KEY=... + NEKO_BASE_URL=...
+```
+
+```bash
+yarn dev   # → http://localhost:3000
+```
+
+```bash
+curl -X POST http://localhost:3000/api/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{"model":"auto","messages":[{"role":"user","content":"Write a lock-free concurrent hashmap in Rust"}]}'
+```
+
+---
+
+## Configuration
+
+| Variable | Default | Description |
+|---|---|---|
+| `ORCHESTRATION_MODE` | `adaptive` | `fast` / `standard` / `deep` / `adaptive` |
+| `MAX_TURNS` | `4` | Max orchestration turns per request |
+| `ORCHESTRATION_TIMEOUT_MS` | `55000` | Timeout (5s Vercel buffer) |
+| `COORDINATOR_SIDECAR_URL` | — | Local Qwen3-0.6B for hidden-state routing (100% Trinity fidelity) |
+| `ENABLE_FEEDBACK` | `true` | Collect 👍/👎 feedback for learning |
+
+---
+
+## Observability
+
+Every request produces a Langfuse trace tree:
+
+```
+Request
+├── Coordinator Decision — model, confidence, reasoning
+├── Thinker — model, tokens, latency
+├── Worker
+├── Verifier — verdict, rationale
+└── Feedback — rating, auto-verification, failure diagnosis
+```
+
+---
+
+## Architecture
+
+```
+app/api/v1/chat/completions/route.ts   ← OpenAI-compatible entry point
+utils/coordinator/                     ← embedder, classifier, bandit, sidecar
+utils/orchestration/                   ← LangGraph state graph, roles, context builder
+utils/feedback/                        ← feedback store, failure diagnosis
+scripts/eval/                          ← eval harness (6 strategies + expert baseline)
+scripts/train/                         ← sep-CMA-ES retraining + targeted optimization
+docker/coordinator-sidecar/            ← optional ONNX Qwen3-0.6B sidecar
+```
+
+---
+
+## Documentation
+
+| Document | Contents |
+|---|---|
+| [Trinity Orchestration Roadmap](docs/TRINITY_ORCHESTRATION_ROADMAP.md) | Full implementation plan |
+| [Deployment Guide](docs/vercel-guide.md) | Vercel deployment |
+| [API Usage](docs/chat_api_usage.md) | Chat API reference |
+
+---
+
+## Research Foundations
+
+- **Trinity** (Sakana AI, ICLR 2026) — Multi-turn coordinator + sep-CMA-ES training. [arXiv:2512.04695](https://arxiv.org/abs/2512.04695)
+- **SkillForge** (Alibaba, SIGIR 2026) — Self-evolving skills, failure diagnosis. [arXiv:2604.08618](https://arxiv.org/abs/2604.08618)
+- **GAM** (BAAI) — JIT-compilation agent memory. [arXiv:2511.18423](https://arxiv.org/abs/2511.18423)
+- **LightMem** (Zhejiang Univ) — Three-stage lightweight memory. [arXiv:2510.18866](https://arxiv.org/abs/2510.18866)
+
+---
+
+## License
+
+MIT © AetherWeaver

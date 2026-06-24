@@ -1,0 +1,291 @@
+{
+  "evaluatedAt": "2026-06-23T10:20:25.558Z",
+  "totalQueries": 16,
+  "runsPerQuery": 1,
+  "accuracy": "75.0%",
+  "byCategory": {
+    "vision": {
+      "accuracy": "100.0%",
+      "samples": 2
+    },
+    "reasoning": {
+      "accuracy": "0.0%",
+      "samples": 2
+    },
+    "chinese": {
+      "accuracy": "0.0%",
+      "samples": 2
+    },
+    "code": {
+      "accuracy": "100.0%",
+      "samples": 2
+    },
+    "creative": {
+      "accuracy": "100.0%",
+      "samples": 2
+    },
+    "search": {
+      "accuracy": "100.0%",
+      "samples": 2
+    },
+    "structured": {
+      "accuracy": "100.0%",
+      "samples": 2
+    },
+    "default": {
+      "accuracy": "100.0%",
+      "samples": 1
+    },
+    "math": {
+      "accuracy": "100.0%",
+      "samples": 1
+    }
+  },
+  "modelDistribution": {
+    "keywordPreferred": {
+      "gpt-5-all": 2,
+      "unknown": 3,
+      "gemini-flash-lite": 11
+    },
+    "firstModel": {
+      "gpt-5-all": 16
+    },
+    "random": {
+      "claude-sonnet-4-all": 4,
+      "gpt": 2,
+      "gemini-flash-lite": 1,
+      "deepseek-reasoner": 1,
+      "command-r-plus": 1,
+      "gpt-5-search": 2,
+      "gpt-5-all": 1,
+      "hunyuan-t1-latest": 2,
+      "Qwen/Qwen3-235B-A22B-search": 1,
+      "qvq-plus": 1
+    }
+  },
+  "results": [
+    {
+      "query": "请分析这张图片的内容",
+      "expectedCategory": "vision",
+      "detectedCategory": "vision",
+      "match": true,
+      "routingRule": "vision_tasks",
+      "preferredModels": [
+        "gpt-5-all",
+        "qvq-plus",
+        "claude-sonnet-4-all"
+      ],
+      "firstModel": "gpt-5-all",
+      "randomModel": "claude-sonnet-4-all"
+    },
+    {
+      "query": "Analyze this photo and describe what you see",
+      "expectedCategory": "vision",
+      "detectedCategory": "vision",
+      "match": true,
+      "routingRule": "vision_tasks",
+      "preferredModels": [
+        "gpt-5-all",
+        "qvq-plus",
+        "claude-sonnet-4-all"
+      ],
+      "firstModel": "gpt-5-all",
+      "randomModel": "gpt"
+    },
+    {
+      "query": "证明勾股定理的详细步骤",
+      "expectedCategory": "reasoning",
+      "detectedCategory": "enhanced",
+      "match": false,
+      "routingRule": "basic",
+      "preferredModels": [],
+      "firstModel": "gpt-5-all",
+      "randomModel": "gemini-flash-lite"
+    },
+    {
+      "query": "Explain why the sky is blue using physics",
+      "expectedCategory": "reasoning",
+      "detectedCategory": "default",
+      "match": false,
+      "routingRule": "basic",
+      "preferredModels": [],
+      "firstModel": "gpt-5-all",
+      "randomModel": "deepseek-reasoner"
+    },
+    {
+      "query": "写一首关于春天的诗",
+      "expectedCategory": "chinese",
+      "detectedCategory": "creative",
+      "match": false,
+      "routingRule": "creative_tasks",
+      "preferredModels": [
+        "gemini-flash-lite",
+        "claude-sonnet-4-all",
+        "hunyuan-t1-latest",
+        "gpt-5-all"
+      ],
+      "firstModel": "gpt-5-all",
+      "randomModel": "claude-sonnet-4-all"
+    },
+    {
+      "query": "用中文解释量子计算的基本原理",
+      "expectedCategory": "chinese",
+      "detectedCategory": "math",
+      "match": false,
+      "routingRule": "reasoning_tasks",
+      "preferredModels": [
+        "gemini-flash-lite",
+        "deepseek-reasoner",
+        "claude-sonnet-4-all",
+        "hunyuan-t1-latest"
+      ],
+      "firstModel": "gpt-5-all",
+      "randomModel": "command-r-plus"
+    },
+    {
+      "query": "Write a Python function to implement quicksort",
+      "expectedCategory": "code",
+      "detectedCategory": "code",
+      "match": true,
+      "routingRule": "code_tasks",
+      "preferredModels": [
+        "gemini-flash-lite",
+        "gpt4.1",
+        "qwen-turbo",
+        "deepseek-reasoner"
+      ],
+      "firstModel": "gpt-5-all",
+      "randomModel": "gpt-5-search"
+    },
+    {
+      "query": "调试这段代码：function add(a,b) { return a-b }",
+      "expectedCategory": "code",
+      "detectedCategory": "code",
+      "match": true,
+      "routingRule": "code_tasks",
+      "preferredModels": [
+        "gemini-flash-lite",
+        "gpt4.1",
+        "qwen-turbo",
+        "deepseek-reasoner"
+      ],
+      "firstModel": "gpt-5-all",
+      "randomModel": "gpt-5-all"
+    },
+    {
+      "query": "写一个关于AI觉醒的短篇故事",
+      "expectedCategory": "creative",
+      "detectedCategory": "creative",
+      "match": true,
+      "routingRule": "creative_tasks",
+      "preferredModels": [
+        "gemini-flash-lite",
+        "claude-sonnet-4-all",
+        "hunyuan-t1-latest",
+        "gpt-5-all"
+      ],
+      "firstModel": "gpt-5-all",
+      "randomModel": "hunyuan-t1-latest"
+    },
+    {
+      "query": "Write a poem about the ocean",
+      "expectedCategory": "creative",
+      "detectedCategory": "creative",
+      "match": true,
+      "routingRule": "creative_tasks",
+      "preferredModels": [
+        "gemini-flash-lite",
+        "claude-sonnet-4-all",
+        "hunyuan-t1-latest",
+        "gpt-5-all"
+      ],
+      "firstModel": "gpt-5-all",
+      "randomModel": "Qwen/Qwen3-235B-A22B-search"
+    },
+    {
+      "query": "搜索最新的AI新闻",
+      "expectedCategory": "search",
+      "detectedCategory": "search",
+      "match": true,
+      "routingRule": "search_tasks",
+      "preferredModels": [
+        "gemini-flash-lite",
+        "gpt4.1",
+        "Qwen/Qwen3-235B-A22B-search",
+        "deepseek-ai/DeepSeek-V3-search"
+      ],
+      "firstModel": "gpt-5-all",
+      "randomModel": "claude-sonnet-4-all"
+    },
+    {
+      "query": "Search for the latest TypeScript features",
+      "expectedCategory": "search",
+      "detectedCategory": "search",
+      "match": true,
+      "routingRule": "search_tasks",
+      "preferredModels": [
+        "gemini-flash-lite",
+        "gpt4.1",
+        "Qwen/Qwen3-235B-A22B-search",
+        "deepseek-ai/DeepSeek-V3-search"
+      ],
+      "firstModel": "gpt-5-all",
+      "randomModel": "gpt-5-search"
+    },
+    {
+      "query": "用JSON格式输出用户信息",
+      "expectedCategory": "structured",
+      "detectedCategory": "structured",
+      "match": true,
+      "routingRule": "structured_output",
+      "preferredModels": [
+        "gemini-flash-lite",
+        "gpt-5-all",
+        "claude-sonnet-4-all",
+        "hunyuan-turbos-latest"
+      ],
+      "firstModel": "gpt-5-all",
+      "randomModel": "gpt"
+    },
+    {
+      "query": "提取这段文本中的关键信息并以表格形式呈现",
+      "expectedCategory": "structured",
+      "detectedCategory": "structured",
+      "match": true,
+      "routingRule": "structured_output",
+      "preferredModels": [
+        "gemini-flash-lite",
+        "gpt-5-all",
+        "claude-sonnet-4-all",
+        "hunyuan-turbos-latest"
+      ],
+      "firstModel": "gpt-5-all",
+      "randomModel": "qvq-plus"
+    },
+    {
+      "query": "Hello, how are you today?",
+      "expectedCategory": "default",
+      "detectedCategory": "default",
+      "match": true,
+      "routingRule": "basic",
+      "preferredModels": [],
+      "firstModel": "gpt-5-all",
+      "randomModel": "claude-sonnet-4-all"
+    },
+    {
+      "query": "计算 234 * 567 的结果",
+      "expectedCategory": "math",
+      "detectedCategory": "math",
+      "match": true,
+      "routingRule": "reasoning_tasks",
+      "preferredModels": [
+        "gemini-flash-lite",
+        "deepseek-reasoner",
+        "claude-sonnet-4-all",
+        "hunyuan-t1-latest"
+      ],
+      "firstModel": "gpt-5-all",
+      "randomModel": "hunyuan-t1-latest"
+    }
+  ]
+}
